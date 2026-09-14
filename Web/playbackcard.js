@@ -58,6 +58,22 @@
         const styleElement = document.createElement('style');
         styleElement.id = CONFIG.STYLES_ID;
         styleElement.textContent = `
+            :root {
+                /* Liquid Glass Physics & Elevation Tokens (LiquidGlass-UI, GlinUI, OpenGlass) */
+                --lg-ease: cubic-bezier(0.16, 1, 0.3, 1);
+                --lg-duration: 0.24s;
+                --lg-specular-top: inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
+                --lg-specular-left: inset 1px 0 0 0 rgba(255, 255, 255, 0.08);
+                --lg-specular-bottom: inset 0 -1px 0 0 rgba(255, 255, 255, 0.03);
+                --lg-depth-shadow: 0 24px 52px -8px rgba(0, 0, 0, 0.88), 0 8px 24px -4px rgba(0, 0, 0, 0.6);
+                --lg-card-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.94) 100%), #090a10;
+                --lg-card-border: 1px solid rgba(255, 255, 255, 0.09);
+                --lg-chip-bg: rgba(255, 255, 255, 0.04);
+                --lg-chip-border: 1px solid rgba(255, 255, 255, 0.08);
+                --lg-control-bg: rgba(255, 255, 255, 0.06);
+                --lg-control-border: 1px solid rgba(255, 255, 255, 0.12);
+            }
+
             /* Container & Activity Banner */
             #${CONFIG.CONTAINER_ID} {
                 width: 100%;
@@ -78,12 +94,12 @@
                 gap: 12px;
                 padding: 12px 18px;
                 margin-bottom: 20px;
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
-                backdrop-filter: blur(24px) saturate(190%) contrast(105%);
-                -webkit-backdrop-filter: blur(24px) saturate(190%) contrast(105%);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+                background: linear-gradient(155deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
+                backdrop-filter: blur(28px) saturate(180%) contrast(105%);
+                -webkit-backdrop-filter: blur(28px) saturate(180%) contrast(105%);
+                border: 1px solid rgba(255, 255, 255, 0.09);
+                border-radius: 14px;
+                box-shadow: var(--lg-specular-top), var(--lg-specular-left), 0 8px 32px 0 rgba(0, 0, 0, 0.5);
             }
 
             .tautulli-activity-left {
@@ -163,42 +179,46 @@
             }
 
             .tautulli-tool-btn {
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: var(--lg-control-bg);
+                border: var(--lg-control-border);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
                 color: #cbd5e1;
-                border-radius: 7px;
-                padding: 5px 10px;
+                border-radius: 8px;
+                padding: 5px 11px;
                 font-size: 11px;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                backdrop-filter: blur(8px);
-                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                transition: all var(--lg-duration) var(--lg-ease);
             }
 
             .tautulli-tool-btn:hover {
-                background: rgba(255, 255, 255, 0.14);
-                border-color: rgba(255, 255, 255, 0.2);
+                background: rgba(255, 255, 255, 0.15);
+                border-color: rgba(255, 255, 255, 0.25);
                 color: #ffffff;
-                transform: scale(1.04);
+                transform: translateY(-1px) scale(1.02);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.35);
             }
 
             .tautulli-tool-btn.active {
                 background: rgba(0, 164, 220, 0.25);
                 border-color: rgba(0, 164, 220, 0.55);
                 color: #00c9ff;
-                box-shadow: 0 0 12px rgba(0, 164, 220, 0.3);
+                box-shadow: 0 0 14px rgba(0, 164, 220, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             }
 
             .tautulli-filter-group {
                 display: flex;
                 align-items: center;
                 gap: 4px;
-                background: rgba(0, 0, 0, 0.35);
-                padding: 2.5px;
-                border-radius: 9px;
+                background: rgba(0, 0, 0, 0.4);
+                padding: 3px;
+                border-radius: 10px;
                 border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
             }
 
             .tautulli-filter-pill {
@@ -207,10 +227,10 @@
                 color: #94a3b8;
                 font-size: 11px;
                 font-weight: 600;
-                padding: 3px 8px;
-                border-radius: 6px;
+                padding: 3.5px 9px;
+                border-radius: 7px;
                 cursor: pointer;
-                transition: all 0.2s ease;
+                transition: all var(--lg-duration) ease;
             }
 
             .tautulli-filter-pill:hover {
@@ -222,7 +242,7 @@
                 background: rgba(56, 189, 248, 0.2);
                 color: #38bdf8;
                 border: 1px solid rgba(56, 189, 248, 0.45);
-                box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             }
 
             /* Responsive Session Grid */
@@ -234,25 +254,25 @@
                 box-sizing: border-box;
             }
 
-            /* Session Card - 2026 Executive Studio Canvas */
+            /* Session Card - 2026 Executive Studio Canvas with Liquid Glass Physics */
             .tautulli-card {
                 position: relative;
                 display: flex;
                 flex-direction: column;
-                border-radius: 16px;
+                border-radius: 18px;
                 overflow: hidden;
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.005) 100%), #090a10;
-                backdrop-filter: blur(32px) saturate(190%) contrast(105%);
-                -webkit-backdrop-filter: blur(32px) saturate(190%) contrast(105%);
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 0 rgba(255, 255, 255, 0.02), 0 20px 48px -12px rgba(0, 0, 0, 0.85);
-                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
+                background: var(--lg-card-bg);
+                backdrop-filter: blur(32px) saturate(185%) contrast(105%);
+                -webkit-backdrop-filter: blur(32px) saturate(185%) contrast(105%);
+                border: var(--lg-card-border);
+                box-shadow: var(--lg-specular-top), var(--lg-specular-left), var(--lg-specular-bottom), var(--lg-depth-shadow);
+                transition: transform var(--lg-duration) var(--lg-ease), box-shadow var(--lg-duration) var(--lg-ease), border-color var(--lg-duration) ease;
             }
 
             .tautulli-card:hover {
                 transform: translateY(-2px);
-                border-color: rgba(56, 189, 248, 0.3);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), 0 24px 56px -12px rgba(0, 0, 0, 0.92), 0 0 20px -4px rgba(56, 189, 248, 0.15);
+                border-color: rgba(56, 189, 248, 0.35);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.28), inset 1px 0 0 0 rgba(255, 255, 255, 0.12), 0 28px 64px -10px rgba(0, 0, 0, 0.94), 0 0 24px -4px rgba(56, 189, 248, 0.18);
             }
 
             /* Moonfin Dynamic Ambient Glass Layer */
@@ -294,11 +314,12 @@
                 align-items: center;
                 justify-content: space-between;
                 gap: 10px;
-                padding: 9px 14px;
-                background: rgba(9, 10, 16, 0.65);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
+                padding: 10px 15px;
+                background: rgba(9, 10, 16, 0.68);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(20px) saturate(160%);
+                -webkit-backdrop-filter: blur(20px) saturate(160%);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
             }
 
             .tautulli-user-strip {
@@ -445,34 +466,36 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                background: var(--lg-control-bg);
+                border: var(--lg-control-border);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 2px 6px rgba(0, 0, 0, 0.35);
                 color: #94a3b8;
                 cursor: pointer;
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
-                transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                transition: all var(--lg-duration) var(--lg-ease);
             }
 
             .tautulli-action-btn:hover {
-                background: rgba(255, 255, 255, 0.14);
-                border-color: rgba(255, 255, 255, 0.22);
+                background: rgba(255, 255, 255, 0.15);
+                border-color: rgba(255, 255, 255, 0.28);
                 color: #ffffff;
-                transform: scale(1.06);
+                transform: translateY(-1px) scale(1.04);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.22), 0 4px 12px rgba(0, 0, 0, 0.5);
             }
 
             .tautulli-action-btn-kill:hover {
-                background: rgba(239, 68, 68, 0.2);
-                border-color: rgba(239, 68, 68, 0.5);
+                background: rgba(239, 68, 68, 0.22);
+                border-color: rgba(239, 68, 68, 0.55);
                 color: #f87171;
-                box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+                box-shadow: 0 0 12px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             }
 
             .tautulli-action-btn-info:hover {
-                background: rgba(56, 189, 248, 0.18);
-                border-color: rgba(56, 189, 248, 0.45);
+                background: rgba(56, 189, 248, 0.2);
+                border-color: rgba(56, 189, 248, 0.5);
                 color: #38bdf8;
-                box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             }
 
             .tautulli-action-btn svg {
@@ -726,22 +749,24 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 5px;
-                padding: 3px 7.5px;
-                border-radius: 6px;
-                background: rgba(255, 255, 255, 0.035);
-                border: 1px solid rgba(255, 255, 255, 0.07);
+                padding: 3.5px 8px;
+                border-radius: 7px;
+                background: var(--lg-chip-bg);
+                border: var(--lg-chip-border);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
                 font-size: 11px;
                 color: #cbd5e1;
                 font-variant-numeric: tabular-nums;
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
-                transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+                backdrop-filter: blur(12px) saturate(140%);
+                -webkit-backdrop-filter: blur(12px) saturate(140%);
+                transition: background var(--lg-duration) ease, border-color var(--lg-duration) ease, color var(--lg-duration) ease, transform var(--lg-duration) var(--lg-ease);
             }
 
             .tautulli-chip:hover {
-                background: rgba(255, 255, 255, 0.06);
-                border-color: rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.075);
+                border-color: rgba(255, 255, 255, 0.16);
                 color: #f8fafc;
+                transform: translateY(-0.5px);
             }
 
             .tautulli-chip strong {
@@ -800,14 +825,15 @@
             .tautulli-card-footer {
                 position: relative;
                 z-index: 1;
-                padding: 9px 14px 11px 14px;
-                background: rgba(9, 10, 16, 0.8);
-                border-top: 1px solid rgba(255, 255, 255, 0.04);
+                padding: 10px 15px 12px 15px;
+                background: rgba(9, 10, 16, 0.82);
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
                 display: flex;
                 flex-direction: column;
-                gap: 5px;
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
+                gap: 6px;
+                backdrop-filter: blur(20px) saturate(160%);
+                -webkit-backdrop-filter: blur(20px) saturate(160%);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
             }
 
             .tautulli-progress-row {
@@ -991,14 +1017,16 @@
                 max-width: 600px;
                 max-height: 88vh;
                 overflow-y: auto;
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: linear-gradient(145deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.98) 100%), #090a10;
+                border: 1px solid rgba(255, 255, 255, 0.15);
                 border-radius: 20px;
-                box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+                backdrop-filter: blur(36px) saturate(190%) contrast(105%);
+                -webkit-backdrop-filter: blur(36px) saturate(190%) contrast(105%);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.25), inset 1px 0 0 0 rgba(255, 255, 255, 0.1), 0 32px 72px -8px rgba(0, 0, 0, 0.95);
                 color: #e2e8f0;
-                padding: 22px;
+                padding: 24px;
                 box-sizing: border-box;
-                animation: tautulli-modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+                animation: tautulli-modal-pop var(--lg-duration) var(--lg-ease);
             }
 
             @keyframes tautulli-modal-pop {
