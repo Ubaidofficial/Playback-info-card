@@ -82,6 +82,13 @@
 - **Privacy mode**: One-click toggle to mask IPs and usernames for screenshots or live demos
 - **Stream filters**: Filter by All, Transcode, WAN, or Paused sessions
 
+### Tautulli-Inspired "10x Better" Suite
+- **Bitrate Compression Efficiency Ratio & Bandwidth Savings Pill**: Automatically computes real-time original-to-transcode bandwidth compression ratios (e.g. `10:1 (90% Bandwidth Saved)`) to showcase server bandwidth savings.
+- **Enhanced Connection Types (CELLULAR vs WAN vs LAN)**: Precision network indicator that distinguishes mobile cellular streams (`CELLULAR` with antenna icon) from home broadband (`WAN`) and local network (`LAN`).
+- **Dedicated Audiophile Music Mode**: Custom spinning vinyl record turntable animation, live animated 4-band equalizer soundwave spectrum, and Hi-Res studio quality badges (`Hi-Res 96kHz 24-bit FLAC`).
+- **SyncPlay / Watch Party Clustering**: Cross-session tracking that groups concurrent watchers into a unified cluster (`SyncPlay (X Members)`).
+- **Collapsible Watch Statistics Mini-Drawer**: Integrated server activity leaderboards ranking Top Watched TV Series and Top Watched Movies with play counts and artwork, accessible even when 0 streams are active.
+
 ### Navigation & Media Support
 - **Deep navigation links**: Click poster or title to open media details; click username for user settings
 - **Audio / Music mode**: Full support for music streams with Artist, Album, Sample Rate, and codec display (FLAC, MP3, etc.)
