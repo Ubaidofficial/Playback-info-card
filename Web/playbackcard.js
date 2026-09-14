@@ -219,10 +219,10 @@
             }
 
             .tautulli-filter-pill.active {
-                background: rgba(0, 164, 220, 0.28);
-                color: #00c9ff;
-                border: 1px solid rgba(0, 164, 220, 0.5);
-                box-shadow: 0 0 10px rgba(0, 164, 220, 0.25);
+                background: rgba(56, 189, 248, 0.2);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.45);
+                box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
             }
 
             /* Responsive Session Grid */
@@ -234,25 +234,25 @@
                 box-sizing: border-box;
             }
 
-            /* Session Card - Void Obsidian Glass + Moonfin Liquid Architecture */
+            /* Session Card - 2026 Executive Studio Canvas */
             .tautulli-card {
                 position: relative;
                 display: flex;
                 flex-direction: column;
-                border-radius: 18px;
+                border-radius: 16px;
                 overflow: hidden;
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.01) 100%), #090a10;
-                backdrop-filter: blur(28px) saturate(190%) contrast(105%);
-                -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(105%);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 0 rgba(255, 255, 255, 0.02), 0 18px 46px -10px rgba(0, 0, 0, 0.75);
-                transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease;
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.005) 100%), #090a10;
+                backdrop-filter: blur(32px) saturate(190%) contrast(105%);
+                -webkit-backdrop-filter: blur(32px) saturate(190%) contrast(105%);
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 0 rgba(255, 255, 255, 0.02), 0 20px 48px -12px rgba(0, 0, 0, 0.85);
+                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
             }
 
             .tautulli-card:hover {
                 transform: translateY(-2px);
-                border-color: rgba(0, 198, 255, 0.35);
-                box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.24), 0 22px 52px -10px rgba(0, 0, 0, 0.82), 0 0 24px -4px rgba(0, 198, 255, 0.18);
+                border-color: rgba(56, 189, 248, 0.3);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), 0 24px 56px -12px rgba(0, 0, 0, 0.92), 0 0 20px -4px rgba(56, 189, 248, 0.15);
             }
 
             /* Moonfin Dynamic Ambient Glass Layer */
@@ -264,8 +264,8 @@
                 height: 150%;
                 background-size: cover;
                 background-position: center;
-                filter: blur(54px) saturate(190%) brightness(0.22);
-                opacity: 0.55;
+                filter: blur(50px) saturate(180%) brightness(0.2);
+                opacity: 0.45;
                 pointer-events: none;
                 z-index: 0;
             }
@@ -279,7 +279,7 @@
                 height: 100%;
                 background-size: cover;
                 background-position: center right;
-                opacity: 0.35;
+                opacity: 0.32;
                 pointer-events: none;
                 z-index: 0;
                 mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 25%, rgba(0, 0, 0, 0.95) 60%, black 100%);
@@ -294,11 +294,11 @@
                 align-items: center;
                 justify-content: space-between;
                 gap: 10px;
-                padding: 10px 14px;
-                background: rgba(9, 10, 16, 0.72);
-                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
+                padding: 9px 14px;
+                background: rgba(9, 10, 16, 0.65);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
             }
 
             .tautulli-user-strip {
@@ -326,9 +326,9 @@
                 font-size: 11px;
                 font-weight: 700;
                 color: #ffffff;
-                background: linear-gradient(135deg, #e91e63, #9c27b0);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 8px rgba(0, 0, 0, 0.5);
             }
 
             .tautulli-user-avatar img {
@@ -441,38 +441,38 @@
             .tautulli-action-btn {
                 width: 26px;
                 height: 26px;
-                border-radius: 8px;
+                border-radius: 7px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: rgba(255, 255, 255, 0.07);
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 color: #94a3b8;
                 cursor: pointer;
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .tautulli-action-btn:hover {
-                background: rgba(255, 255, 255, 0.18);
-                border-color: rgba(255, 255, 255, 0.28);
+                background: rgba(255, 255, 255, 0.14);
+                border-color: rgba(255, 255, 255, 0.22);
                 color: #ffffff;
-                transform: scale(1.08);
+                transform: scale(1.06);
             }
 
             .tautulli-action-btn-kill:hover {
-                background: rgba(239, 68, 68, 0.25);
-                border-color: rgba(239, 68, 68, 0.6);
+                background: rgba(239, 68, 68, 0.2);
+                border-color: rgba(239, 68, 68, 0.5);
                 color: #f87171;
-                box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+                box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
             }
 
             .tautulli-action-btn-info:hover {
-                background: rgba(0, 164, 220, 0.25);
-                border-color: rgba(0, 164, 220, 0.55);
-                color: #00c9ff;
-                box-shadow: 0 0 12px rgba(0, 164, 220, 0.35);
+                background: rgba(56, 189, 248, 0.18);
+                border-color: rgba(56, 189, 248, 0.45);
+                color: #38bdf8;
+                box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
             }
 
             .tautulli-action-btn svg {
@@ -488,7 +488,7 @@
                 display: flex;
                 gap: 14px;
                 padding: 14px;
-                background: rgba(0, 0, 0, 0.22);
+                background: rgba(0, 0, 0, 0.18);
                 min-height: 155px;
             }
 
@@ -502,7 +502,7 @@
                 overflow: hidden;
                 background: rgba(10, 10, 15, 0.9);
                 border: 1px solid rgba(255, 255, 255, 0.1);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+                box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.7);
                 flex-shrink: 0;
                 cursor: pointer;
                 text-decoration: none;
@@ -517,8 +517,8 @@
             }
 
             .tautulli-poster-wrapper:hover .tautulli-poster-img {
-                transform: scale(1.06);
-                filter: brightness(1.08);
+                transform: scale(1.05);
+                filter: brightness(1.06);
             }
 
             .tautulli-poster-fallback {
@@ -567,7 +567,7 @@
                 font-weight: 700;
                 color: #ffffff;
                 text-decoration: none;
-                letter-spacing: -0.015em;
+                letter-spacing: -0.02em;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 white-space: nowrap;
@@ -575,7 +575,7 @@
             }
 
             .tautulli-title-primary:hover {
-                color: #00c9ff;
+                color: #38bdf8;
             }
 
             .tautulli-title-secondary {
@@ -591,12 +591,12 @@
             .tautulli-rating-badge {
                 padding: 1px 5px;
                 border-radius: 4px;
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.14);
+                background: rgba(255, 255, 255, 0.07);
+                border: 1px solid rgba(255, 255, 255, 0.12);
                 font-size: 9.5px;
-                font-weight: 600;
+                font-weight: 700;
                 color: #cbd5e1;
-                letter-spacing: 0.02em;
+                letter-spacing: 0.04em;
                 line-height: 1.2;
             }
 
@@ -604,107 +604,117 @@
             .tautulli-badge-row {
                 display: flex;
                 align-items: center;
-                gap: 6px;
+                gap: 5px;
                 flex-wrap: wrap;
             }
 
             .tautulli-badge {
                 display: inline-flex;
                 align-items: center;
-                gap: 4px;
-                padding: 2.5px 8px;
+                gap: 5px;
+                padding: 2.5px 7.5px;
                 border-radius: 9999px;
                 font-size: 9.5px;
                 font-weight: 700;
                 text-transform: uppercase;
                 letter-spacing: 0.04em;
                 line-height: 1.3;
-                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+            }
+
+            .tautulli-live-dot {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: currentColor;
+                display: inline-block;
+                box-shadow: 0 0 6px currentColor;
+                flex-shrink: 0;
             }
 
             .tautulli-badge-directplay {
-                background: linear-gradient(180deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.12) 100%);
+                background: rgba(16, 185, 129, 0.12);
                 color: #34d399;
-                border: 1px solid rgba(16, 185, 129, 0.4);
-                box-shadow: 0 0 10px -2px rgba(16, 185, 129, 0.3);
+                border: 1px solid rgba(16, 185, 129, 0.28);
             }
 
             .tautulli-badge-directstream {
-                background: linear-gradient(180deg, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0.12) 100%);
+                background: rgba(56, 189, 248, 0.12);
                 color: #38bdf8;
-                border: 1px solid rgba(56, 189, 248, 0.4);
-                box-shadow: 0 0 10px -2px rgba(56, 189, 248, 0.3);
+                border: 1px solid rgba(56, 189, 248, 0.28);
             }
 
             .tautulli-badge-transcode {
-                background: linear-gradient(180deg, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.12) 100%);
-                color: #f87171;
-                border: 1px solid rgba(239, 68, 68, 0.45);
-                box-shadow: 0 0 12px -2px rgba(239, 68, 68, 0.35);
+                background: rgba(239, 68, 68, 0.12);
+                color: #fca5a5;
+                border: 1px solid rgba(239, 68, 68, 0.28);
             }
 
             .tautulli-badge-hw {
-                background: linear-gradient(180deg, rgba(168, 85, 247, 0.28) 0%, rgba(168, 85, 247, 0.14) 100%);
+                background: rgba(168, 85, 247, 0.12);
                 color: #d8b4fe;
-                border: 1px solid rgba(168, 85, 247, 0.45);
-                box-shadow: 0 0 12px -2px rgba(168, 85, 247, 0.3);
+                border: 1px solid rgba(168, 85, 247, 0.28);
             }
 
             .tautulli-badge-sw {
-                background: linear-gradient(180deg, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.12) 100%);
-                color: #fbbf24;
-                border: 1px solid rgba(245, 158, 11, 0.45);
-                box-shadow: 0 0 10px -2px rgba(245, 158, 11, 0.25);
+                background: rgba(245, 158, 11, 0.12);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.28);
             }
 
             .tautulli-speed-good {
                 color: #34d399;
-                background: rgba(16, 185, 129, 0.14);
-                border: 1px solid rgba(16, 185, 129, 0.3);
+                background: rgba(16, 185, 129, 0.12);
+                border: 1px solid rgba(16, 185, 129, 0.25);
             }
 
             .tautulli-speed-slow {
-                color: #f87171;
-                background: rgba(239, 68, 68, 0.15);
-                border: 1px solid rgba(239, 68, 68, 0.35);
+                color: #fca5a5;
+                background: rgba(239, 68, 68, 0.12);
+                border: 1px solid rgba(239, 68, 68, 0.28);
             }
 
             .tautulli-badge-burnin {
-                background: rgba(245, 158, 11, 0.22);
-                color: #fbbf24;
-                border: 1px solid rgba(245, 158, 11, 0.45);
-                box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+                background: rgba(245, 158, 11, 0.14);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.3);
             }
 
             .tautulli-badge-hdr {
-                background: linear-gradient(180deg, rgba(245, 158, 11, 0.28) 0%, rgba(245, 158, 11, 0.14) 100%);
-                color: #fbbf24;
-                border: 1px solid rgba(245, 158, 11, 0.5);
-                box-shadow: 0 0 10px -2px rgba(245, 158, 11, 0.35);
+                background: rgba(255, 255, 255, 0.04);
+                color: #fcd34d;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
             }
 
             .tautulli-badge-res {
-                background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.06) 100%);
+                background: rgba(255, 255, 255, 0.04);
                 color: #f1f5f9;
-                border: 1px solid rgba(255, 255, 255, 0.28);
-                box-shadow: 0 0 8px rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
             }
 
             .tautulli-badge-audio {
-                background: linear-gradient(180deg, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0.14) 100%);
-                color: #a5b4fc;
-                border: 1px solid rgba(99, 102, 241, 0.45);
-                box-shadow: 0 0 10px -2px rgba(99, 102, 241, 0.35);
+                background: rgba(255, 255, 255, 0.04);
+                color: #c7d2fe;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
             }
 
             .tautulli-badge-surround {
-                background: linear-gradient(180deg, rgba(14, 165, 233, 0.28) 0%, rgba(14, 165, 233, 0.12) 100%);
-                color: #7dd3fc;
-                border: 1px solid rgba(14, 165, 233, 0.45);
-                box-shadow: 0 0 10px -2px rgba(14, 165, 233, 0.3);
+                background: rgba(255, 255, 255, 0.04);
+                color: #bae6fd;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
             }
 
-            /* Stream Pipeline Chips (Diskovarr dashboard precision) */
+            /* Stream Pipeline Chips (Diskovarr dashboard precision with vector glyphs) */
             .tautulli-pipeline-grid {
                 display: flex;
                 flex-wrap: wrap;
@@ -716,35 +726,54 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 5px;
-                padding: 3px 8px;
+                padding: 3px 7.5px;
                 border-radius: 6px;
-                background: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.035);
+                border: 1px solid rgba(255, 255, 255, 0.07);
                 font-size: 11px;
                 color: #cbd5e1;
                 font-variant-numeric: tabular-nums;
                 backdrop-filter: blur(8px);
                 -webkit-backdrop-filter: blur(8px);
+                transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+            }
+
+            .tautulli-chip:hover {
+                background: rgba(255, 255, 255, 0.06);
+                border-color: rgba(255, 255, 255, 0.12);
+                color: #f8fafc;
             }
 
             .tautulli-chip strong {
                 color: #ffffff;
-                font-weight: 700;
+                font-weight: 600;
                 letter-spacing: 0.015em;
             }
 
             .tautulli-chip-icon {
-                font-size: 11px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 12px;
+                height: 12px;
+                flex-shrink: 0;
+                color: #94a3b8;
+            }
+
+            .tautulli-chip-icon svg {
+                width: 100%;
+                height: 100%;
+                fill: currentColor;
             }
 
             /* Transcode Reason Banner */
             .tautulli-reason-banner {
                 font-size: 10.5px;
-                color: #fcd34d;
-                background: rgba(245, 158, 11, 0.1);
-                border: 1px solid rgba(245, 158, 11, 0.25);
+                color: rgba(253, 230, 138, 0.9);
+                background: rgba(245, 158, 11, 0.08);
+                border: 1px solid rgba(245, 158, 11, 0.2);
                 border-radius: 6px;
-                padding: 3.5px 8px;
+                padding: 3px 8px;
                 display: flex;
                 align-items: center;
                 gap: 6px;
@@ -754,7 +783,10 @@
             }
 
             .tautulli-reason-label {
+                font-size: 9.5px;
                 font-weight: 700;
+                letter-spacing: 0.05em;
+                color: #fbbf24;
                 flex-shrink: 0;
             }
 
@@ -768,14 +800,14 @@
             .tautulli-card-footer {
                 position: relative;
                 z-index: 1;
-                padding: 10px 14px 12px 14px;
-                background: rgba(9, 10, 16, 0.9);
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
+                padding: 9px 14px 11px 14px;
+                background: rgba(9, 10, 16, 0.8);
+                border-top: 1px solid rgba(255, 255, 255, 0.04);
                 display: flex;
                 flex-direction: column;
-                gap: 6px;
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
+                gap: 5px;
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
             }
 
             .tautulli-progress-row {
@@ -793,37 +825,38 @@
                 min-width: 24px;
                 border-radius: 50%;
                 background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.1);
                 color: #ffffff;
                 cursor: pointer;
-                transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease;
+                transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease;
             }
 
             .tautulli-state-icon:hover {
-                transform: scale(1.12);
-                background: rgba(255, 255, 255, 0.15);
+                transform: scale(1.1);
+                background: rgba(255, 255, 255, 0.14);
             }
 
             .tautulli-state-icon svg {
-                width: 13px;
-                height: 13px;
+                width: 12px;
+                height: 12px;
                 fill: currentColor;
             }
 
             .tautulli-state-playing {
                 color: #34d399;
+                box-shadow: 0 0 10px rgba(52, 211, 153, 0.15);
             }
 
             .tautulli-state-paused {
                 color: #fbbf24;
+                box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
             }
 
             .tautulli-progress-track {
                 flex: 1;
                 height: 4px;
                 border-radius: 9999px;
-                background: rgba(255, 255, 255, 0.09);
-                overflow: hidden;
+                background: rgba(255, 255, 255, 0.08);
                 position: relative;
             }
 
@@ -832,7 +865,7 @@
                 top: 0;
                 left: 0;
                 height: 100%;
-                background: rgba(255, 255, 255, 0.22);
+                background: rgba(255, 255, 255, 0.18);
                 border-radius: 9999px;
                 transition: width 0.35s ease;
                 z-index: 1;
@@ -843,31 +876,32 @@
                 z-index: 2;
                 height: 100%;
                 border-radius: 9999px;
-                background: linear-gradient(90deg, #0072ff 0%, #00c6ff 100%);
-                box-shadow: 0 0 12px rgba(0, 198, 255, 0.85), 0 0 4px #0072ff;
+                background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
+                box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
                 transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .tautulli-progress-fill::after {
                 content: '';
                 position: absolute;
-                right: -2px;
+                right: -4px;
                 top: 50%;
                 transform: translateY(-50%);
-                width: 7px;
-                height: 7px;
+                width: 8px;
+                height: 8px;
                 border-radius: 50%;
                 background: #ffffff;
-                box-shadow: 0 0 8px #00e5ff, 0 0 3px #ffffff;
+                box-shadow: 0 0 8px #38bdf8, 0 0 2px #ffffff;
+                z-index: 3;
             }
 
             .tautulli-progress-fill.paused {
                 background: linear-gradient(90deg, #d97706 0%, #fbbf24 100%);
-                box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+                box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
             }
 
             .tautulli-progress-fill.paused::after {
-                box-shadow: 0 0 8px #fbbf24, 0 0 3px #ffffff;
+                box-shadow: 0 0 8px #fbbf24, 0 0 2px #ffffff;
             }
 
             .tautulli-time-row {
@@ -886,15 +920,15 @@
 
             .tautulli-time-eta {
                 font-weight: 700;
-                color: #00c9ff;
+                color: #38bdf8;
                 letter-spacing: 0.02em;
-                text-shadow: 0 0 10px rgba(0, 201, 255, 0.4);
+                text-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
             }
 
             .tautulli-time-paused {
                 color: #fbbf24;
                 font-weight: 700;
-                text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+                text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
             }
 
             /* Empty State Container */
@@ -1013,9 +1047,9 @@
             }
 
             .tautulli-modal-tool-btn:hover {
-                background: rgba(0, 164, 220, 0.22);
-                border-color: rgba(0, 164, 220, 0.5);
-                color: #00c9ff;
+                background: rgba(56, 189, 248, 0.18);
+                border-color: rgba(56, 189, 248, 0.45);
+                color: #38bdf8;
                 transform: scale(1.03);
             }
 
@@ -1048,7 +1082,7 @@
                 font-weight: 700;
                 text-transform: uppercase;
                 letter-spacing: 0.06em;
-                color: #00c9ff;
+                color: #38bdf8;
                 margin-bottom: 8px;
                 display: flex;
                 align-items: center;
@@ -1438,19 +1472,26 @@
     }
 
     /**
-     * Generates a stable color from a username string for the avatar fallback.
+     * Generates a stable executive dark-mode gradient for avatar fallback initials.
      */
     function getAvatarColor(name) {
-        if (!name) return '#e91e63';
+        if (!name) return 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)';
         let hash = 0;
         for (let i = 0; i < name.length; i++) {
             hash = name.charCodeAt(i) + ((hash << 5) - hash);
         }
-        const colors = [
-            '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
-            '#2196f3', '#009688', '#4caf50', '#ff9800', '#f44336'
+        const gradients = [
+            'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)', // deep sapphire
+            'linear-gradient(135deg, #0e7490 0%, #083344 100%)', // dark cyan
+            'linear-gradient(135deg, #065f46 0%, #022c22 100%)', // dark emerald
+            'linear-gradient(135deg, #3730a3 0%, #1e1b4b 100%)', // dark indigo
+            'linear-gradient(135deg, #5b21b6 0%, #2e1065 100%)', // dark violet
+            'linear-gradient(135deg, #0369a1 0%, #082f49 100%)', // dark sky
+            'linear-gradient(135deg, #115e59 0%, #042f2e 100%)', // dark teal
+            'linear-gradient(135deg, #92400e 0%, #451a03 100%)', // dark amber
+            'linear-gradient(135deg, #334155 0%, #0f172a 100%)'  // dark slate
         ];
-        return colors[Math.abs(hash) % colors.length];
+        return gradients[Math.abs(hash) % gradients.length];
     }
 
     /**
@@ -1461,135 +1502,135 @@
 
         if (combined.includes('apple tv') || combined.includes('appletv')) {
             return {
-                bg: '#000000',
-                color: '#ffffff',
+                bg: 'rgba(255, 255, 255, 0.08)',
+                color: '#f8fafc',
                 title: 'Apple TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('webos') || combined.includes('lg')) {
             return {
-                bg: '#a50034',
-                color: '#ffffff',
+                bg: 'rgba(165, 0, 52, 0.25)',
+                color: '#fda4af',
                 title: 'LG webOS TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('tizen') || combined.includes('samsung')) {
             return {
-                bg: '#0f79af',
-                color: '#ffffff',
+                bg: 'rgba(15, 121, 175, 0.25)',
+                color: '#7dd3fc',
                 title: 'Samsung Tizen TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('playstation') || combined.includes('ps4') || combined.includes('ps5')) {
             return {
-                bg: '#003791',
-                color: '#ffffff',
+                bg: 'rgba(0, 55, 145, 0.3)',
+                color: '#93c5fd',
                 title: 'PlayStation',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H9v2H7v-2H5v-2h2V9h2v2h2v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
             };
         }
         if (combined.includes('xbox')) {
             return {
-                bg: '#107c10',
-                color: '#ffffff',
+                bg: 'rgba(16, 124, 16, 0.25)',
+                color: '#86efac',
                 title: 'Xbox Console',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.88 15.53c-1.04.52-2.39.84-3.88.84s-2.84-.32-3.88-.84c-.45-.23-.84-.5-1.19-.8 1.13-1.01 2.99-2.36 5.07-2.36s3.94 1.35 5.07 2.36c-.35.3-.74.57-1.19.8zm2.4-2.28c-.89-.92-2.28-1.99-4.28-2.58 1.62-.97 3.39-1.28 4.14-1.34.46 1.19.64 2.52.14 3.92zm-12.56 0c-.5-1.4-.32-2.73.14-3.92.75.06 2.52.37 4.14 1.34-2 .59-3.39 1.66-4.28 2.58z"/></svg>`
             };
         }
         if (combined.includes('swiftfin')) {
             return {
-                bg: '#00a4dc',
-                color: '#ffffff',
+                bg: 'rgba(0, 164, 220, 0.25)',
+                color: '#38bdf8',
                 title: 'Swiftfin Client',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>`
             };
         }
         if (combined.includes('infuse')) {
             return {
-                bg: '#ff4b3a',
-                color: '#ffffff',
+                bg: 'rgba(255, 75, 58, 0.25)',
+                color: '#fca5a5',
                 title: 'Infuse Player',
                 svg: `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`
             };
         }
         if (combined.includes('kodi')) {
             return {
-                bg: '#17b2e7',
-                color: '#ffffff',
+                bg: 'rgba(23, 178, 231, 0.25)',
+                color: '#7dd3fc',
                 title: 'Kodi Media Center',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 3.83L18.17 12 12 18.17 5.83 12 12 5.83z"/></svg>`
             };
         }
         if (combined.includes('android') || combined.includes('pixel') || combined.includes('shield')) {
             return {
-                bg: '#3ddc84',
-                color: '#000000',
+                bg: 'rgba(61, 220, 132, 0.22)',
+                color: '#6ee7b7',
                 title: 'Android / Google TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`
             };
         }
         if (combined.includes('safari')) {
             return {
-                bg: '#00a4dc',
-                color: '#ffffff',
+                bg: 'rgba(0, 164, 220, 0.22)',
+                color: '#38bdf8',
                 title: 'Apple Safari',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-3.5l2.79-6.29 6.29-2.79-2.79 6.29-6.29 2.79zm4.25-4.25c-.41.41-.41 1.09 0 1.5s1.09.41 1.5 0 .41-1.09 0-1.5-1.09-.41-1.5 0z"/></svg>`
             };
         }
         if (combined.includes('apple') || combined.includes('ios') || combined.includes('macos') || combined.includes('iphone') || combined.includes('ipad')) {
             return {
-                bg: '#1c1c1e',
-                color: '#ffffff',
+                bg: 'rgba(255, 255, 255, 0.08)',
+                color: '#f8fafc',
                 title: 'Apple / iOS / macOS',
                 svg: `<svg viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.87c.66-.82 1.11-1.96.99-3.1-.96.04-2.12.65-2.8 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.13-.47 2.79-1.29z"/></svg>`
             };
         }
         if (combined.includes('fire') || combined.includes('amazon')) {
             return {
-                bg: '#ff9900',
-                color: '#111111',
+                bg: 'rgba(255, 153, 0, 0.25)',
+                color: '#fcd34d',
                 title: 'Amazon Fire TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('chrome')) {
             return {
-                bg: '#ea4335',
-                color: '#ffffff',
+                bg: 'rgba(234, 67, 53, 0.22)',
+                color: '#fca5a5',
                 title: 'Google Chrome',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`
             };
         }
         if (combined.includes('firefox')) {
             return {
-                bg: '#ff7139',
-                color: '#ffffff',
+                bg: 'rgba(255, 113, 57, 0.22)',
+                color: '#fdba74',
                 title: 'Mozilla Firefox',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
             };
         }
         if (combined.includes('edg')) {
             return {
-                bg: '#0078d7',
-                color: '#ffffff',
+                bg: 'rgba(0, 120, 215, 0.25)',
+                color: '#7dd3fc',
                 title: 'Microsoft Edge',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
             };
         }
         if (combined.includes('roku')) {
             return {
-                bg: '#662d91',
-                color: '#ffffff',
+                bg: 'rgba(102, 45, 145, 0.3)',
+                color: '#d8b4fe',
                 title: 'Roku',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         return {
-            bg: '#00a4dc',
-            color: '#ffffff',
+            bg: 'rgba(255, 255, 255, 0.06)',
+            color: '#94a3b8',
             title: client || 'Web Player',
             svg: `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`
         };
@@ -1855,7 +1896,7 @@
         if (isHdr) {
             let hdrName = 'HDR';
             if (videoRange.includes('DOVI') || (videoStream.Title && videoStream.Title.toUpperCase().includes('DV'))) {
-                hdrName = '✨ Dolby Vision';
+                hdrName = 'Dolby Vision';
             } else if (videoRange.includes('HDR10+') || videoRange.includes('HDR10PLUS')) {
                 hdrName = 'HDR10+';
             } else if (videoRange.includes('HDR10')) {
@@ -2084,14 +2125,14 @@
     function renderSessionCard(card) {
         // Stream Badge
         let badgeClass = 'tautulli-badge-directplay';
-        let badgeLabel = 'Direct Play';
+        let badgeLabel = '<span class="tautulli-live-dot"></span>Direct Play';
 
         if (card.isTranscode) {
             badgeClass = 'tautulli-badge-transcode';
-            badgeLabel = card.isThrottled ? 'Transcode (Throttled)' : 'Transcode';
+            badgeLabel = card.isThrottled ? '<span class="tautulli-live-dot"></span>Transcode (Throttled)' : '<span class="tautulli-live-dot"></span>Transcode';
         } else if (card.isDirectStream) {
             badgeClass = 'tautulli-badge-directstream';
-            badgeLabel = 'Direct Stream';
+            badgeLabel = '<span class="tautulli-live-dot"></span>Direct Stream';
         }
 
         // Hardware Acceleration / Software Transcode Badge
@@ -2113,7 +2154,7 @@
         // Subtitle Burn-In warning badge
         let burnInHtml = '';
         if (card.isSubtitleBurnIn) {
-            burnInHtml = `<span class="tautulli-badge tautulli-badge-burnin" title="Subtitle format forcing transcode">⚠️ Sub Burn-In</span>`;
+            burnInHtml = `<span class="tautulli-badge tautulli-badge-burnin" title="Subtitle format forcing transcode">Sub Burn-In</span>`;
         }
 
         // Transcode Reasons banner HTML
@@ -2122,7 +2163,7 @@
             const reasonsText = card.transcodeReasons.map(formatTranscodeReason).join(', ');
             reasonsBannerHtml = `
                 <div class="tautulli-reason-banner" title="Transcoding trigger: ${escapeHtml(reasonsText)}">
-                    <span class="tautulli-reason-label">ℹ️ Transcode Reason:</span>
+                    <span class="tautulli-reason-label">REASON</span>
                     <span class="tautulli-reason-val">${escapeHtml(reasonsText)}</span>
                 </div>
             `;
@@ -2187,7 +2228,8 @@
 
                     <div class="tautulli-header-controls">
                         <span class="tautulli-network-pill ${card.isLan ? 'tautulli-net-lan' : 'tautulli-net-wan'}" title="Network endpoint">
-                            ${card.isLan ? '🔒 LAN' : 'WAN'} ${escapeHtml(card.locationDisplay)}
+                            <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;">${card.isLan ? '<path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>' : '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>'}</svg>
+                            ${card.isLan ? 'LAN' : 'WAN'} • ${escapeHtml(card.locationDisplay)}
                         </span>
                         ${card.platformBadge ? `
                         <div class="tautulli-platform-badge" style="background: ${card.platformBadge.bg}; color: ${card.platformBadge.color};" title="${escapeHtml(card.platformBadge.title)}">
@@ -2234,11 +2276,11 @@
                                 ${card.resBadge ? `<span class="tautulli-badge tautulli-badge-res" title="Source Resolution">${escapeHtml(card.resBadge)}</span>` : ''}
                                 ${hwBadgeHtml}
                                 ${speedHtml}
-                                ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow" title="Transcode speed < 1.0x! Client will experience buffering.">⚠️ Buffering (&lt;1.0x)</span>` : ''}
+                                ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow" title="Transcode speed < 1.0x! Client will experience buffering."><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>BUFFERING (&lt;1.0x)</span>` : ''}
                                 ${card.hdrBadge ? `<span class="tautulli-badge tautulli-badge-hdr" title="High Dynamic Range">${escapeHtml(card.hdrBadge)}</span>` : ''}
                                 ${card.audioBadge ? `<span class="tautulli-badge tautulli-badge-audio" title="High Fidelity Audio">${escapeHtml(card.audioBadge)}</span>` : ''}
                                 ${card.audioChannelsBadge ? `<span class="tautulli-badge tautulli-badge-surround" title="Audio Channels">${escapeHtml(card.audioChannelsBadge)}</span>` : ''}
-                                ${card.isMuted ? `<span class="tautulli-badge" style="background:rgba(239,68,68,0.22);color:#f87171;border:1px solid rgba(239,68,68,0.45);" title="Player is muted">🔇 Muted</span>` : ''}
+                                ${card.isMuted ? `<span class="tautulli-badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);" title="Player is muted"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>MUTED</span>` : ''}
                                 ${burnInHtml}
                             </div>
                         </div>
@@ -2246,24 +2288,24 @@
                         <!-- Stream Pipeline Chips -->
                         <div class="tautulli-pipeline-grid">
                             <div class="tautulli-chip" title="Video stream specs: ${escapeHtml(card.videoDisplay)}">
-                                <span class="tautulli-chip-icon">🎬</span>
+                                <span class="tautulli-chip-icon"><svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></span>
                                 <span>${escapeHtml(card.videoChip)}</span>
                             </div>
                             <div class="tautulli-chip" title="Audio stream specs: ${escapeHtml(card.audioDisplay)}">
-                                <span class="tautulli-chip-icon">🔊</span>
+                                <span class="tautulli-chip-icon"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></span>
                                 <span>${escapeHtml(card.audioChip)}</span>
                             </div>
                             <div class="tautulli-chip" title="Container format: ${escapeHtml(card.containerDisplay)}">
-                                <span class="tautulli-chip-icon">📦</span>
+                                <span class="tautulli-chip-icon"><svg viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg></span>
                                 <span>${escapeHtml(card.containerChip)}</span>
                             </div>
                             <div class="tautulli-chip" title="Bandwidth & Quality: ${escapeHtml(card.qualityDisplay)}">
-                                <span class="tautulli-chip-icon">⚡</span>
+                                <span class="tautulli-chip-icon"><svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg></span>
                                 <span><strong>${escapeHtml(card.bandwidthDisplay)}</strong></span>
                             </div>
                             ${card.subChip ? `
                             <div class="tautulli-chip" title="Subtitle stream: ${escapeHtml(card.subtitleDisplay)}">
-                                <span class="tautulli-chip-icon">💬</span>
+                                <span class="tautulli-chip-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6zm0 4h8v2H6zm10 0h2v2h-2zm-6-4h8v2h-8z"/></svg></span>
                                 <span>${escapeHtml(card.subChip)}</span>
                             </div>` : ''}
                         </div>
@@ -2390,9 +2432,9 @@
                     ${totalStreams > 1 ? `
                     <div class="tautulli-filter-group">
                         <button class="tautulli-filter-pill ${currentFilter === 'all' ? 'active' : ''}" data-action="set-filter" data-filter="all">All (${totalStreams})</button>
-                        ${transcodeCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'transcode' ? 'active' : ''}" data-action="set-filter" data-filter="transcode">⚡ Transcode (${transcodeCount})</button>` : ''}
-                        ${wanCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'wan' ? 'active' : ''}" data-action="set-filter" data-filter="wan">🌐 WAN (${wanCount})</button>` : ''}
-                        ${pausedCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'paused' ? 'active' : ''}" data-action="set-filter" data-filter="paused">⏸ Paused (${pausedCount})</button>` : ''}
+                        ${transcodeCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'transcode' ? 'active' : ''}" data-action="set-filter" data-filter="transcode">Transcode (${transcodeCount})</button>` : ''}
+                        ${wanCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'wan' ? 'active' : ''}" data-action="set-filter" data-filter="wan">WAN (${wanCount})</button>` : ''}
+                        ${pausedCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'paused' ? 'active' : ''}" data-action="set-filter" data-filter="paused">Paused (${pausedCount})</button>` : ''}
                     </div>` : ''}
                 </div>
 
@@ -2470,7 +2512,8 @@
         modal.innerHTML = `
             <div class="tautulli-modal-header">
                 <div class="tautulli-modal-title">
-                    <span>📊 Stream Diagnostics &amp; Telemetry</span>
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                    <span>Stream Diagnostics &amp; Telemetry</span>
                 </div>
                 <div class="tautulli-modal-header-actions">
                     <button class="tautulli-modal-tool-btn" data-action="copy-telemetry" title="Copy raw session telemetry to clipboard">
@@ -2486,7 +2529,8 @@
             <!-- Media Source Telemetry -->
             <div class="tautulli-modal-section">
                 <div class="tautulli-modal-section-title">
-                    <span>🎬 Media Source Specs</span>
+                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                    <span>Media Source Specs</span>
                 </div>
                 <table class="tautulli-modal-table">
                     <tr><td>Media Title</td><td>${escapeHtml(card.primaryTitle)}</td></tr>
@@ -2503,7 +2547,8 @@
             <!-- Audio & Subtitles -->
             <div class="tautulli-modal-section">
                 <div class="tautulli-modal-section-title">
-                    <span>🔊 Audio &amp; Subtitle Specs</span>
+                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                    <span>Audio &amp; Subtitle Specs</span>
                 </div>
                 <table class="tautulli-modal-table">
                     <tr><td>Audio Stream</td><td>${escapeHtml(card.audioDisplay)}</td></tr>
@@ -2511,7 +2556,7 @@
                     ${card.audioBitRate ? `<tr><td>Audio Bitrate</td><td>${escapeHtml(card.audioBitRate)}</td></tr>` : ''}
                     ${card.audioBadge ? `<tr><td>Audio Fidelity</td><td><span style="color:#a5b4fc;font-weight:700;">${escapeHtml(card.audioBadge)}</span></td></tr>` : ''}
                     <tr><td>Subtitle Stream</td><td>${escapeHtml(card.subtitleDisplay)}</td></tr>
-                    ${card.isSubtitleBurnIn ? `<tr><td>Subtitle Burn-In</td><td><span style="color:#fbbf24;font-weight:700;">⚠️ Yes (Requires Transcode)</span></td></tr>` : ''}
+                    ${card.isSubtitleBurnIn ? `<tr><td>Subtitle Burn-In</td><td><span style="color:#fbbf24;font-weight:700;">Active (Subtitles Forcing Transcode)</span></td></tr>` : ''}
                 </table>
             </div>
 
@@ -2519,7 +2564,8 @@
             ${card.isTranscode ? `
             <div class="tautulli-modal-section">
                 <div class="tautulli-modal-section-title">
-                    <span style="color:#f87171;">⚡ Transcode Pipeline</span>
+                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+                    <span style="color:#f87171;">Transcode Pipeline</span>
                 </div>
                 <table class="tautulli-modal-table">
                     <tr><td>Hardware Acceleration</td><td>${escapeHtml(card.hwAccelBadge || (card.isSwTranscode ? 'Software (CPU)' : 'None'))}</td></tr>
@@ -2533,14 +2579,15 @@
             <!-- Client & Player -->
             <div class="tautulli-modal-section">
                 <div class="tautulli-modal-section-title">
-                    <span>📱 Client &amp; Network</span>
+                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M4 6h16v10H4V6zm16 12H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2zm-8 1.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5z"/></svg>
+                    <span>Client &amp; Network</span>
                 </div>
                 <table class="tautulli-modal-table">
                     <tr><td>User Account</td><td>${escapeHtml(card.userName)}</td></tr>
                     <tr><td>Device Name</td><td>${escapeHtml(card.player)}</td></tr>
                     <tr><td>Client App</td><td>${escapeHtml(card.product)}</td></tr>
-                    <tr><td>Network Endpoint</td><td>${card.isLan ? '🔒 LAN' : '🌐 WAN'} ${escapeHtml(card.locationDisplay)}</td></tr>
-                    ${card.isMuted ? `<tr><td>Audio State</td><td><span style="color:#f87171;font-weight:700;">🔇 Muted</span></td></tr>` : ''}
+                    <tr><td>Network Endpoint</td><td>${card.isLan ? 'LAN' : 'WAN'} • ${escapeHtml(card.locationDisplay)}</td></tr>
+                    ${card.isMuted ? `<tr><td>Audio State</td><td><span style="color:#f87171;font-weight:700;">Muted</span></td></tr>` : ''}
                     ${card.volumeLevel != null ? `<tr><td>Volume Level</td><td>${card.volumeLevel}%</td></tr>` : ''}
                     <tr><td>Session ID</td><td style="font-size:10px;word-break:break-all;">${escapeHtml(card.sessionId)}</td></tr>
                 </table>
