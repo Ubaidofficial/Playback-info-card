@@ -8,6 +8,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,6 +18,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
@@ -34,6 +39,51 @@ jobs:
         cp plugin.json output/
         cd output && zip -r ../jellyfin-plugin-playbackcard.zip .
 
+    - name: Compute Checksum & Update Manifest
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        TAG_NAME="${GITHUB_REF#refs/tags/}"
+        RAW_VER="${TAG_NAME#v}"
+        VERSION="${RAW_VER}.0"
+        CHECKSUM=$(md5sum jellyfin-plugin-playbackcard.zip | awk '{print $1}')
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        node -e "
+          const fs = require('fs');
+          const manifest = [
+            {
+              guid: 'b7e6f831-2794-4d82-8419-7c48ef2e2a39',
+              name: 'Playback Info Card',
+              description: 'Real-time, Tautulli-inspired visual monitoring grid injected directly into the Jellyfin Admin Dashboard.',
+              overview: 'Transient live monitoring displaying real-time session telemetry, direct play vs transcode status, transcode reasons, stream bandwidth, and ETA.',
+              owner: 'Ubaidofficial',
+              category: 'General',
+              versions: [
+                {
+                  version: '${VERSION}',
+                  changelog: 'Release ${TAG_NAME}',
+                  targetAbi: '10.9.0.0',
+                  sourceUrl: 'https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard/releases/download/${TAG_NAME}/jellyfin-plugin-playbackcard.zip',
+                  checksum: '${CHECKSUM}',
+                  timestamp: '${TIMESTAMP}'
+                }
+              ]
+            }
+          ];
+          fs.writeFileSync('manifest.json', JSON.stringify(manifest, null, 2) + '\n');
+        "
+        cat manifest.json
+
+    - name: Commit Updated Manifest to Main
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git checkout main
+        git add manifest.json
+        git commit -m "chore(release): update manifest.json for ${GITHUB_REF#refs/tags/}" || echo "No changes to commit"
+        git push origin main || echo "Push skipped"
+
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
       with:
@@ -44,6 +94,8 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
-        files: jellyfin-plugin-playbackcard.zip
+        files: |
+          jellyfin-plugin-playbackcard.zip
+          manifest.json
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

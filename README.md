@@ -57,28 +57,41 @@ Operating strictly in-memory and transiently, it writes zero data to disk or dat
 - [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - Jellyfin Media Server 10.9+ or v12+
 
-### Build from Source
-```bash
-# Clone the repository
-git clone https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard.git
-cd jellyfin-plugin-playbackcard
+### Method 1: Direct Install via Jellyfin Plugin Repository (Recommended)
 
-# Compile in Release configuration
-dotnet build -c Release
-```
+Install and receive automatic updates directly inside the Jellyfin Web UI:
 
-### Manual Installation
-1. Locate your Jellyfin server's `plugins` directory (e.g., `/var/lib/jellyfin/plugins` on Linux, or `%ProgramData%\Jellyfin\Server\plugins` on Windows).
-2. Create a folder named `PlaybackCard`:
+1. In your Jellyfin Web interface, go to **Dashboard > Plugins > Repositories**.
+2. Click the **+** button to add a repository.
+3. Enter:
+   - **Repository Name**: `Playback Info Card`
+   - **Repository URL**: `https://raw.githubusercontent.com/Ubaidofficial/jellyfin-plugin-playbackcard/main/manifest.json`
+4. Click **Save**.
+5. Switch to the **Catalog** tab under Plugins.
+6. Locate **Playback Info Card**, click **Install**, and choose the latest version.
+7. Restart your Jellyfin Server.
+
+---
+
+### Method 2: Manual Installation (Release ZIP)
+1. Download `jellyfin-plugin-playbackcard.zip` from the [GitHub Releases](https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard/releases).
+2. Locate your Jellyfin server's `plugins` directory (e.g., `/var/lib/jellyfin/plugins` on Linux, or `%ProgramData%\Jellyfin\Server\plugins` on Windows).
+3. Create a folder named `PlaybackCard`:
    ```bash
    mkdir -p /var/lib/jellyfin/plugins/PlaybackCard
    ```
-3. Copy the compiled DLL into the directory:
-   ```bash
-   cp bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll /var/lib/jellyfin/plugins/PlaybackCard/
-   ```
-4. Restart your Jellyfin server.
-5. Log into the Jellyfin Web UI with an administrator account and navigate to **Dashboard** (`/dashboard.html`). The live monitoring grid will appear at the very top of your dashboard.
+4. Extract `Jellyfin.Plugin.PlaybackCard.dll` and `plugin.json` into that directory.
+5. Restart your Jellyfin server.
+
+---
+
+### Method 3: Build from Source
+```bash
+git clone https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard.git
+cd jellyfin-plugin-playbackcard
+dotnet build -c Release
+```
+Copy the compiled DLL (`bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll`) into your Jellyfin `plugins/PlaybackCard/` directory and restart the server.
 
 ---
 
