@@ -1,16 +1,23 @@
 /**
- * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard)
+ * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.1.0
  * 
- * Injects a real-time, Tautulli-inspired visual monitoring grid directly into
+ * Injects a real-time, Tautulli & Jellywatch-inspired visual monitoring grid directly into
  * the Jellyfin Admin Dashboard (/dashboard.html / .dashboardForm).
  * 
- * Features:
+ * Enhanced Features:
  * - Real-time polling of ApiClient.getSessions() every 3 seconds.
+ * - Hardware Acceleration Badges (NVENC, QuickSync, VAAPI, VideoToolbox, AMF vs SW Transcode).
+ * - Transcode Performance Metrics (Transcode FPS & real-time playback speed multiplier).
+ * - Paused Stream Timer (Counts up paused duration to detect resource locks).
+ * - Subtitle Burn-In Diagnostic Badges (Identifies forced transcode causes like PGS/VOBSUB).
+ * - Interactive Session Controls (Kill Stream, Send Message to Device, Pause/Resume).
+ * - Bandwidth Breakdown in Activity Banner (Total Bandwidth, LAN Bandwidth, WAN Upload).
+ * - Admin Privacy Mode (1-click toggle to mask IPs and usernames for screenshots/streaming).
+ * - Deep-Navigation Links (Click poster/title to open media details, click user for user settings).
+ * - Audio/Music Mode support (Artist, Album, Sample Rate, FLAC/MP3).
  * - Strict memory leak prevention with viewshow/viewhide/viewdestroy lifecycle management.
  * - Isolated DOM rendering (zero scroll reset, zero global state mutation).
  * - Liquid Glass aesthetic with backdrop blur, sleek dark translucent panes, and ambient glow.
- * - Exact Tautulli split-card anatomy: Media poster, telemetry data grid, ETA calculations,
- *   color-coded stream badges, transcode reasons, neon seam progress bar, and user avatar.
  */
 
 (function () {
@@ -25,7 +32,8 @@
         COLOR_DIRECT_PLAY: '#2ecc71',
         COLOR_DIRECT_STREAM: '#3498db',
         COLOR_TRANSCODE: '#e74c3c',
-        COLOR_PAUSED: '#f39c12'
+        COLOR_PAUSED: '#f39c12',
+        COLOR_HW: '#bb86fc'
     };
 
     // State management
@@ -33,9 +41,11 @@
     let isDashboardActive = false;
     let isFetching = false;
     let lastRenderedHash = '';
+    let isPrivacyMode = false;
+    const sessionPausedTimestamps = new Map(); // sessionId -> timestamp when pause was first detected
 
     /**
-     * Injects custom CSS styling for the Liquid Glass theme and Tautulli card anatomy.
+     * Injects custom CSS styling for the Liquid Glass theme and Tautulli/Jellywatch card anatomy.
      */
     function injectStyles() {
         if (document.getElementById(CONFIG.STYLES_ID)) {
@@ -60,7 +70,7 @@
                 align-items: center;
                 justify-content: space-between;
                 flex-wrap: wrap;
-                gap: 10px;
+                gap: 12px;
                 padding: 10px 16px;
                 margin-bottom: 16px;
                 background: rgba(20, 20, 20, 0.7);
@@ -69,6 +79,13 @@
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 8px;
                 box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            }
+
+            .tautulli-activity-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
             }
 
             .tautulli-activity-title {
@@ -101,13 +118,44 @@
                 color: #a0a0a0;
                 display: flex;
                 align-items: center;
-                gap: 16px;
+                gap: 12px;
                 flex-wrap: wrap;
             }
 
             .tautulli-activity-stat-highlight {
                 color: #ffffff;
                 font-weight: 600;
+            }
+
+            .tautulli-activity-tools {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .tautulli-tool-btn {
+                background: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #cccccc;
+                border-radius: 6px;
+                padding: 4px 8px;
+                font-size: 11px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                transition: all 0.2s ease;
+            }
+
+            .tautulli-tool-btn:hover {
+                background: rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+            }
+
+            .tautulli-tool-btn.active {
+                background: rgba(0, 164, 220, 0.25);
+                border-color: rgba(0, 164, 220, 0.5);
+                color: #00c9ff;
             }
 
             /* Responsive Session Grid */
@@ -165,6 +213,7 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                cursor: pointer;
             }
 
             .tautulli-poster-img {
@@ -172,6 +221,11 @@
                 height: 100%;
                 object-fit: cover;
                 display: block;
+                transition: transform 0.3s ease;
+            }
+
+            .tautulli-poster-wrapper:hover .tautulli-poster-img {
+                transform: scale(1.04);
             }
 
             .tautulli-poster-fallback {
@@ -204,13 +258,20 @@
                 overflow: hidden;
             }
 
-            /* Platform Badge (Top-Right) */
-            .tautulli-platform-badge {
+            /* Top-Right Platform Badge & Quick Actions */
+            .tautulli-card-header-actions {
                 position: absolute;
                 top: 10px;
                 right: 12px;
-                width: 28px;
-                height: 28px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                z-index: 2;
+            }
+
+            .tautulli-platform-badge {
+                width: 26px;
+                height: 26px;
                 border-radius: 6px;
                 display: flex;
                 align-items: center;
@@ -218,12 +279,42 @@
                 background: rgba(0, 164, 220, 0.2);
                 border: 1px solid rgba(0, 164, 220, 0.4);
                 color: #00a4dc;
-                z-index: 2;
             }
 
             .tautulli-platform-badge svg {
-                width: 16px;
-                height: 16px;
+                width: 15px;
+                height: 15px;
+                fill: currentColor;
+            }
+
+            .tautulli-action-btn {
+                width: 26px;
+                height: 26px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: #cccccc;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .tautulli-action-btn:hover {
+                background: rgba(255, 255, 255, 0.18);
+                color: #ffffff;
+            }
+
+            .tautulli-action-btn-kill:hover {
+                background: rgba(231, 76, 60, 0.3);
+                border-color: rgba(231, 76, 60, 0.6);
+                color: #ff6b6b;
+            }
+
+            .tautulli-action-btn svg {
+                width: 14px;
+                height: 14px;
                 fill: currentColor;
             }
 
@@ -237,7 +328,7 @@
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                padding-right: 32px;
+                padding-right: 68px; /* space for actions */
             }
 
             .tautulli-lbl {
@@ -260,9 +351,10 @@
                 display: flex;
                 align-items: center;
                 gap: 6px;
+                flex-wrap: nowrap;
             }
 
-            /* Play Method & Reason Badges */
+            /* Badges */
             .tautulli-badge {
                 display: inline-flex;
                 align-items: center;
@@ -294,12 +386,49 @@
                 border: 1px solid rgba(231, 76, 60, 0.35);
             }
 
+            .tautulli-badge-hw {
+                background: rgba(155, 89, 182, 0.2);
+                color: ${CONFIG.COLOR_HW};
+                border: 1px solid rgba(155, 89, 182, 0.45);
+                font-size: 9.5px;
+            }
+
+            .tautulli-badge-sw {
+                background: rgba(230, 126, 34, 0.2);
+                color: #f39c12;
+                border: 1px solid rgba(230, 126, 34, 0.45);
+                font-size: 9.5px;
+            }
+
             .tautulli-badge-reason {
                 background: rgba(243, 156, 18, 0.15);
                 color: #f39c12;
                 border: 1px solid rgba(243, 156, 18, 0.3);
-                font-size: 9.5px;
+                font-size: 9px;
                 padding: 1px 5px;
+            }
+
+            .tautulli-badge-burnin {
+                background: rgba(231, 76, 60, 0.2);
+                color: #ff7675;
+                border: 1px solid rgba(231, 76, 60, 0.4);
+                font-size: 9px;
+                padding: 1px 5px;
+            }
+
+            .tautulli-speed-tag {
+                font-size: 10px;
+                font-weight: 600;
+                padding: 1px 5px;
+                border-radius: 4px;
+            }
+            .tautulli-speed-good {
+                color: #2ecc71;
+                background: rgba(46, 204, 113, 0.1);
+            }
+            .tautulli-speed-slow {
+                color: #e74c3c;
+                background: rgba(231, 76, 60, 0.15);
             }
 
             /* Floating Time & ETA Overlay */
@@ -320,6 +449,11 @@
                 font-weight: 600;
                 color: #00c9ff;
                 letter-spacing: 0.04em;
+            }
+
+            .tautulli-time-paused {
+                color: ${CONFIG.COLOR_PAUSED};
+                font-weight: 700;
             }
 
             .tautulli-time-progress {
@@ -370,6 +504,12 @@
                 height: 22px;
                 min-width: 22px;
                 color: #ffffff;
+                cursor: pointer;
+                transition: transform 0.2s ease;
+            }
+
+            .tautulli-state-icon:hover {
+                transform: scale(1.15);
             }
 
             .tautulli-state-icon svg {
@@ -400,6 +540,12 @@
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                text-decoration: none;
+                cursor: pointer;
+            }
+
+            .tautulli-title-primary:hover {
+                color: #00c9ff;
             }
 
             .tautulli-title-secondary {
@@ -424,6 +570,8 @@
                 align-items: center;
                 gap: 8px;
                 min-width: fit-content;
+                cursor: pointer;
+                text-decoration: none;
             }
 
             .tautulli-user-avatar {
@@ -458,6 +606,10 @@
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+            }
+
+            .tautulli-user-badge:hover .tautulli-user-name {
+                color: #ffffff;
             }
 
             /* Empty State Container */
@@ -535,10 +687,13 @@
     }
 
     /**
-     * Formats estimated finish time (ETA) based on remaining seconds.
+     * Formats estimated finish time (ETA) or paused timer duration.
      */
-    function formatETA(remainingSeconds, isPaused) {
+    function formatETA(remainingSeconds, isPaused, pausedSeconds) {
         if (isPaused) {
+            if (pausedSeconds > 0) {
+                return `Paused (${formatDuration(pausedSeconds)})`;
+            }
             return 'ETA: Paused';
         }
         if (!remainingSeconds || remainingSeconds <= 0) {
@@ -572,11 +727,24 @@
      */
     function formatTranscodeReason(reason) {
         if (!reason) return 'Transcoding';
-        // Convert camelCase or PascalCase to spaced words
         return reason
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, (s) => s.toUpperCase())
             .trim();
+    }
+
+    /**
+     * Formats Hardware Acceleration engine names.
+     */
+    function formatHwAccel(hwType) {
+        if (!hwType) return null;
+        const lower = hwType.toLowerCase();
+        if (lower.includes('nvenc') || lower.includes('nvidia')) return 'HW: NVENC';
+        if (lower.includes('qsv') || lower.includes('quicksync')) return 'HW: QuickSync';
+        if (lower.includes('vaapi')) return 'HW: VAAPI';
+        if (lower.includes('videotoolbox') || lower.includes('apple')) return 'HW: VideoToolbox';
+        if (lower.includes('amf') || lower.includes('amd')) return 'HW: AMF';
+        return `HW: ${hwType.toUpperCase()}`;
     }
 
     /**
@@ -602,18 +770,14 @@
         const combined = `${client || ''} ${deviceName || ''}`.toLowerCase();
 
         if (combined.includes('android')) {
-            // Android robot icon
             return `<svg viewBox="0 0 24 24"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`;
         }
         if (combined.includes('apple') || combined.includes('safari') || combined.includes('ios') || combined.includes('macos')) {
-            // Apple / Safari Compass icon
             return `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-3.5l2.79-6.29 6.29-2.79-2.79 6.29-6.29 2.79zm4.25-4.25c-.41.41-.41 1.09 0 1.5s1.09.41 1.5 0 .41-1.09 0-1.5-1.09-.41-1.5 0z"/></svg>`;
         }
         if (combined.includes('fire') || combined.includes('tv') || combined.includes('roku') || combined.includes('shield')) {
-            // TV Screen icon
             return `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`;
         }
-        // Generic Web / Monitor icon
         return `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`;
     }
 
@@ -624,7 +788,6 @@
         if (!window.ApiClient || !session.NowPlayingItem) return null;
         const item = session.NowPlayingItem;
 
-        // Try item's own Primary tag
         if (item.PrimaryImageTag) {
             return window.ApiClient.getImageUrl(item.Id, {
                 type: 'Primary',
@@ -632,8 +795,6 @@
                 tag: item.PrimaryImageTag
             });
         }
-
-        // For TV episodes, fallback to Series Primary image
         if (item.SeriesId && item.SeriesPrimaryImageTag) {
             return window.ApiClient.getImageUrl(item.SeriesId, {
                 type: 'Primary',
@@ -641,8 +802,13 @@
                 tag: item.SeriesPrimaryImageTag
             });
         }
-
-        // Fallback to backdrop image if available
+        if (item.AlbumId && item.AlbumPrimaryImageTag) {
+            return window.ApiClient.getImageUrl(item.AlbumId, {
+                type: 'Primary',
+                maxHeight: 400,
+                tag: item.AlbumPrimaryImageTag
+            });
+        }
         if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
             return window.ApiClient.getImageUrl(item.Id, {
                 type: 'Backdrop',
@@ -650,7 +816,6 @@
                 tag: item.BackdropImageTags[0]
             });
         }
-
         return null;
     }
 
@@ -670,9 +835,87 @@
     }
 
     /**
-     * Maps raw Jellyfin session data into Tautulli card view model.
+     * Interactive Action: Stop / Kill Stream (Jellywatch & Tautulli flagship feature)
      */
-    function mapSessionToCardModel(session) {
+    async function handleKillStream(sessionId, userName, mediaTitle) {
+        if (!window.ApiClient) return;
+        const confirmMsg = `Terminate active playback for ${userName} (${mediaTitle})?`;
+        if (!window.confirm(confirmMsg)) {
+            return;
+        }
+
+        try {
+            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
+                await window.ApiClient.sendPlaystateCommand(sessionId, 'Stop');
+            } else if (typeof window.ApiClient.ajax === 'function') {
+                await window.ApiClient.ajax({
+                    type: 'POST',
+                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/Stop`)
+                });
+            }
+            // Trigger an immediate refresh
+            fetchAndRenderSessions();
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to stop session:', err);
+            alert('Could not terminate session. Please check admin permissions.');
+        }
+    }
+
+    /**
+     * Interactive Action: Send On-Screen Message to Player (Jellywatch feature)
+     */
+    async function handleSendMessage(sessionId, userName) {
+        if (!window.ApiClient) return;
+        const msg = window.prompt(`Send on-screen message to ${userName}:`, 'Server restart in 5 minutes.');
+        if (!msg || !msg.trim()) {
+            return;
+        }
+
+        try {
+            if (typeof window.ApiClient.ajax === 'function') {
+                await window.ApiClient.ajax({
+                    type: 'POST',
+                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Message`),
+                    data: JSON.stringify({
+                        Text: msg.trim(),
+                        Header: 'Server Notice',
+                        TimeoutMs: 7000
+                    }),
+                    contentType: 'application/json'
+                });
+                alert(`Message sent to ${userName}.`);
+            }
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to send message to session:', err);
+            alert('Could not send message to client.');
+        }
+    }
+
+    /**
+     * Interactive Action: Toggle Play/Pause on client session
+     */
+    async function handleTogglePlayPause(sessionId, isCurrentlyPaused) {
+        if (!window.ApiClient) return;
+        const command = isCurrentlyPaused ? 'Unpause' : 'Pause';
+        try {
+            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
+                await window.ApiClient.sendPlaystateCommand(sessionId, command);
+            } else if (typeof window.ApiClient.ajax === 'function') {
+                await window.ApiClient.ajax({
+                    type: 'POST',
+                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/${command}`)
+                });
+            }
+            fetchAndRenderSessions();
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to toggle playstate:', err);
+        }
+    }
+
+    /**
+     * Maps raw Jellyfin session data into Tautulli/Jellywatch card view model.
+     */
+    function mapSessionToCardModel(session, index) {
         const item = session.NowPlayingItem || {};
         const playState = session.PlayState || {};
         const transcodeInfo = session.TranscodingInfo || null;
@@ -683,11 +926,40 @@
         let isDirectStream = playMethod === 'DirectStream';
         let isTranscode = playMethod === 'Transcode' || (!isDirectPlay && !isDirectStream && transcodeInfo != null);
 
+        // Hardware Acceleration detection (NVENC, QuickSync, VAAPI, VideoToolbox vs SW)
+        let hwAccelBadge = null;
+        let isSwTranscode = false;
+        if (isTranscode && transcodeInfo) {
+            if (transcodeInfo.HardwareAccelerationType) {
+                hwAccelBadge = formatHwAccel(transcodeInfo.HardwareAccelerationType);
+            } else if (transcodeInfo.IsVideoDirect === false) {
+                isSwTranscode = true;
+            }
+        }
+
+        // Transcode Speed & FPS
+        let transcodeFps = null;
+        let transcodeSpeedMultiplier = null;
+        if (isTranscode && transcodeInfo && transcodeInfo.Framerate) {
+            transcodeFps = Math.round(transcodeInfo.Framerate);
+            // Default target video fps around 24-30
+            const nominalFps = 24.0;
+            transcodeSpeedMultiplier = (transcodeInfo.Framerate / nominalFps).toFixed(1);
+        }
+
         // Codec & Media stream parsing
         const mediaStreams = item.MediaStreams || [];
         const videoStream = mediaStreams.find((s) => s.Type === 'Video') || {};
         const audioStream = mediaStreams.find((s) => s.Type === 'Audio' && (playState.AudioStreamIndex == null || s.Index === playState.AudioStreamIndex)) || {};
         const subStream = mediaStreams.find((s) => s.Type === 'Subtitle' && s.Index === playState.SubtitleStreamIndex) || null;
+
+        // Subtitle Burn-In check
+        let isSubtitleBurnIn = false;
+        if (isTranscode && transcodeInfo && transcodeInfo.TranscodeReasons) {
+            if (transcodeInfo.TranscodeReasons.includes('SubtitleCodecNotSupported')) {
+                isSubtitleBurnIn = true;
+            }
+        }
 
         // Container
         const origContainer = (item.Container || 'MKV').toUpperCase();
@@ -740,16 +1012,19 @@
             : `Original (${formatBitrate(currentBitrate)})`;
         const bandwidthDisplay = formatBitrate(currentBitrate);
 
-        // Location
+        // Location & IP Privacy
         const rawIp = session.RemoteEndPoint || '127.0.0.1';
         const isLan = isLanIp(rawIp);
         const cleanIp = rawIp.split(':')[0];
-        const locationDisplay = `${isLan ? '🔒 LAN' : 'WAN'}: ${cleanIp}`;
+        let locationDisplay = `${isLan ? '🔒 LAN' : 'WAN'}: ${cleanIp}`;
+        if (isPrivacyMode) {
+            locationDisplay = `${isLan ? '🔒 LAN' : 'WAN'}: [Protected]`;
+        }
 
         // Transcode Reasons
         const transcodeReasons = (transcodeInfo && transcodeInfo.TranscodeReasons) || [];
 
-        // Timing & Progress
+        // Timing & Paused tracking
         const positionTicks = playState.PositionTicks || 0;
         const runTimeTicks = item.RunTimeTicks || 0;
         const progressRatio = runTimeTicks > 0 ? Math.min(1, Math.max(0, positionTicks / runTimeTicks)) : 0;
@@ -759,22 +1034,46 @@
         const totalSeconds = Math.floor(runTimeTicks / 10000000);
         const remainingSeconds = Math.max(0, totalSeconds - currentSeconds);
 
-        const timeProgressStr = `${formatDuration(currentSeconds)} / ${formatDuration(totalSeconds)}`;
-        const etaStr = formatETA(remainingSeconds, playState.IsPaused);
+        // Track pause duration
+        let pausedDurationSeconds = 0;
+        if (playState.IsPaused) {
+            if (!sessionPausedTimestamps.has(session.Id)) {
+                sessionPausedTimestamps.set(session.Id, Date.now());
+            }
+            const startTime = sessionPausedTimestamps.get(session.Id);
+            pausedDurationSeconds = Math.floor((Date.now() - startTime) / 1000);
+        } else {
+            sessionPausedTimestamps.delete(session.Id);
+        }
 
-        // Titles
+        const timeProgressStr = `${formatDuration(currentSeconds)} / ${formatDuration(totalSeconds)}`;
+        const etaStr = formatETA(remainingSeconds, playState.IsPaused, pausedDurationSeconds);
+
+        // Titles & Navigation
         let primaryTitle = item.Name || 'Unknown Title';
         let secondaryTitle = item.ProductionYear ? String(item.ProductionYear) : '';
+        const isAudioItem = item.Type === 'Audio';
 
         if (item.Type === 'Episode') {
             primaryTitle = item.SeriesName || item.Name;
             const seasonNum = item.ParentIndexNumber || 1;
             const episodeNum = item.IndexNumber || 1;
             secondaryTitle = `S${seasonNum}:E${episodeNum} · ${item.Name}`;
+        } else if (isAudioItem) {
+            primaryTitle = item.Name;
+            const artists = (item.Artists || []).join(', ') || item.AlbumArtist || 'Artist';
+            secondaryTitle = `${artists} · ${item.Album || 'Single'}`;
+        }
+
+        let displayName = session.UserName || 'User';
+        if (isPrivacyMode) {
+            displayName = `User #${index + 1}`;
         }
 
         return {
             sessionId: session.Id,
+            itemId: item.Id,
+            userId: session.UserId,
             product: session.Client || 'Jellyfin Web',
             player: session.DeviceName || 'Browser',
             qualityDisplay,
@@ -783,25 +1082,33 @@
             isDirectStream,
             isTranscode,
             isThrottled: Boolean(transcodeInfo && transcodeInfo.IsThrottled),
+            hwAccelBadge,
+            isSwTranscode,
+            transcodeFps,
+            transcodeSpeedMultiplier,
+            isSubtitleBurnIn,
             transcodeReasons,
             containerDisplay,
             videoDisplay,
             audioDisplay,
             subtitleDisplay,
             locationDisplay,
+            isLan,
             bandwidthDisplay,
             bandwidthNumber: currentBitrate,
             etaStr,
             timeProgressStr,
             progressPercent,
             isPaused: Boolean(playState.IsPaused),
+            pausedDurationSeconds,
             primaryTitle,
             secondaryTitle,
-            userName: session.UserName || 'User',
+            userName: displayName,
             posterUrl: getPosterUrl(session),
             userAvatarUrl: getUserAvatarUrl(session),
             client: session.Client,
-            deviceName: session.DeviceName
+            deviceName: session.DeviceName,
+            isAudioItem
         };
     }
 
@@ -819,6 +1126,28 @@
         } else if (card.isDirectStream) {
             badgeClass = 'tautulli-badge-directstream';
             badgeLabel = 'Direct Stream';
+        }
+
+        // Hardware Acceleration / Software Transcode Badge
+        let hwBadgeHtml = '';
+        if (card.hwAccelBadge) {
+            hwBadgeHtml = `<span class="tautulli-badge tautulli-badge-hw" title="Hardware Accelerated Transcoding">${escapeHtml(card.hwAccelBadge)}</span>`;
+        } else if (card.isSwTranscode) {
+            hwBadgeHtml = `<span class="tautulli-badge tautulli-badge-sw" title="CPU Software Transcode">SW Transcode</span>`;
+        }
+
+        // Transcode Speed tag
+        let speedHtml = '';
+        if (card.transcodeSpeedMultiplier) {
+            const isGood = parseFloat(card.transcodeSpeedMultiplier) >= 1.0;
+            const speedClass = isGood ? 'tautulli-speed-good' : 'tautulli-speed-slow';
+            speedHtml = `<span class="tautulli-speed-tag ${speedClass}" title="${card.transcodeFps} fps">${card.transcodeSpeedMultiplier}x speed</span>`;
+        }
+
+        // Subtitle Burn-In warning badge
+        let burnInHtml = '';
+        if (card.isSubtitleBurnIn) {
+            burnInHtml = `<span class="tautulli-badge tautulli-badge-burnin" title="Subtitle format forcing transcode">⚠️ Sub Burn-In</span>`;
         }
 
         // Transcode Reasons badges HTML
@@ -847,7 +1176,7 @@
 
         // User Avatar image or initials circle
         let avatarHtml = '';
-        if (card.userAvatarUrl) {
+        if (card.userAvatarUrl && !isPrivacyMode) {
             avatarHtml = `<div class="tautulli-user-avatar"><img src="${escapeHtml(card.userAvatarUrl)}" alt="${escapeHtml(card.userName)}" /></div>`;
         } else {
             const initial = (card.userName ? card.userName.charAt(0).toUpperCase() : 'U');
@@ -857,23 +1186,38 @@
 
         // Play/Pause icon
         const stateIconHtml = card.isPaused
-            ? `<div class="tautulli-state-icon tautulli-state-paused" title="Paused"><svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></div>`
-            : `<div class="tautulli-state-icon tautulli-state-playing" title="Playing"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>`;
+            ? `<div class="tautulli-state-icon tautulli-state-paused" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="true" title="Click to Resume"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>`
+            : `<div class="tautulli-state-icon tautulli-state-playing" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="false" title="Click to Pause"><svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></div>`;
+
+        // ETA / Paused overlay class
+        const etaClass = card.isPaused ? 'tautulli-time-paused' : 'tautulli-time-eta';
+
+        // Direct detail link
+        const detailHref = card.itemId ? `#!/details?id=${encodeURIComponent(card.itemId)}` : '#';
+        const userHref = card.userId ? `#!/useredit.html?userId=${encodeURIComponent(card.userId)}` : '#';
 
         return `
             <div class="tautulli-card" data-session-id="${escapeHtml(card.sessionId)}">
                 <!-- Top Block: Poster & Telemetry Data Grid -->
                 <div class="tautulli-top-block">
-                    <!-- Left Poster -->
-                    <div class="tautulli-poster-wrapper">
+                    <!-- Left Poster (Clickable link to item details) -->
+                    <a href="${detailHref}" class="tautulli-poster-wrapper" title="View details: ${escapeHtml(card.primaryTitle)}">
                         ${posterHtml}
-                    </div>
+                    </a>
 
                     <!-- Right Telemetry Grid -->
                     <div class="tautulli-telemetry-panel">
-                        <!-- Top-Right Platform Badge -->
-                        <div class="tautulli-platform-badge" title="${escapeHtml(card.product)} · ${escapeHtml(card.player)}">
-                            ${platformIcon}
+                        <!-- Top-Right Actions (Platform Badge + Jellywatch Kill/Message Controls) -->
+                        <div class="tautulli-card-header-actions">
+                            <button class="tautulli-action-btn" data-action="message-user" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" title="Send message to player">
+                                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+                            </button>
+                            <button class="tautulli-action-btn tautulli-action-btn-kill" data-action="kill-stream" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" title="Terminate stream">
+                                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                            </button>
+                            <div class="tautulli-platform-badge" title="${escapeHtml(card.product)} · ${escapeHtml(card.player)}">
+                                ${platformIcon}
+                            </div>
                         </div>
 
                         <!-- Data Rows -->
@@ -893,6 +1237,9 @@
                             <span class="tautulli-lbl">Stream</span>
                             <span class="tautulli-val">
                                 <span class="tautulli-badge ${badgeClass}">${badgeLabel}</span>
+                                ${hwBadgeHtml}
+                                ${speedHtml}
+                                ${burnInHtml}
                                 ${reasonsHtml}
                             </span>
                         </div>
@@ -923,7 +1270,7 @@
 
                         <!-- Floating Time & ETA -->
                         <div class="tautulli-time-overlay">
-                            <span class="tautulli-time-eta">${escapeHtml(card.etaStr)}</span>
+                            <span class="${etaClass}">${escapeHtml(card.etaStr)}</span>
                             <span class="tautulli-time-progress">${escapeHtml(card.timeProgressStr)}</span>
                         </div>
                     </div>
@@ -939,19 +1286,19 @@
                     <div class="tautulli-media-info">
                         ${stateIconHtml}
                         <div class="tautulli-titles">
-                            <div class="tautulli-title-primary" title="${escapeHtml(card.primaryTitle)}">
+                            <a href="${detailHref}" class="tautulli-title-primary" title="${escapeHtml(card.primaryTitle)}">
                                 ${escapeHtml(card.primaryTitle)}
-                            </div>
+                            </a>
                             <div class="tautulli-title-secondary">
                                 <span class="tautulli-title-year">${escapeHtml(card.secondaryTitle)}</span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="tautulli-user-badge" title="${escapeHtml(card.userName)}">
+                    <a href="${userHref}" class="tautulli-user-badge" title="Manage user: ${escapeHtml(card.userName)}">
                         <span class="tautulli-user-name">${escapeHtml(card.userName)}</span>
                         ${avatarHtml}
-                    </div>
+                    </a>
                 </div>
             </div>
         `;
@@ -977,7 +1324,19 @@
         const directPlayCount = cards.filter((c) => c.isDirectPlay).length;
         const directStreamCount = cards.filter((c) => c.isDirectStream).length;
         const transcodeCount = cards.filter((c) => c.isTranscode).length;
-        const totalBandwidth = cards.reduce((acc, c) => acc + (c.bandwidthNumber || 0), 0);
+
+        // Bandwidth aggregation (Total, LAN, WAN upload)
+        let lanBandwidth = 0;
+        let wanBandwidth = 0;
+        cards.forEach((c) => {
+            const bw = c.bandwidthNumber || 0;
+            if (c.isLan) {
+                lanBandwidth += bw;
+            } else {
+                wanBandwidth += bw;
+            }
+        });
+        const totalBandwidth = lanBandwidth + wanBandwidth;
 
         const breakdownParts = [];
         if (directPlayCount > 0) breakdownParts.push(`${directPlayCount} direct play${directPlayCount > 1 ? 's' : ''}`);
@@ -986,22 +1345,80 @@
 
         const breakdownStr = breakdownParts.length > 0 ? `(${breakdownParts.join(', ')})` : '';
 
+        // Bandwidth detail string (matching Tautulli activity header)
+        let bandwidthDetail = formatBitrate(totalBandwidth);
+        if (totalBandwidth > 0) {
+            if (wanBandwidth > 0 && lanBandwidth > 0) {
+                bandwidthDetail = `${formatBitrate(totalBandwidth)} (LAN: ${formatBitrate(lanBandwidth)} | WAN: ${formatBitrate(wanBandwidth)})`;
+            } else if (wanBandwidth > 0) {
+                bandwidthDetail = `${formatBitrate(totalBandwidth)} (WAN: ${formatBitrate(wanBandwidth)})`;
+            } else {
+                bandwidthDetail = `${formatBitrate(totalBandwidth)} (LAN: ${formatBitrate(lanBandwidth)})`;
+            }
+        }
+
+        const privacyBtnClass = isPrivacyMode ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
+
         return `
             <div class="tautulli-activity-banner">
-                <div class="tautulli-activity-title">
-                    <div class="tautulli-activity-pulse"></div>
-                    <span>Activity</span>
+                <div class="tautulli-activity-left">
+                    <div class="tautulli-activity-title">
+                        <div class="tautulli-activity-pulse"></div>
+                        <span>Activity</span>
+                    </div>
+                    <div class="tautulli-activity-stats">
+                        <span>Sessions: <span class="tautulli-activity-stat-highlight">${totalStreams} stream${totalStreams > 1 ? 's' : ''}</span> ${breakdownStr}</span>
+                        <span>|</span>
+                        <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span></span>
+                    </div>
                 </div>
-                <div class="tautulli-activity-stats">
-                    <span>Sessions: <span class="tautulli-activity-stat-highlight">${totalStreams} stream${totalStreams > 1 ? 's' : ''}</span> ${breakdownStr}</span>
-                    <span>|</span>
-                    <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${formatBitrate(totalBandwidth)}</span></span>
+
+                <div class="tautulli-activity-tools">
+                    <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
+                        <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                        <span>${isPrivacyMode ? 'Privacy On' : 'Privacy'}</span>
+                    </button>
                 </div>
             </div>
             <div class="tautulli-grid">
                 ${cards.map(renderSessionCard).join('')}
             </div>
         `;
+    }
+
+    /**
+     * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Privacy).
+     */
+    function attachContainerEvents(container) {
+        container.onclick = function (e) {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+
+            const action = target.getAttribute('data-action');
+            if (action === 'toggle-privacy') {
+                e.preventDefault();
+                isPrivacyMode = !isPrivacyMode;
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
+            const sessionId = target.getAttribute('data-session-id');
+            const userName = target.getAttribute('data-user') || 'User';
+            const mediaTitle = target.getAttribute('data-title') || 'Media';
+
+            if (action === 'kill-stream') {
+                e.preventDefault();
+                handleKillStream(sessionId, userName, mediaTitle);
+            } else if (action === 'message-user') {
+                e.preventDefault();
+                handleSendMessage(sessionId, userName);
+            } else if (action === 'toggle-play') {
+                e.preventDefault();
+                const isPaused = target.getAttribute('data-paused') === 'true';
+                handleTogglePlayPause(sessionId, isPaused);
+            }
+        };
     }
 
     /**
@@ -1024,20 +1441,27 @@
 
             // Filter for active playback sessions with active media item
             const activeSessions = (rawSessions || []).filter((s) => s && s.NowPlayingItem != null);
-            const cards = activeSessions.map(mapSessionToCardModel);
+            const cards = activeSessions.map((s, idx) => mapSessionToCardModel(s, idx));
 
             // Compute hash of content to avoid redundant DOM mutations
-            const contentHash = JSON.stringify(cards.map((c) => ({
-                id: c.sessionId,
-                method: c.playMethod,
-                paused: c.isPaused,
-                pos: c.timeProgressStr,
-                bw: c.bandwidthDisplay
-            })));
+            const contentHash = JSON.stringify({
+                privacy: isPrivacyMode,
+                cards: cards.map((c) => ({
+                    id: c.sessionId,
+                    method: c.playMethod,
+                    paused: c.isPaused,
+                    pauseSec: Math.floor(c.pausedDurationSeconds / 5), // re-render every 5s if paused
+                    pos: c.timeProgressStr,
+                    bw: c.bandwidthDisplay,
+                    hw: c.hwAccelBadge,
+                    speed: c.transcodeSpeedMultiplier
+                }))
+            });
 
             if (contentHash !== lastRenderedHash) {
                 lastRenderedHash = contentHash;
                 container.innerHTML = renderContainer(cards);
+                attachContainerEvents(container);
             }
         } catch (err) {
             console.warn('[PlaybackCard] Failed to fetch active playback sessions:', err);
@@ -1100,6 +1524,7 @@
 
         // Prepend directly at the absolute top of the dashboard form
         target.insertBefore(container, target.firstChild);
+        attachContainerEvents(container);
         return true;
     }
 
@@ -1168,5 +1593,5 @@
         }
     }
 
-    console.info('[PlaybackCard] Jellyfin Playback Info Card script initialized successfully.');
+    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.1.0 initialized successfully.');
 })();
