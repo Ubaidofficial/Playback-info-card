@@ -64,6 +64,10 @@
   - **Concurrent Stream Limiter**: Enforces simultaneous streams quota per user account to prevent credential sharing
   - **Recent Guard Log**: Live history of automated rule enforcements
 - **Buffer Starvation & Stutter Alarm**: Proactively monitors transcode speed multiplier; flashes pulsating red warning when speed drops below 1.0x across consecutive poll cycles
+- **Bottleneck Splitter ("Who is to Blame? Server vs Client Wi-Fi")**: Algorithmic root-cause diagnostic pill and inspector breakdown that objectively proves whether a stream stutter is caused by Server GPU/CPU overload, marginal encoder capacity, or Client Wi-Fi / WAN congestion
+- **Tracearr-Grade Multi-IP Sharing Detection**: Real-time analysis flagging concurrent playback on multiple distinct WAN IP addresses under a single user account, with banner security alerts and card badges
+- **Live Bandwidth Rolling Sparkline**: Smooth SVG micro-trendline embedded in the activity banner displaying real-time bandwidth velocity, gradient area fill, and peak/current transfer rates over a rolling window
+- **HDR-to-SDR Tone Mapping Telemetry**: Explicit detection of HDR10 (PQ), HLG, and Dolby Vision wide color gamuts (BT.2020) transcoding to BT.709 SDR with VPP/OpenCL tone mapping tags
 - **Hardware acceleration badges**: NVENC, QuickSync, VAAPI, VideoToolbox, AMF vs CPU Software Transcode detection
 - **Transcode performance metrics**: Real-time transcode FPS and playback speed multiplier (e.g., `2.4x`)
 - **Paused stream timer**: Counts elapsed pause duration to identify resource locks
