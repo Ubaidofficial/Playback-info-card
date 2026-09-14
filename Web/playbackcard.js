@@ -38,10 +38,13 @@
 
     // State management
     let pollIntervalId = null;
+    let liveTickerIntervalId = null;
     let isDashboardActive = false;
     let isFetching = false;
     let lastRenderedHash = '';
     let isPrivacyMode = false;
+    let currentFilter = 'all'; // 'all', 'transcode', 'wan', 'paused'
+    let currentCardModels = [];
     const sessionPausedTimestamps = new Map(); // sessionId -> timestamp when pause was first detected
 
     /**
@@ -129,6 +132,30 @@
                 font-weight: 600;
             }
 
+            .tautulli-bandwidth-visual {
+                display: inline-flex;
+                width: 68px;
+                height: 6px;
+                border-radius: 9999px;
+                background: rgba(255, 255, 255, 0.08);
+                overflow: hidden;
+                vertical-align: middle;
+                margin-left: 6px;
+                box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+            }
+
+            .tautulli-bandwidth-bar-lan {
+                background: linear-gradient(90deg, #10b981, #34d399);
+                height: 100%;
+                transition: width 0.35s ease;
+            }
+
+            .tautulli-bandwidth-bar-wan {
+                background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                height: 100%;
+                transition: width 0.35s ease;
+            }
+
             .tautulli-activity-tools {
                 display: flex;
                 align-items: center;
@@ -162,6 +189,40 @@
                 border-color: rgba(0, 164, 220, 0.55);
                 color: #00c9ff;
                 box-shadow: 0 0 12px rgba(0, 164, 220, 0.3);
+            }
+
+            .tautulli-filter-group {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                background: rgba(0, 0, 0, 0.32);
+                padding: 2.5px;
+                border-radius: 9px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .tautulli-filter-pill {
+                background: transparent;
+                border: none;
+                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 3px 8px;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .tautulli-filter-pill:hover {
+                color: #ffffff;
+                background: rgba(255, 255, 255, 0.08);
+            }
+
+            .tautulli-filter-pill.active {
+                background: rgba(0, 164, 220, 0.28);
+                color: #00c9ff;
+                border: 1px solid rgba(0, 164, 220, 0.5);
+                box-shadow: 0 0 10px rgba(0, 164, 220, 0.25);
             }
 
             /* Responsive Session Grid */
@@ -413,6 +474,13 @@
                 box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
             }
 
+            .tautulli-action-btn-info:hover {
+                background: rgba(0, 164, 220, 0.25);
+                border-color: rgba(0, 164, 220, 0.55);
+                color: #00c9ff;
+                box-shadow: 0 0 12px rgba(0, 164, 220, 0.35);
+            }
+
             .tautulli-action-btn svg {
                 width: 13px;
                 height: 13px;
@@ -621,11 +689,25 @@
                 box-shadow: 0 0 10px -2px rgba(245, 158, 11, 0.35);
             }
 
+            .tautulli-badge-res {
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.06) 100%);
+                color: #f1f5f9;
+                border: 1px solid rgba(255, 255, 255, 0.28);
+                box-shadow: 0 0 8px rgba(255, 255, 255, 0.12);
+            }
+
             .tautulli-badge-audio {
                 background: linear-gradient(180deg, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0.14) 100%);
                 color: #a5b4fc;
                 border: 1px solid rgba(99, 102, 241, 0.45);
                 box-shadow: 0 0 10px -2px rgba(99, 102, 241, 0.35);
+            }
+
+            .tautulli-badge-surround {
+                background: linear-gradient(180deg, rgba(14, 165, 233, 0.28) 0%, rgba(14, 165, 233, 0.12) 100%);
+                color: #7dd3fc;
+                border: 1px solid rgba(14, 165, 233, 0.45);
+                box-shadow: 0 0 10px -2px rgba(14, 165, 233, 0.3);
             }
 
             /* Stream Pipeline Chips */
@@ -770,6 +852,28 @@
                 transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
+            .tautulli-progress-fill::after {
+                content: '';
+                position: absolute;
+                right: -2px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: #ffffff;
+                box-shadow: 0 0 8px #00e5ff, 0 0 3px #ffffff;
+            }
+
+            .tautulli-progress-fill.paused {
+                background: linear-gradient(90deg, #d97706 0%, #fbbf24 100%);
+                box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+            }
+
+            .tautulli-progress-fill.paused::after {
+                box-shadow: 0 0 8px #fbbf24, 0 0 3px #ffffff;
+            }
+
             .tautulli-time-row {
                 display: flex;
                 align-items: center;
@@ -825,6 +929,165 @@
                 font-weight: 500;
                 color: #777777;
                 letter-spacing: 0.02em;
+            }
+
+            /* Stream Details Inspector Modal */
+            .tautulli-modal-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.75);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                z-index: 99999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                box-sizing: border-box;
+                animation: tautulli-fade-in 0.2s ease;
+            }
+
+            @keyframes tautulli-fade-in {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+
+            .tautulli-modal {
+                position: relative;
+                width: 100%;
+                max-width: 600px;
+                max-height: 88vh;
+                overflow-y: auto;
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 100%), rgba(14, 15, 24, 0.95);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                border-radius: 20px;
+                box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85), inset 0 1px 1.5px rgba(255, 255, 255, 0.25);
+                color: #e2e8f0;
+                padding: 22px;
+                box-sizing: border-box;
+                animation: tautulli-modal-pop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            @keyframes tautulli-modal-pop {
+                from { transform: scale(0.94); opacity: 0; }
+                to { transform: scale(1); opacity: 1; }
+            }
+
+            .tautulli-modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                padding-bottom: 14px;
+                margin-bottom: 16px;
+            }
+
+            .tautulli-modal-title {
+                font-size: 15px;
+                font-weight: 700;
+                color: #ffffff;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .tautulli-modal-header-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .tautulli-modal-tool-btn {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                color: #e2e8f0;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 5px 10px;
+                border-radius: 8px;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                backdrop-filter: blur(8px);
+                transition: all 0.2s ease;
+            }
+
+            .tautulli-modal-tool-btn:hover {
+                background: rgba(0, 164, 220, 0.22);
+                border-color: rgba(0, 164, 220, 0.5);
+                color: #00c9ff;
+                transform: scale(1.03);
+            }
+
+            .tautulli-modal-close {
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: #94a3b8;
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.15s ease;
+            }
+
+            .tautulli-modal-close:hover {
+                background: rgba(239, 68, 68, 0.25);
+                color: #f87171;
+                border-color: rgba(239, 68, 68, 0.5);
+            }
+
+            .tautulli-modal-section {
+                margin-bottom: 18px;
+            }
+
+            .tautulli-modal-section-title {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: #00c9ff;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .tautulli-modal-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+                background: rgba(0, 0, 0, 0.28);
+                border-radius: 10px;
+                overflow: hidden;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+
+            .tautulli-modal-table td {
+                padding: 7px 12px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            }
+
+            .tautulli-modal-table tr:last-child td {
+                border-bottom: none;
+            }
+
+            .tautulli-modal-table td:first-child {
+                color: #94a3b8;
+                font-weight: 500;
+                width: 38%;
+            }
+
+            .tautulli-modal-table td:last-child {
+                color: #f1f5f9;
+                font-weight: 600;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
             }
         `;
         document.head.appendChild(styleElement);
@@ -888,7 +1151,18 @@
         const hours = etaDate.getHours();
         const minutes = etaDate.getMinutes();
         const pad = (n) => (n < 10 ? '0' + n : n);
-        return `ETA: ${pad(hours)}:${pad(minutes)}`;
+
+        let leftStr = '';
+        if (remainingSeconds < 3600) {
+            const mins = Math.max(1, Math.round(remainingSeconds / 60));
+            leftStr = `(${mins}m left)`;
+        } else {
+            const hrs = Math.floor(remainingSeconds / 3600);
+            const mins = Math.round((remainingSeconds % 3600) / 60);
+            leftStr = `(${hrs}h ${mins}m left)`;
+        }
+
+        return `ETA: ${pad(hours)}:${pad(minutes)} ${leftStr}`;
     }
 
     /**
@@ -957,7 +1231,71 @@
     function getPlatformBadge(client, deviceName) {
         const combined = `${client || ''} ${deviceName || ''}`.toLowerCase();
 
-        if (combined.includes('android') || combined.includes('pixel') || combined.includes('samsung') || combined.includes('shield')) {
+        if (combined.includes('apple tv') || combined.includes('appletv')) {
+            return {
+                bg: '#000000',
+                color: '#ffffff',
+                title: 'Apple TV',
+                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
+            };
+        }
+        if (combined.includes('webos') || combined.includes('lg')) {
+            return {
+                bg: '#a50034',
+                color: '#ffffff',
+                title: 'LG webOS TV',
+                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
+            };
+        }
+        if (combined.includes('tizen') || combined.includes('samsung')) {
+            return {
+                bg: '#0f79af',
+                color: '#ffffff',
+                title: 'Samsung Tizen TV',
+                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
+            };
+        }
+        if (combined.includes('playstation') || combined.includes('ps4') || combined.includes('ps5')) {
+            return {
+                bg: '#003791',
+                color: '#ffffff',
+                title: 'PlayStation',
+                svg: `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H9v2H7v-2H5v-2h2V9h2v2h2v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
+            };
+        }
+        if (combined.includes('xbox')) {
+            return {
+                bg: '#107c10',
+                color: '#ffffff',
+                title: 'Xbox Console',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.88 15.53c-1.04.52-2.39.84-3.88.84s-2.84-.32-3.88-.84c-.45-.23-.84-.5-1.19-.8 1.13-1.01 2.99-2.36 5.07-2.36s3.94 1.35 5.07 2.36c-.35.3-.74.57-1.19.8zm2.4-2.28c-.89-.92-2.28-1.99-4.28-2.58 1.62-.97 3.39-1.28 4.14-1.34.46 1.19.64 2.52.14 3.92zm-12.56 0c-.5-1.4-.32-2.73.14-3.92.75.06 2.52.37 4.14 1.34-2 .59-3.39 1.66-4.28 2.58z"/></svg>`
+            };
+        }
+        if (combined.includes('swiftfin')) {
+            return {
+                bg: '#00a4dc',
+                color: '#ffffff',
+                title: 'Swiftfin Client',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>`
+            };
+        }
+        if (combined.includes('infuse')) {
+            return {
+                bg: '#ff4b3a',
+                color: '#ffffff',
+                title: 'Infuse Player',
+                svg: `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`
+            };
+        }
+        if (combined.includes('kodi')) {
+            return {
+                bg: '#17b2e7',
+                color: '#ffffff',
+                title: 'Kodi Media Center',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 3.83L18.17 12 12 18.17 5.83 12 12 5.83z"/></svg>`
+            };
+        }
+        if (combined.includes('android') || combined.includes('pixel') || combined.includes('shield')) {
             return {
                 bg: '#3ddc84',
                 color: '#000000',
@@ -995,6 +1333,22 @@
                 color: '#ffffff',
                 title: 'Google Chrome',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`
+            };
+        }
+        if (combined.includes('firefox')) {
+            return {
+                bg: '#ff7139',
+                color: '#ffffff',
+                title: 'Mozilla Firefox',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
+            };
+        }
+        if (combined.includes('edg')) {
+            return {
+                bg: '#0078d7',
+                color: '#ffffff',
+                title: 'Microsoft Edge',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
             };
         }
         if (combined.includes('roku')) {
@@ -1397,6 +1751,40 @@
             ? Math.min(100, Math.max(0, Math.round(transcodeInfo.CompletionPercentage)))
             : null;
 
+        // Detailed media specs for stream inspector
+        const videoProfile = videoStream.Profile || null;
+        const videoBitDepth = videoStream.BitDepth ? `${videoStream.BitDepth}-bit` : null;
+        const videoFrameRate = videoStream.AverageFrameRate ? `${Math.round(videoStream.AverageFrameRate)} fps` : (videoStream.RealFrameRate ? `${Math.round(videoStream.RealFrameRate)} fps` : null);
+        const audioSampleRate = audioStream.SampleRate ? `${(audioStream.SampleRate / 1000).toFixed(1)} kHz` : null;
+        const audioBitRate = audioStream.BitRate ? formatBitrate(audioStream.BitRate) : null;
+        const isMuted = Boolean(playState.IsMuted);
+        const volumeLevel = playState.VolumeLevel != null ? Math.round(playState.VolumeLevel) : null;
+        const isSlowTranscode = Boolean(isTranscode && transcodeSpeedMultiplier && parseFloat(transcodeSpeedMultiplier) < 1.0);
+
+        // Resolution Badge (4K UHD, 1080p FHD, 720p HD, SD)
+        let resBadge = null;
+        const videoHeight = videoStream.Height || 0;
+        const videoWidth = videoStream.Width || 0;
+        if (videoHeight >= 2100 || videoWidth >= 3800) {
+            resBadge = '4K UHD';
+        } else if (videoHeight >= 1000 || videoWidth >= 1900) {
+            resBadge = '1080p FHD';
+        } else if (videoHeight >= 700 || videoWidth >= 1200) {
+            resBadge = '720p HD';
+        } else if (videoHeight > 0) {
+            resBadge = `${videoHeight}p`;
+        }
+
+        // Audio Channels Badge (7.1 Surround, 5.1 Surround, Stereo)
+        let audioChannelsBadge = null;
+        if (audioStream.Channels === 8) {
+            audioChannelsBadge = '7.1 Surround';
+        } else if (audioStream.Channels === 6) {
+            audioChannelsBadge = '5.1 Surround';
+        } else if (audioStream.Channels === 2) {
+            audioChannelsBadge = 'Stereo';
+        }
+
         return {
             sessionId: session.Id,
             itemId: item.Id,
@@ -1416,7 +1804,18 @@
             transcodeCompletionPercentage,
             hdrBadge,
             audioBadge,
+            resBadge,
+            audioChannelsBadge,
             officialRating: item.OfficialRating || null,
+            videoProfile,
+            videoBitDepth,
+            videoFrameRate,
+            colorSpace,
+            audioSampleRate,
+            audioBitRate,
+            isMuted,
+            volumeLevel,
+            isSlowTranscode,
             isSubtitleBurnIn,
             transcodeReasons,
             containerDisplay,
@@ -1434,6 +1833,8 @@
             etaStr,
             timeProgressStr,
             progressPercent,
+            currentSeconds,
+            totalSeconds,
             isPaused: Boolean(playState.IsPaused),
             pausedDurationSeconds,
             primaryTitle,
@@ -1565,6 +1966,9 @@
                             ${card.platformBadge.svg}
                         </div>` : ''}
                         <div class="tautulli-action-cluster">
+                            <button class="tautulli-action-btn tautulli-action-btn-info" data-action="inspect-stream" data-session-id="${escapeHtml(card.sessionId)}" title="Stream Telemetry & Diagnostics">
+                                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                            </button>
                             <button class="tautulli-action-btn" data-action="message-user" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" title="Send message to player">
                                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
                             </button>
@@ -1599,10 +2003,14 @@
                             <!-- Engine Status Badges -->
                             <div class="tautulli-badge-row">
                                 <span class="tautulli-badge ${badgeClass}">${badgeLabel}</span>
+                                ${card.resBadge ? `<span class="tautulli-badge tautulli-badge-res" title="Source Resolution">${escapeHtml(card.resBadge)}</span>` : ''}
                                 ${hwBadgeHtml}
                                 ${speedHtml}
+                                ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow" title="Transcode speed < 1.0x! Client will experience buffering.">⚠️ Buffering (&lt;1.0x)</span>` : ''}
                                 ${card.hdrBadge ? `<span class="tautulli-badge tautulli-badge-hdr" title="High Dynamic Range">${escapeHtml(card.hdrBadge)}</span>` : ''}
                                 ${card.audioBadge ? `<span class="tautulli-badge tautulli-badge-audio" title="High Fidelity Audio">${escapeHtml(card.audioBadge)}</span>` : ''}
+                                ${card.audioChannelsBadge ? `<span class="tautulli-badge tautulli-badge-surround" title="Audio Channels">${escapeHtml(card.audioChannelsBadge)}</span>` : ''}
+                                ${card.isMuted ? `<span class="tautulli-badge" style="background:rgba(239,68,68,0.22);color:#f87171;border:1px solid rgba(239,68,68,0.45);" title="Player is muted">🔇 Muted</span>` : ''}
                                 ${burnInHtml}
                             </div>
                         </div>
@@ -1643,7 +2051,7 @@
                         ${stateIconHtml}
                         <div class="tautulli-progress-track">
                             ${card.transcodeCompletionPercentage != null ? `<div class="tautulli-progress-buffer" style="width: ${card.transcodeCompletionPercentage}%;" title="Transcode Buffer: ${card.transcodeCompletionPercentage}%"></div>` : ''}
-                            <div class="tautulli-progress-fill" style="width: ${card.progressPercent}%;"></div>
+                            <div class="tautulli-progress-fill ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
                         </div>
                     </div>
                     <div class="tautulli-time-row">
@@ -1678,6 +2086,8 @@
         const directPlayCount = cards.filter((c) => c.isDirectPlay).length;
         const directStreamCount = cards.filter((c) => c.isDirectStream).length;
         const transcodeCount = cards.filter((c) => c.isTranscode).length;
+        const wanCount = cards.filter((c) => !c.isLan).length;
+        const pausedCount = cards.filter((c) => c.isPaused).length;
 
         // Bandwidth aggregation (Total, LAN, WAN upload)
         let lanBandwidth = 0;
@@ -1711,7 +2121,31 @@
             }
         }
 
+        const lanPercent = totalBandwidth > 0 ? Math.round((lanBandwidth / totalBandwidth) * 100) : 0;
+        const wanPercent = totalBandwidth > 0 ? (100 - lanPercent) : 0;
+        const bandwidthVisualHtml = totalBandwidth > 0
+            ? `<div class="tautulli-bandwidth-visual" title="LAN: ${formatBitrate(lanBandwidth)} (${lanPercent}%) | WAN: ${formatBitrate(wanBandwidth)} (${wanPercent}%)"><div class="tautulli-bandwidth-bar-lan" style="width:${lanPercent}%;"></div><div class="tautulli-bandwidth-bar-wan" style="width:${wanPercent}%;"></div></div>`
+            : '';
+
         const privacyBtnClass = isPrivacyMode ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
+
+        // Filter active cards based on current user selection
+        let displayedCards = cards;
+        if (currentFilter === 'transcode') {
+            displayedCards = cards.filter((c) => c.isTranscode);
+        } else if (currentFilter === 'wan') {
+            displayedCards = cards.filter((c) => !c.isLan);
+        } else if (currentFilter === 'paused') {
+            displayedCards = cards.filter((c) => c.isPaused);
+        }
+
+        const cardsContentHtml = displayedCards.length > 0
+            ? `<div class="tautulli-grid">${displayedCards.map(renderSessionCard).join('')}</div>`
+            : `
+                <div class="tautulli-empty-container">
+                    <div class="tautulli-empty-text">No active streams matching filter "${escapeHtml(currentFilter)}"</div>
+                </div>
+            `;
 
         return `
             <div class="tautulli-activity-banner">
@@ -1723,8 +2157,15 @@
                     <div class="tautulli-activity-stats">
                         <span>Sessions: <span class="tautulli-activity-stat-highlight">${totalStreams} stream${totalStreams > 1 ? 's' : ''}</span> ${breakdownStr}</span>
                         <span>|</span>
-                        <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span></span>
+                        <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span>${bandwidthVisualHtml}</span>
                     </div>
+                    ${totalStreams > 1 ? `
+                    <div class="tautulli-filter-group">
+                        <button class="tautulli-filter-pill ${currentFilter === 'all' ? 'active' : ''}" data-action="set-filter" data-filter="all">All (${totalStreams})</button>
+                        ${transcodeCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'transcode' ? 'active' : ''}" data-action="set-filter" data-filter="transcode">⚡ Transcode (${transcodeCount})</button>` : ''}
+                        ${wanCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'wan' ? 'active' : ''}" data-action="set-filter" data-filter="wan">🌐 WAN (${wanCount})</button>` : ''}
+                        ${pausedCount > 0 ? `<button class="tautulli-filter-pill ${currentFilter === 'paused' ? 'active' : ''}" data-action="set-filter" data-filter="paused">⏸ Paused (${pausedCount})</button>` : ''}
+                    </div>` : ''}
                 </div>
 
                 <div class="tautulli-activity-tools">
@@ -1734,14 +2175,207 @@
                     </button>
                 </div>
             </div>
-            <div class="tautulli-grid">
-                ${cards.map(renderSessionCard).join('')}
-            </div>
+            ${cardsContentHtml}
         `;
     }
 
     /**
-     * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Privacy).
+     * Renders and displays the Stream Details Inspector modal.
+     */
+    /**
+     * Keydown handler to dismiss the inspector modal via Escape key.
+     */
+    function handleModalEscape(e) {
+        if (e.key === 'Escape') {
+            closeStreamInspectorModal();
+        }
+    }
+
+    /**
+     * Copies text to clipboard with fallback.
+     */
+    function copyTextToClipboard(text, btnElement) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                const lbl = btnElement && btnElement.querySelector('.copy-label');
+                if (lbl) lbl.textContent = '✓ Copied!';
+                setTimeout(() => { if (lbl) lbl.textContent = 'Copy Telemetry'; }, 2000);
+            }).catch(() => fallbackPromptCopy(text));
+        } else {
+            fallbackPromptCopy(text);
+        }
+    }
+
+    function fallbackPromptCopy(text) {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            ta.remove();
+        } catch (e) {
+            window.prompt('Copy telemetry data:', text);
+        }
+    }
+
+    /**
+     * Renders and displays the Stream Details Inspector modal.
+     */
+    function openStreamInspectorModal(card) {
+        if (!card) return;
+        closeStreamInspectorModal();
+
+        const backdrop = document.createElement('div');
+        backdrop.id = 'tautulli-inspector-modal-backdrop';
+        backdrop.className = 'tautulli-modal-backdrop';
+        backdrop.onclick = function (e) {
+            if (e.target === backdrop) {
+                closeStreamInspectorModal();
+            }
+        };
+
+        const modal = document.createElement('div');
+        modal.className = 'tautulli-modal';
+        modal.innerHTML = `
+            <div class="tautulli-modal-header">
+                <div class="tautulli-modal-title">
+                    <span>📊 Stream Diagnostics &amp; Telemetry</span>
+                </div>
+                <div class="tautulli-modal-header-actions">
+                    <button class="tautulli-modal-tool-btn" data-action="copy-telemetry" title="Copy raw session telemetry to clipboard">
+                        <svg style="width:12px;height:12px;" fill="currentColor" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                        <span class="copy-label">Copy Telemetry</span>
+                    </button>
+                    <button class="tautulli-modal-close" data-action="close-modal" title="Close">
+                        <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Media Source Telemetry -->
+            <div class="tautulli-modal-section">
+                <div class="tautulli-modal-section-title">
+                    <span>🎬 Media Source Specs</span>
+                </div>
+                <table class="tautulli-modal-table">
+                    <tr><td>Media Title</td><td>${escapeHtml(card.primaryTitle)}</td></tr>
+                    <tr><td>Production Year &amp; Duration</td><td>${escapeHtml(card.secondaryTitle || 'N/A')}</td></tr>
+                    <tr><td>Container</td><td>${escapeHtml(card.containerDisplay)}</td></tr>
+                    <tr><td>Video Codec &amp; Resolution</td><td>${escapeHtml(card.videoDisplay)}</td></tr>
+                    ${card.videoProfile ? `<tr><td>Video Profile &amp; Bit Depth</td><td>${escapeHtml(card.videoProfile)} (${escapeHtml(card.videoBitDepth || '8-bit')})</td></tr>` : ''}
+                    ${card.videoFrameRate ? `<tr><td>Source Frame Rate</td><td>${escapeHtml(card.videoFrameRate)}</td></tr>` : ''}
+                    ${card.colorSpace ? `<tr><td>Color Space / Range</td><td>${escapeHtml(card.colorSpace)} ${card.hdrBadge ? `(${escapeHtml(card.hdrBadge)})` : ''}</td></tr>` : ''}
+                    <tr><td>Stream Bitrate</td><td>${escapeHtml(card.bandwidthDisplay)}</td></tr>
+                </table>
+            </div>
+
+            <!-- Audio & Subtitles -->
+            <div class="tautulli-modal-section">
+                <div class="tautulli-modal-section-title">
+                    <span>🔊 Audio &amp; Subtitle Specs</span>
+                </div>
+                <table class="tautulli-modal-table">
+                    <tr><td>Audio Stream</td><td>${escapeHtml(card.audioDisplay)}</td></tr>
+                    ${card.audioSampleRate ? `<tr><td>Audio Sample Rate</td><td>${escapeHtml(card.audioSampleRate)}</td></tr>` : ''}
+                    ${card.audioBitRate ? `<tr><td>Audio Bitrate</td><td>${escapeHtml(card.audioBitRate)}</td></tr>` : ''}
+                    ${card.audioBadge ? `<tr><td>Audio Fidelity</td><td><span style="color:#a5b4fc;font-weight:700;">${escapeHtml(card.audioBadge)}</span></td></tr>` : ''}
+                    <tr><td>Subtitle Stream</td><td>${escapeHtml(card.subtitleDisplay)}</td></tr>
+                    ${card.isSubtitleBurnIn ? `<tr><td>Subtitle Burn-In</td><td><span style="color:#fbbf24;font-weight:700;">⚠️ Yes (Requires Transcode)</span></td></tr>` : ''}
+                </table>
+            </div>
+
+            <!-- Transcode Pipeline -->
+            ${card.isTranscode ? `
+            <div class="tautulli-modal-section">
+                <div class="tautulli-modal-section-title">
+                    <span style="color:#f87171;">⚡ Transcode Pipeline</span>
+                </div>
+                <table class="tautulli-modal-table">
+                    <tr><td>Hardware Acceleration</td><td>${escapeHtml(card.hwAccelBadge || (card.isSwTranscode ? 'Software (CPU)' : 'None'))}</td></tr>
+                    ${card.transcodeFps ? `<tr><td>Transcoding FPS &amp; Speed</td><td>${escapeHtml(card.transcodeFps)} fps (${escapeHtml(card.transcodeSpeedMultiplier)}x real-time)</td></tr>` : ''}
+                    ${card.transcodeCompletionPercentage != null ? `<tr><td>Transcode Buffer Ahead</td><td>${card.transcodeCompletionPercentage}% completed</td></tr>` : ''}
+                    <tr><td>Throttled State</td><td>${card.isThrottled ? '<span style="color:#34d399;">Active (Throttled / Power Saving)</span>' : 'Unthrottled'}</td></tr>
+                    ${card.transcodeReasons.length > 0 ? `<tr><td>Transcode Triggers</td><td>${escapeHtml(card.transcodeReasons.map(formatTranscodeReason).join(', '))}</td></tr>` : ''}
+                </table>
+            </div>` : ''}
+
+            <!-- Client & Player -->
+            <div class="tautulli-modal-section">
+                <div class="tautulli-modal-section-title">
+                    <span>📱 Client &amp; Network</span>
+                </div>
+                <table class="tautulli-modal-table">
+                    <tr><td>User Account</td><td>${escapeHtml(card.userName)}</td></tr>
+                    <tr><td>Device Name</td><td>${escapeHtml(card.player)}</td></tr>
+                    <tr><td>Client App</td><td>${escapeHtml(card.product)}</td></tr>
+                    <tr><td>Network Endpoint</td><td>${card.isLan ? '🔒 LAN' : '🌐 WAN'} ${escapeHtml(card.locationDisplay)}</td></tr>
+                    ${card.isMuted ? `<tr><td>Audio State</td><td><span style="color:#f87171;font-weight:700;">🔇 Muted</span></td></tr>` : ''}
+                    ${card.volumeLevel != null ? `<tr><td>Volume Level</td><td>${card.volumeLevel}%</td></tr>` : ''}
+                    <tr><td>Session ID</td><td style="font-size:10px;word-break:break-all;">${escapeHtml(card.sessionId)}</td></tr>
+                </table>
+            </div>
+        `;
+
+        const copyBtn = modal.querySelector('[data-action="copy-telemetry"]');
+        if (copyBtn) {
+            copyBtn.onclick = function () {
+                const diag = {
+                    title: card.primaryTitle,
+                    media: card.secondaryTitle,
+                    playMethod: card.playMethod,
+                    container: card.containerDisplay,
+                    video: card.videoDisplay,
+                    videoProfile: card.videoProfile,
+                    videoBitDepth: card.videoBitDepth,
+                    framerate: card.videoFrameRate,
+                    colorSpace: card.colorSpace,
+                    hdr: card.hdrBadge,
+                    resolution: card.resBadge,
+                    audio: card.audioDisplay,
+                    audioChannels: card.audioChannelsBadge,
+                    audioFidelity: card.audioBadge,
+                    sampleRate: card.audioSampleRate,
+                    audioBitrate: card.audioBitRate,
+                    subtitles: card.subtitleDisplay,
+                    subBurnIn: card.isSubtitleBurnIn,
+                    bitrate: card.bandwidthDisplay,
+                    transcodeReasons: card.transcodeReasons,
+                    hwAccel: card.hwAccelBadge || (card.isSwTranscode ? 'Software' : 'None'),
+                    fps: card.transcodeFps,
+                    speed: card.transcodeSpeedMultiplier ? `${card.transcodeSpeedMultiplier}x` : null,
+                    user: card.userName,
+                    client: card.product,
+                    device: card.player,
+                    network: card.isLan ? 'LAN' : 'WAN',
+                    location: card.locationDisplay,
+                    sessionId: card.sessionId
+                };
+                copyTextToClipboard(JSON.stringify(diag, null, 2), copyBtn);
+            };
+        }
+
+        modal.querySelector('[data-action="close-modal"]').onclick = closeStreamInspectorModal;
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        document.addEventListener('keydown', handleModalEscape);
+    }
+
+    /**
+     * Closes the active stream inspector modal if open.
+     */
+    function closeStreamInspectorModal() {
+        document.removeEventListener('keydown', handleModalEscape);
+        const existing = document.getElementById('tautulli-inspector-modal-backdrop');
+        if (existing) {
+            existing.remove();
+        }
+    }
+
+    /**
+     * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Privacy, Filter, Inspect).
      */
     function attachContainerEvents(container) {
         container.onclick = function (e) {
@@ -1757,11 +2391,25 @@
                 return;
             }
 
+            if (action === 'set-filter') {
+                e.preventDefault();
+                currentFilter = target.getAttribute('data-filter') || 'all';
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
             const sessionId = target.getAttribute('data-session-id');
             const userName = target.getAttribute('data-user') || 'User';
             const mediaTitle = target.getAttribute('data-title') || 'Media';
 
-            if (action === 'kill-stream') {
+            if (action === 'inspect-stream') {
+                e.preventDefault();
+                const card = currentCardModels.find((c) => c.sessionId === sessionId);
+                if (card) {
+                    openStreamInspectorModal(card);
+                }
+            } else if (action === 'kill-stream') {
                 e.preventDefault();
                 handleKillStream(sessionId, userName, mediaTitle);
             } else if (action === 'message-user') {
@@ -1805,10 +2453,12 @@
             }
 
             const cards = activeSessions.map((s, idx) => mapSessionToCardModel(s, idx));
+            currentCardModels = cards;
 
             // Compute hash of content to avoid redundant DOM mutations
             const contentHash = JSON.stringify({
                 privacy: isPrivacyMode,
+                filter: currentFilter,
                 cards: cards.map((c) => ({
                     id: c.sessionId,
                     method: c.playMethod,
@@ -1835,6 +2485,65 @@
     }
 
     /**
+     * Advances playback elapsed time and updates progress bars smoothly on a 1-second interval
+     * between 3-second API poll intervals, keeping the UI alive and responsive without network overhead.
+     */
+    function startLiveTicker() {
+        stopLiveTicker();
+        liveTickerIntervalId = setInterval(() => {
+            if (!isDashboardActive || currentCardModels.length === 0) return;
+
+            const container = document.getElementById(CONFIG.CONTAINER_ID);
+            if (!container) return;
+
+            currentCardModels.forEach((card) => {
+                const cardEl = container.querySelector(`.tautulli-card[data-session-id="${card.sessionId}"]`);
+                if (!cardEl) return;
+
+                if (!card.isPaused) {
+                    if (card.totalSeconds > 0 && card.currentSeconds < card.totalSeconds) {
+                        card.currentSeconds += 1;
+                        const progressRatio = Math.min(1, card.currentSeconds / card.totalSeconds);
+                        const percentStr = (progressRatio * 100).toFixed(1);
+
+                        const fillEl = cardEl.querySelector('.tautulli-progress-fill');
+                        if (fillEl) {
+                            fillEl.style.width = `${percentStr}%`;
+                        }
+
+                        const timeProgressEl = cardEl.querySelector('.tautulli-time-progress');
+                        if (timeProgressEl) {
+                            timeProgressEl.textContent = `${formatDuration(card.currentSeconds)} / ${formatDuration(card.totalSeconds)}`;
+                        }
+
+                        const remainingSec = Math.max(0, card.totalSeconds - card.currentSeconds);
+                        const etaEl = cardEl.querySelector('.tautulli-time-eta');
+                        if (etaEl) {
+                            etaEl.textContent = formatETA(remainingSec, false, 0);
+                        }
+                    }
+                } else {
+                    card.pausedDurationSeconds += 1;
+                    const pausedEl = cardEl.querySelector('.tautulli-time-paused');
+                    if (pausedEl) {
+                        pausedEl.textContent = formatETA(0, true, card.pausedDurationSeconds);
+                    }
+                }
+            });
+        }, 1000);
+    }
+
+    /**
+     * Stops the 1-second live ticker interval.
+     */
+    function stopLiveTicker() {
+        if (liveTickerIntervalId != null) {
+            clearInterval(liveTickerIntervalId);
+            liveTickerIntervalId = null;
+        }
+    }
+
+    /**
      * Starts the polling timer.
      */
     function startPolling() {
@@ -1843,6 +2552,7 @@
         lastRenderedHash = '';
         fetchAndRenderSessions();
         pollIntervalId = setInterval(fetchAndRenderSessions, CONFIG.POLL_INTERVAL_MS);
+        startLiveTicker();
     }
 
     /**
@@ -1854,6 +2564,7 @@
             clearInterval(pollIntervalId);
             pollIntervalId = null;
         }
+        stopLiveTicker();
     }
 
     /**
@@ -1928,6 +2639,7 @@
         const view = e.target || (e.detail && e.detail.element);
         if (isDashboardView(view)) {
             stopPolling();
+            closeStreamInspectorModal();
             const container = document.getElementById(CONFIG.CONTAINER_ID);
             if (container) {
                 container.remove();
