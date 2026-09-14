@@ -49,6 +49,10 @@
     const sessionSlowCycles = new Map(); // sessionId -> consecutive slow (<1.0x) poll cycles
     const autoKillEventsLog = []; // { id, time, userName, title, reason }
 
+    // P1 Rolling Telemetry History
+    const MAX_BANDWIDTH_HISTORY = 16;
+    const bandwidthHistory = []; // { time, total, wan, lan }
+
     // Smart Stream Guard Rules state (persisted in localStorage)
     const DEFAULT_STREAM_GUARD_RULES = {
         killPausedEnabled: false,
@@ -872,6 +876,89 @@
                 border: 1px solid rgba(255, 255, 255, 0.1);
                 border-radius: 4px;
                 padding: 2px 5.5px;
+            }
+
+            .tautulli-badge-tonemap {
+                background: rgba(245, 158, 11, 0.12);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.28);
+                border-radius: 4px;
+                padding: 2px 5.5px;
+            }
+
+            .tautulli-badge-multi-ip {
+                background: rgba(239, 68, 68, 0.16);
+                color: #fca5a5;
+                border: 1px solid rgba(239, 68, 68, 0.42);
+                border-radius: 4px;
+                padding: 2px 6px;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+                animation: tautulli-stutter-pulse 2.2s infinite ease-in-out;
+            }
+
+            .tautulli-security-alert-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 3px 9px;
+                border-radius: 9999px;
+                background: rgba(239, 68, 68, 0.16);
+                color: #fca5a5;
+                border: 1px solid rgba(239, 68, 68, 0.38);
+                font-size: 11px;
+                font-weight: 600;
+                animation: tautulli-stutter-pulse 2.2s infinite ease-in-out;
+            }
+
+            /* Bottleneck Splitter Badges */
+            .tautulli-bottleneck-server {
+                background: rgba(239, 68, 68, 0.14);
+                color: #fca5a5;
+                border: 1px solid rgba(239, 68, 68, 0.32);
+            }
+
+            .tautulli-bottleneck-marginal {
+                background: rgba(245, 158, 11, 0.14);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.3);
+            }
+
+            .tautulli-bottleneck-client {
+                background: rgba(56, 189, 248, 0.14);
+                color: #7dd3fc;
+                border: 1px solid rgba(56, 189, 248, 0.3);
+            }
+
+            .tautulli-bottleneck-healthy {
+                background: rgba(16, 185, 129, 0.12);
+                color: #6ee7b7;
+                border: 1px solid rgba(16, 185, 129, 0.28);
+            }
+
+            .tautulli-bottleneck-paused {
+                background: rgba(148, 163, 184, 0.12);
+                color: #cbd5e1;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+            }
+
+            /* Live Bandwidth History Sparkline */
+            .tautulli-sparkline-wrap {
+                display: inline-flex;
+                align-items: center;
+                margin-left: 8px;
+                vertical-align: middle;
+                height: 24px;
+                cursor: pointer;
+            }
+
+            .tautulli-sparkline-svg {
+                overflow: visible;
+                display: block;
+            }
+
+            .tautulli-sparkline-dot {
+                animation: tautulli-pulse 2s infinite ease-in-out;
             }
 
             /* Stream Pipeline Chips (Diskovarr dashboard precision with vector glyphs) */
@@ -1869,6 +1956,117 @@
     }
 
     /**
+     * P1.3 Bottleneck Splitter: Diagnoses whether a stream stall/buffering is caused by server or client.
+     */
+    function computeBottleneckDiagnostic(card) {
+        if (!card) return null;
+
+        // Server Overload: Transcode speed is below real-time (< 1.0x)
+        if (card.isTranscode && card.transcodeSpeedMultiplier && parseFloat(card.transcodeSpeedMultiplier) < 1.0) {
+            return {
+                key: 'server-overload',
+                badgeClass: 'tautulli-bottleneck-server',
+                badgeText: '✕ Server Overload (<1.0x)',
+                shortName: 'Server Overload',
+                title: 'Server GPU/CPU cannot encode fast enough (speed < 1.0x). Playback will buffer/freeze.',
+                explanation: 'The server processing capacity is the bottleneck. The transcode speed is below real-time playback speed (1.0x), causing client buffer starvation.',
+                recommendation: 'Enable hardware acceleration (NVENC/QuickSync) or reduce video transcode bitrate.'
+            };
+        }
+
+        // Server Marginal: Transcode speed is between 1.0x and 1.35x
+        if (card.isTranscode && card.transcodeSpeedMultiplier && parseFloat(card.transcodeSpeedMultiplier) >= 1.0 && parseFloat(card.transcodeSpeedMultiplier) < 1.35) {
+            return {
+                key: 'server-marginal',
+                badgeClass: 'tautulli-bottleneck-marginal',
+                badgeText: '· Server Marginal (1.0–1.3x)',
+                shortName: 'Server Marginal',
+                title: 'Server transcode speed is near real-time (1.0x–1.35x). Minor spikes may cause brief buffering.',
+                explanation: 'The server is barely outpacing playback. Temporary background loads on the server may cause micro-stutters.',
+                recommendation: 'Monitor server CPU/GPU load to ensure speed stays comfortably above 1.5x.'
+            };
+        }
+
+        // Client Paused: Stream is paused on client device
+        if (card.isPaused && card.pausedDurationSeconds > 15) {
+            return {
+                key: 'client-paused',
+                badgeClass: 'tautulli-bottleneck-paused',
+                badgeText: '· Client Paused',
+                shortName: 'Client Paused',
+                title: `Client paused playback for ${formatDuration(card.pausedDurationSeconds)}. No active data transmission needed.`,
+                explanation: 'Playback is paused on the user device. Server stream session is held open.',
+                recommendation: 'Smart Stream Guard will auto-reclaim resources if pause exceeds limit.'
+            };
+        }
+
+        // High Bitrate WAN direct stream
+        if (!card.isPaused && (card.isDirectPlay || card.isDirectStream || (card.transcodeSpeedMultiplier && parseFloat(card.transcodeSpeedMultiplier) >= 2.0))) {
+            if (!card.isLan && card.bandwidthNumber > 35000000) {
+                return {
+                    key: 'wan-high-bitrate',
+                    badgeClass: 'tautulli-bottleneck-client',
+                    badgeText: '· WAN High Bitrate',
+                    shortName: 'WAN High Bitrate',
+                    title: 'High remote bitrate (>35 Mbps). Stutters are likely caused by client Wi-Fi or ISP upload limit.',
+                    explanation: 'Server is direct playing or transcoding fast (>2.0x). If client reports buffering, the bottleneck is remote WAN connection or client 2.4GHz Wi-Fi.',
+                    recommendation: 'Client should switch to 5GHz Wi-Fi / Ethernet or select a lower remote streaming quality.'
+                };
+            }
+        }
+
+        // Optimal / Healthy Pipeline
+        return {
+            key: 'healthy',
+            badgeClass: 'tautulli-bottleneck-healthy',
+            badgeText: '✓ Pipeline Healthy',
+            shortName: 'Pipeline Healthy',
+            title: 'Server pipeline throughput is healthy with no detected bottlenecks.',
+            explanation: 'Server encoding speed and delivery throughput are optimal.',
+            recommendation: 'Stream is operating smoothly.'
+        };
+    }
+
+    /**
+     * P1.1 Live Bandwidth History Sparkline: Generates an SVG micro-trendline.
+     */
+    function renderBandwidthSparkline(history, width = 100, height = 22) {
+        if (!history || history.length < 2) {
+            return '';
+        }
+        const maxVal = Math.max(...history.map((h) => h.total), 500000); // at least 500 kbps scale
+        const pts = history.map((pt, i) => {
+            const x = Math.round((i / (history.length - 1)) * (width - 8) + 4);
+            const y = Math.round(height - 4 - ((pt.total / maxVal) * (height - 8)));
+            return { x, y, total: pt.total };
+        });
+
+        const polylinePts = pts.map((p) => `${p.x},${p.y}`).join(' ');
+        const firstX = pts[0].x;
+        const lastPt = pts[pts.length - 1];
+        const fillPath = `M ${firstX},${height} L ${pts.map((p) => `${p.x},${p.y}`).join(' L ')} L ${lastPt.x},${height} Z`;
+
+        const peakRate = formatBitrate(Math.max(...history.map((h) => h.total)));
+        const curRate = formatBitrate(lastPt.total);
+
+        return `
+            <div class="tautulli-sparkline-wrap" title="Rolling Bandwidth Trend (${history.length * 3}s window) · Peak: ${peakRate} · Current: ${curRate}">
+                <svg class="tautulli-sparkline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                    <defs>
+                        <linearGradient id="tautulli-sparkline-grad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.35"/>
+                            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="${fillPath}" fill="url(#tautulli-sparkline-grad)" />
+                    <polyline points="${polylinePts}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="${lastPt.x}" cy="${lastPt.y}" r="2.5" fill="#38bdf8" class="tautulli-sparkline-dot" />
+                </svg>
+            </div>
+        `;
+    }
+
+    /**
      * Generates a stable executive dark-mode gradient for avatar fallback initials.
      */
     function getAvatarColor(name) {
@@ -2285,25 +2483,40 @@
             audioChip = `${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}`;
         }
 
-        // HDR Detection (HDR10, HDR10+, Dolby Vision, HLG, BT2020)
+        // HDR Detection & P1.4 Enhanced Tone Mapping Details (HDR10, HDR10+, Dolby Vision, HLG, BT2020)
         let hdrBadge = null;
         const videoRange = (videoStream.VideoRange || videoStream.VideoRangeType || '').toUpperCase();
         const colorSpace = (videoStream.ColorSpace || '').toUpperCase();
-        const isHdr = videoRange.includes('HDR') || videoRange.includes('DOVI') || videoRange.includes('HLG') || colorSpace.includes('BT2020');
+        const colorTransfer = (videoStream.ColorTransfer || '').toLowerCase();
+        const colorPrimaries = (videoStream.ColorPrimaries || '').toLowerCase();
+        const isHdr = videoRange.includes('HDR') || videoRange.includes('DOVI') || videoRange.includes('HLG') || colorSpace.includes('BT2020') || colorTransfer === 'smpte2084' || colorTransfer === 'arib-std-b67';
+        let hdrStandardDesc = null;
+        let isToneMapped = false;
+        let toneMappingDetail = null;
+
         if (isHdr) {
             let hdrName = 'HDR';
             if (videoRange.includes('DOVI') || (videoStream.Title && videoStream.Title.toUpperCase().includes('DV'))) {
                 hdrName = 'Dolby Vision';
+                hdrStandardDesc = 'Dolby Vision (Dynamic Metadata)';
             } else if (videoRange.includes('HDR10+') || videoRange.includes('HDR10PLUS')) {
                 hdrName = 'HDR10+';
-            } else if (videoRange.includes('HDR10')) {
+                hdrStandardDesc = 'HDR10+ (Dynamic Metadata)';
+            } else if (videoRange.includes('HDR10') || colorTransfer === 'smpte2084') {
                 hdrName = 'HDR10';
-            } else if (videoRange.includes('HLG')) {
+                hdrStandardDesc = 'SMPTE ST 2084 (PQ)';
+            } else if (videoRange.includes('HLG') || colorTransfer === 'arib-std-b67') {
                 hdrName = 'HLG';
+                hdrStandardDesc = 'ARIB STD-B67 (HLG)';
+            } else {
+                hdrStandardDesc = 'HDR Wide Color Gamut';
             }
 
             if (isTranscode && transcodeInfo && !transcodeInfo.IsVideoDirect) {
+                isToneMapped = true;
                 hdrBadge = `${hdrName} ➔ SDR`;
+                const sourceGamut = colorPrimaries.includes('2020') ? 'BT.2020' : (colorSpace || 'BT.2020');
+                toneMappingDetail = `${sourceGamut} (${hdrName}) ➔ BT.709 SDR (Tone Mapped)`;
             } else {
                 hdrBadge = hdrName;
             }
@@ -2485,6 +2698,15 @@
             videoBitDepth,
             videoFrameRate,
             colorSpace,
+            colorTransfer: colorTransfer || null,
+            colorPrimaries: colorPrimaries || null,
+            hdrStandardDesc,
+            isToneMapped,
+            toneMappingDetail,
+            rawCleanIp: cleanIp,
+            isMultiIpSharing: false,
+            distinctWanIpCount: 1,
+            wanIpList: [],
             audioSampleRate,
             audioBitRate,
             isMuted,
@@ -2525,6 +2747,9 @@
             deviceName: session.DeviceName,
             isAudioItem
         };
+
+        model.bottleneck = computeBottleneckDiagnostic(model);
+        return model;
     }
 
     /**
@@ -2666,6 +2891,11 @@
                             <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;">${card.isLan ? '<path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>' : '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>'}</svg>
                             ${card.isLan ? 'LAN' : 'WAN'} • ${escapeHtml(card.locationDisplay)}
                         </span>
+                        ${card.isMultiIpSharing ? `
+                        <span class="tautulli-badge tautulli-badge-multi-ip" title="Security Alert: Account streaming from ${card.distinctWanIpCount} distinct WAN locations concurrently. Possible credential sharing.">
+                            <svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                            MULTI-IP (${card.distinctWanIpCount} WAN)
+                        </span>` : ''}
                         ${card.platformBadge ? `
                         <div class="tautulli-platform-badge" style="background: ${card.platformBadge.bg}; color: ${card.platformBadge.color};" title="${escapeHtml(card.platformBadge.title)}">
                             ${card.platformBadge.svg}
@@ -2712,7 +2942,8 @@
                                 ${hwBadgeHtml}
                                 ${speedHtml}
                                 ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow ${card.isSevereStutter ? 'tautulli-stutter-alarm' : ''}" title="${card.isSevereStutter ? 'SEVERE STUTTER ALARM: Transcode speed < 1.0x for consecutive intervals. Client is starving buffer.' : 'Transcode speed < 1.0x! Client will experience buffering.'}"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>${card.isSevereStutter ? 'STUTTER ALARM (&lt;1.0x)' : 'BUFFERING (&lt;1.0x)'}</span>` : ''}
-                                ${card.hdrBadge ? `<span class="tautulli-badge tautulli-badge-hdr" title="High Dynamic Range">${escapeHtml(card.hdrBadge)}</span>` : ''}
+                                ${card.hdrBadge ? `<span class="tautulli-badge ${card.isToneMapped ? 'tautulli-badge-tonemap' : 'tautulli-badge-hdr'}" title="${escapeHtml(card.toneMappingDetail || card.hdrStandardDesc || 'High Dynamic Range')}">${escapeHtml(card.hdrBadge)}</span>` : ''}
+                                ${card.bottleneck ? `<span class="tautulli-badge ${card.bottleneck.badgeClass}" title="${escapeHtml(card.bottleneck.title)}">${escapeHtml(card.bottleneck.badgeText)}</span>` : ''}
                                 ${card.audioBadge ? `<span class="tautulli-badge tautulli-badge-audio" title="High Fidelity Audio">${escapeHtml(card.audioBadge)}</span>` : ''}
                                 ${card.audioChannelsBadge ? `<span class="tautulli-badge tautulli-badge-surround" title="Audio Channels">${escapeHtml(card.audioChannelsBadge)}</span>` : ''}
                                 ${card.isMuted ? `<span class="tautulli-badge" style="background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3);" title="Player is muted"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>MUTED</span>` : ''}
@@ -2807,6 +3038,29 @@
         });
         const totalBandwidth = lanBandwidth + wanBandwidth;
 
+        // P1.1 Live Bandwidth Rolling History update
+        bandwidthHistory.push({
+            time: Date.now(),
+            total: totalBandwidth,
+            wan: wanBandwidth,
+            lan: lanBandwidth
+        });
+        if (bandwidthHistory.length > MAX_BANDWIDTH_HISTORY) {
+            bandwidthHistory.shift();
+        }
+        const sparklineHtml = renderBandwidthSparkline(bandwidthHistory, 104, 22);
+
+        // P1.2 Multi-IP Account Sharing Detection for Activity Banner
+        const hasMultiIpAlert = cards.some((c) => c.isMultiIpSharing);
+        const multiIpAlertBannerHtml = hasMultiIpAlert
+            ? `
+                <div class="tautulli-security-alert-pill" title="Security Warning: Multiple remote WAN IP addresses detected concurrently under the same user account. Possible credential sharing.">
+                    <svg style="width:11px;height:11px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    <span>Multi-IP Alert</span>
+                </div>
+            `
+            : '';
+
         const breakdownParts = [];
         if (directPlayCount > 0) breakdownParts.push(`${directPlayCount} direct play${directPlayCount > 1 ? 's' : ''}`);
         if (directStreamCount > 0) breakdownParts.push(`${directStreamCount} direct stream${directStreamCount > 1 ? 's' : ''}`);
@@ -2862,8 +3116,9 @@
                     <div class="tautulli-activity-stats">
                         <span>Sessions: <span class="tautulli-activity-stat-highlight">${totalStreams} stream${totalStreams > 1 ? 's' : ''}</span> ${breakdownStr}</span>
                         <span>|</span>
-                        <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span>${bandwidthVisualHtml}</span>
+                        <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span>${bandwidthVisualHtml}${sparklineHtml}</span>
                     </div>
+                    ${multiIpAlertBannerHtml}
                     ${totalStreams > 1 ? `
                     <div class="tautulli-filter-group">
                         <button class="tautulli-filter-pill ${currentFilter === 'all' ? 'active' : ''}" data-action="set-filter" data-filter="all">All (${totalStreams})</button>
@@ -2966,6 +3221,20 @@
                 </div>
             </div>
 
+            <!-- P1.3 Bottleneck Splitter (Root Cause Diagnosis) -->
+            <div class="tautulli-modal-section">
+                <div class="tautulli-modal-section-title">
+                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    <span>Bottleneck Splitter (Root Cause Analysis)</span>
+                </div>
+                <table class="tautulli-modal-table">
+                    <tr><td>Performance State</td><td><span class="tautulli-badge ${card.bottleneck ? card.bottleneck.badgeClass : 'tautulli-bottleneck-healthy'}">${escapeHtml(card.bottleneck ? card.bottleneck.badgeText : 'Pipeline Healthy')}</span></td></tr>
+                    <tr><td>Primary Diagnosis</td><td><strong>${escapeHtml(card.bottleneck ? card.bottleneck.shortName : 'Optimal')}</strong></td></tr>
+                    <tr><td>Technical Finding</td><td>${escapeHtml(card.bottleneck ? card.bottleneck.explanation : 'Encoder speed and transmission throughput are balanced.')}</td></tr>
+                    <tr><td>Admin Recommendation</td><td style="color:#38bdf8;">${escapeHtml(card.bottleneck ? card.bottleneck.recommendation : 'No intervention needed.')}</td></tr>
+                </table>
+            </div>
+
             <!-- Media Source Telemetry -->
             <div class="tautulli-modal-section">
                 <div class="tautulli-modal-section-title">
@@ -2979,7 +3248,9 @@
                     <tr><td>Video Codec &amp; Resolution</td><td>${escapeHtml(card.videoDisplay)}</td></tr>
                     ${card.videoProfile ? `<tr><td>Video Profile &amp; Bit Depth</td><td>${escapeHtml(card.videoProfile)} (${escapeHtml(card.videoBitDepth || '8-bit')})</td></tr>` : ''}
                     ${card.videoFrameRate ? `<tr><td>Source Frame Rate</td><td>${escapeHtml(card.videoFrameRate)}</td></tr>` : ''}
-                    ${card.colorSpace ? `<tr><td>Color Space / Range</td><td>${escapeHtml(card.colorSpace)} ${card.hdrBadge ? `(${escapeHtml(card.hdrBadge)})` : ''}</td></tr>` : ''}
+                    ${card.colorSpace ? `<tr><td>Color Space / Gamut</td><td>${escapeHtml(card.colorSpace)}${card.colorPrimaries ? ` (${escapeHtml(card.colorPrimaries.toUpperCase())})` : ''} ${card.hdrBadge ? `[${escapeHtml(card.hdrBadge)}]` : ''}</td></tr>` : ''}
+                    ${card.colorTransfer ? `<tr><td>Transfer Characteristics</td><td>${escapeHtml(card.colorTransfer)} ${card.hdrStandardDesc ? `(${escapeHtml(card.hdrStandardDesc)})` : ''}</td></tr>` : ''}
+                    ${card.isToneMapped ? `<tr><td>HDR Tone Mapping</td><td><span style="color:#f59e0b;font-weight:600;">Active · ${escapeHtml(card.toneMappingDetail)}</span></td></tr>` : ''}
                     <tr><td>Stream Bitrate</td><td>${escapeHtml(card.bandwidthDisplay)}</td></tr>
                 </table>
             </div>
@@ -3026,7 +3297,8 @@
                     <tr><td>User Account</td><td>${escapeHtml(card.userName)}</td></tr>
                     <tr><td>Device Name</td><td>${escapeHtml(card.player)}</td></tr>
                     <tr><td>Client App</td><td>${escapeHtml(card.product)}</td></tr>
-                    <tr><td>Network Endpoint</td><td>${card.isLan ? 'LAN' : 'WAN'} • ${escapeHtml(card.locationDisplay)}</td></tr>
+                    <tr><td>Network Endpoint</td><td>${card.isLan ? 'LAN (Local Private Network)' : `WAN (Remote Endpoint: ${escapeHtml(card.locationDisplay)})`}</td></tr>
+                    <tr><td>Multi-Location Check</td><td>${card.isMultiIpSharing ? `<span style="color:#f87171;font-weight:700;">Flagged: ${card.distinctWanIpCount} Distinct WAN IPs streaming concurrently</span>` : '<span style="color:#34d399;">Authorized Single Household</span>'}</td></tr>
                     ${card.isMuted ? `<tr><td>Audio State</td><td><span style="color:#f87171;font-weight:700;">Muted</span></td></tr>` : ''}
                     ${card.volumeLevel != null ? `<tr><td>Volume Level</td><td>${card.volumeLevel}%</td></tr>` : ''}
                     <tr><td>Session ID</td><td style="font-size:10px;word-break:break-all;">${escapeHtml(card.sessionId)}</td></tr>
@@ -3041,12 +3313,16 @@
                     title: card.primaryTitle,
                     media: card.secondaryTitle,
                     playMethod: card.playMethod,
+                    bottleneck: card.bottleneck ? card.bottleneck.shortName : 'Healthy',
                     container: card.containerDisplay,
                     video: card.videoDisplay,
                     videoProfile: card.videoProfile,
                     videoBitDepth: card.videoBitDepth,
                     framerate: card.videoFrameRate,
                     colorSpace: card.colorSpace,
+                    colorTransfer: card.colorTransfer,
+                    colorPrimaries: card.colorPrimaries,
+                    toneMapping: card.toneMappingDetail || (card.isToneMapped ? 'Active' : 'Direct'),
                     hdr: card.hdrBadge,
                     resolution: card.resBadge,
                     audio: card.audioDisplay,
@@ -3066,6 +3342,7 @@
                     device: card.player,
                     network: card.isLan ? 'LAN' : 'WAN',
                     location: card.locationDisplay,
+                    multiIpSharing: card.isMultiIpSharing ? `${card.distinctWanIpCount} WAN IPs` : 'None',
                     sessionId: card.sessionId
                 };
                 copyTextToClipboard(JSON.stringify(diag, null, 2), copyBtn);
@@ -3463,6 +3740,33 @@
             }
 
             const cards = activeSessions.map((s, idx) => mapSessionToCardModel(s, idx));
+
+            // P1.2 Multi-IP concurrent account sharing cross-analysis
+            const userWanMap = new Map(); // userId -> Set of distinct clean WAN IPs
+            cards.forEach((c) => {
+                if (!c.isLan && c.rawCleanIp) {
+                    const uid = c.userId || c.userName;
+                    if (!userWanMap.has(uid)) {
+                        userWanMap.set(uid, new Set());
+                    }
+                    userWanMap.get(uid).add(c.rawCleanIp);
+                }
+            });
+
+            cards.forEach((c) => {
+                const uid = c.userId || c.userName;
+                const wanSet = userWanMap.get(uid);
+                if (wanSet && wanSet.size > 1) {
+                    c.isMultiIpSharing = true;
+                    c.distinctWanIpCount = wanSet.size;
+                    c.wanIpList = Array.from(wanSet);
+                } else {
+                    c.isMultiIpSharing = false;
+                    c.distinctWanIpCount = 1;
+                }
+                c.bottleneck = computeBottleneckDiagnostic(c);
+            });
+
             currentCardModels = cards;
 
             // Compute hash of content to avoid redundant DOM mutations
@@ -3479,7 +3783,9 @@
                     bw: c.bandwidthDisplay,
                     hw: c.hwAccelBadge,
                     speed: c.transcodeSpeedMultiplier,
-                    stutter: c.isSevereStutter
+                    stutter: c.isSevereStutter,
+                    multiIp: c.isMultiIpSharing,
+                    bottleneck: c.bottleneck ? c.bottleneck.key : ''
                 }))
             });
 
