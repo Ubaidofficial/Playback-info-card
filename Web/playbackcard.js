@@ -2457,10 +2457,25 @@
     }
 
     /**
+     * Resolves the active Jellyfin ApiClient across various web client versions and architectures.
+     */
+    function getApiClient() {
+        if (window.ApiClient) return window.ApiClient;
+        if (window.connectionManager && typeof window.connectionManager.currentApiClient === 'function') {
+            return window.connectionManager.currentApiClient();
+        }
+        if (window.ServerConnections && typeof window.ServerConnections.currentApiClient === 'function') {
+            return window.ServerConnections.currentApiClient();
+        }
+        return null;
+    }
+
+    /**
      * Resolves the poster/primary artwork URL for an active session.
      */
     function getPosterUrl(session) {
-        if (!window.ApiClient || !session.NowPlayingItem) return null;
+        const apiClient = getApiClient();
+        if (!apiClient || !session.NowPlayingItem) return null;
         const item = session.NowPlayingItem;
 
         if (item.PrimaryImageTag) {
@@ -4415,6 +4430,47 @@
     }
 
     /**
+     * Searches for the optimal insertion point across Jellyfin 10.8, 10.9, and 10.10 dashboard layouts.
+     */
+    function findDashboardTarget(viewElement) {
+        const candidateSelectors = [
+            '.activeDevices',
+            '#activeDevices',
+            '.dashboardServerActivity',
+            '#dashboardServerActivity',
+            '.dashboardForm',
+            '.dashboardGeneralForm',
+            '.dashboardPage .content-primary',
+            '.dashboardPage',
+            '.content-primary',
+            '.pageTabContent:not(.hide)',
+            '.pageContainer:not(.hide)',
+            'div[data-role="page"]:not(.hide)',
+            '.view:not(.hide)',
+            '.mainAnimatedPages > .page:not(.hide)',
+            '.mainAnimatedPages > div:not(.hide)'
+        ];
+
+        if (viewElement && typeof viewElement.querySelector === 'function') {
+            for (const sel of candidateSelectors) {
+                try {
+                    const el = viewElement.querySelector(sel);
+                    if (el) return el;
+                } catch (e) {}
+            }
+        }
+
+        for (const sel of candidateSelectors) {
+            try {
+                const el = document.querySelector(sel);
+                if (el) return el;
+            } catch (e) {}
+        }
+
+        return null;
+    }
+
+    /**
      * Finds the dashboard form container and prepends the playback card container cleanly.
      */
     function setupDashboardContainer(viewElement) {
@@ -4426,12 +4482,7 @@
             existing.remove();
         }
 
-        // Target .dashboardForm or .content-primary inside view or document
-        const target =
-            (viewElement && (viewElement.querySelector('.dashboardForm') || viewElement.querySelector('.content-primary'))) ||
-            document.querySelector('.dashboardForm') ||
-            document.querySelector('.content-primary');
-
+        const target = findDashboardTarget(viewElement);
         if (!target) {
             return false;
         }
@@ -4444,8 +4495,18 @@
             </div>
         `;
 
-        // Prepend directly at the absolute top of the dashboard form
-        target.insertBefore(container, target.firstChild);
+        // If target is an existing dashboard section (e.g. .activeDevices or .dashboardServerActivity), insert directly before it
+        const isExistingSection = (target.classList && (target.classList.contains('activeDevices') || target.classList.contains('dashboardServerActivity'))) || target.id === 'activeDevices';
+        if (isExistingSection) {
+            if (target.parentNode) {
+                target.parentNode.insertBefore(container, target);
+            } else {
+                target.insertBefore(container, target.firstChild);
+            }
+        } else {
+            target.insertBefore(container, target.firstChild);
+        }
+
         attachContainerEvents(container);
         return true;
     }
@@ -4454,15 +4515,19 @@
      * Determines whether the given element or URL corresponds to the admin dashboard.
      */
     function isDashboardView(element) {
-        if (!element) return false;
-        if (element.classList && (element.classList.contains('dashboardForm') || element.classList.contains('dashboardGeneralForm'))) {
+        const path = (window.location.hash || window.location.pathname || '').toLowerCase();
+        if (path.includes('dashboard') || path.includes('serverstatus') || path.includes('dashboard.html')) {
             return true;
         }
-        if (element.querySelector && (element.querySelector('.dashboardForm') || element.querySelector('.dashboardGeneralForm'))) {
+        if (document.querySelector('.activeDevices') || document.querySelector('.dashboardServerActivity') || document.querySelector('.dashboardForm')) {
             return true;
         }
-        const path = window.location.hash || window.location.pathname || '';
-        return path.includes('dashboard') || path.includes('dashboard.html');
+        if (element && typeof element.querySelector === 'function') {
+            if (element.querySelector('.activeDevices') || element.querySelector('.dashboardServerActivity') || element.querySelector('.dashboardForm')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -4494,27 +4559,45 @@
         }
     }
 
-    // Register lifecycle event listeners on document
-    document.addEventListener('viewshow', onViewShow);
-    document.addEventListener('viewhide', onViewTearDown);
-    document.addEventListener('viewdestroy', onViewTearDown);
-
-    // Initial check in case script is loaded while already on dashboard view
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            if (isDashboardView(document.body)) {
+    /**
+     * Heartbeat guard: Ensures container mounts immediately even if custom JS loaded after viewshow event.
+     */
+    function checkAndMount() {
+        if (isDashboardView(document.body)) {
+            const existing = document.getElementById(CONFIG.CONTAINER_ID);
+            const isAttached = existing && document.body && (typeof document.body.contains === 'function' ? document.body.contains(existing) : true);
+            if (!existing || !isAttached) {
                 if (setupDashboardContainer(document.body)) {
                     startPolling();
                 }
-            }
-        });
-    } else {
-        if (isDashboardView(document.body)) {
-            if (setupDashboardContainer(document.body)) {
+            } else if (!isDashboardActive) {
                 startPolling();
+            }
+        } else {
+            if (isDashboardActive) {
+                stopPolling();
+                const existing = document.getElementById(CONFIG.CONTAINER_ID);
+                if (existing) {
+                    existing.remove();
+                }
             }
         }
     }
+
+    // Register lifecycle event listeners on document and window router
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('viewshow', onViewShow);
+        document.addEventListener('viewhide', onViewTearDown);
+        document.addEventListener('viewdestroy', onViewTearDown);
+    }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('hashchange', checkAndMount);
+        window.addEventListener('popstate', checkAndMount);
+    }
+
+    // Run immediate check and continuous 1-second watcher
+    checkAndMount();
+    setInterval(checkAndMount, 1000);
 
     console.info('[PlaybackCard] Jellyfin Playback Info Card v0.1.0 initialized successfully.');
 })();
