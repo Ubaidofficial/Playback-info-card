@@ -60,7 +60,7 @@ Operating strictly in-memory and transiently, it writes zero data to disk or dat
 ### Build from Source
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/jellyfin-plugin-playbackcard.git
+git clone https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard.git
 cd jellyfin-plugin-playbackcard
 
 # Compile in Release configuration

@@ -1,0 +1,49 @@
+name: Build and Package Plugin
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build Plugin (Release)
+      run: dotnet build --configuration Release --no-restore
+
+    - name: Package Plugin Artifacts
+      run: |
+        mkdir -p output
+        cp bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll output/
+        cp plugin.json output/
+        cd output && zip -r ../jellyfin-plugin-playbackcard.zip .
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: jellyfin-plugin-playbackcard
+        path: output/
+
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: jellyfin-plugin-playbackcard.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
