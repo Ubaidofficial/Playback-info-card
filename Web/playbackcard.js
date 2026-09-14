@@ -215,6 +215,22 @@
                 z-index: 0;
             }
 
+            /* Right-Side Fanart Backdrop with Frosted Liquid Glass Vignette Mask (Tautulli + Moonfin) */
+            .tautulli-card-fanart-backdrop {
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 72%;
+                height: 100%;
+                background-size: cover;
+                background-position: center right;
+                opacity: 0.35;
+                pointer-events: none;
+                z-index: 0;
+                mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.75) 25%, black 100%);
+                -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.75) 25%, black 100%);
+            }
+
             /* Card Header: User & Client Strip */
             .tautulli-card-header {
                 position: relative;
@@ -340,6 +356,25 @@
                 background: rgba(59, 130, 246, 0.14);
                 color: #60a5fa;
                 border: 1px solid rgba(59, 130, 246, 0.3);
+            }
+
+            .tautulli-platform-badge {
+                width: 24px;
+                height: 24px;
+                min-width: 24px;
+                border-radius: 7px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                flex-shrink: 0;
+            }
+
+            .tautulli-platform-badge svg {
+                width: 14px;
+                height: 14px;
+                fill: currentColor;
             }
 
             .tautulli-action-cluster {
@@ -486,6 +521,21 @@
                 color: #94a3b8;
                 font-weight: 500;
                 flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .tautulli-rating-badge {
+                padding: 1px 5px;
+                border-radius: 4px;
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                font-size: 9.5px;
+                font-weight: 600;
+                color: #cbd5e1;
+                letter-spacing: 0.02em;
+                line-height: 1.2;
             }
 
             /* Badge Pill Row */
@@ -562,6 +612,20 @@
                 color: #fbbf24;
                 border: 1px solid rgba(245, 158, 11, 0.45);
                 box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+            }
+
+            .tautulli-badge-hdr {
+                background: linear-gradient(180deg, rgba(245, 158, 11, 0.28) 0%, rgba(245, 158, 11, 0.14) 100%);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.5);
+                box-shadow: 0 0 10px -2px rgba(245, 158, 11, 0.35);
+            }
+
+            .tautulli-badge-audio {
+                background: linear-gradient(180deg, rgba(99, 102, 241, 0.28) 0%, rgba(99, 102, 241, 0.14) 100%);
+                color: #a5b4fc;
+                border: 1px solid rgba(99, 102, 241, 0.45);
+                box-shadow: 0 0 10px -2px rgba(99, 102, 241, 0.35);
             }
 
             /* Stream Pipeline Chips */
@@ -685,7 +749,20 @@
                 position: relative;
             }
 
+            .tautulli-progress-buffer {
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                background: rgba(255, 255, 255, 0.22);
+                border-radius: 9999px;
+                transition: width 0.35s ease;
+                z-index: 1;
+            }
+
             .tautulli-progress-fill {
+                position: relative;
+                z-index: 2;
                 height: 100%;
                 border-radius: 9999px;
                 background: linear-gradient(90deg, #0072ff 0%, #00c6ff 100%);
@@ -875,21 +952,65 @@
     }
 
     /**
-     * Returns an SVG icon corresponding to client or device type.
+     * Returns an SVG icon and signature brand color for client / device badges (Tautulli style).
      */
-    function getPlatformIcon(client, deviceName) {
+    function getPlatformBadge(client, deviceName) {
         const combined = `${client || ''} ${deviceName || ''}`.toLowerCase();
 
-        if (combined.includes('android')) {
-            return `<svg viewBox="0 0 24 24"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`;
+        if (combined.includes('android') || combined.includes('pixel') || combined.includes('samsung') || combined.includes('shield')) {
+            return {
+                bg: '#3ddc84',
+                color: '#000000',
+                title: 'Android / Google TV',
+                svg: `<svg viewBox="0 0 24 24"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`
+            };
         }
-        if (combined.includes('apple') || combined.includes('safari') || combined.includes('ios') || combined.includes('macos')) {
-            return `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-3.5l2.79-6.29 6.29-2.79-2.79 6.29-6.29 2.79zm4.25-4.25c-.41.41-.41 1.09 0 1.5s1.09.41 1.5 0 .41-1.09 0-1.5-1.09-.41-1.5 0z"/></svg>`;
+        if (combined.includes('safari')) {
+            return {
+                bg: '#00a4dc',
+                color: '#ffffff',
+                title: 'Apple Safari',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-3.5l2.79-6.29 6.29-2.79-2.79 6.29-6.29 2.79zm4.25-4.25c-.41.41-.41 1.09 0 1.5s1.09.41 1.5 0 .41-1.09 0-1.5-1.09-.41-1.5 0z"/></svg>`
+            };
         }
-        if (combined.includes('fire') || combined.includes('tv') || combined.includes('roku') || combined.includes('shield')) {
-            return `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`;
+        if (combined.includes('apple') || combined.includes('ios') || combined.includes('macos') || combined.includes('iphone') || combined.includes('ipad')) {
+            return {
+                bg: '#1c1c1e',
+                color: '#ffffff',
+                title: 'Apple / iOS / macOS',
+                svg: `<svg viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.87c.66-.82 1.11-1.96.99-3.1-.96.04-2.12.65-2.8 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.13-.47 2.79-1.29z"/></svg>`
+            };
         }
-        return `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`;
+        if (combined.includes('fire') || combined.includes('amazon')) {
+            return {
+                bg: '#ff9900',
+                color: '#111111',
+                title: 'Amazon Fire TV',
+                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
+            };
+        }
+        if (combined.includes('chrome')) {
+            return {
+                bg: '#ea4335',
+                color: '#ffffff',
+                title: 'Google Chrome',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`
+            };
+        }
+        if (combined.includes('roku')) {
+            return {
+                bg: '#662d91',
+                color: '#ffffff',
+                title: 'Roku',
+                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
+            };
+        }
+        return {
+            bg: '#00a4dc',
+            color: '#ffffff',
+            title: client || 'Web Player',
+            svg: `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`
+        };
     }
 
     /**
@@ -925,6 +1046,38 @@
                 type: 'Backdrop',
                 maxHeight: 400,
                 tag: item.BackdropImageTags[0]
+            });
+        }
+        return null;
+    }
+
+    /**
+     * Resolves the fanart / backdrop artwork URL for the right-side glass background.
+     */
+    function getBackdropUrl(session) {
+        if (!window.ApiClient || !session.NowPlayingItem) return null;
+        const item = session.NowPlayingItem;
+
+        if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
+            return window.ApiClient.getImageUrl(item.Id, {
+                type: 'Backdrop',
+                maxWidth: 800,
+                tag: item.BackdropImageTags[0]
+            });
+        }
+        if (item.ParentBackdropImageTags && item.ParentBackdropImageTags.length > 0) {
+            const targetId = item.ParentBackdropItemId || item.SeriesId || item.Id;
+            return window.ApiClient.getImageUrl(targetId, {
+                type: 'Backdrop',
+                maxWidth: 800,
+                tag: item.ParentBackdropImageTags[0]
+            });
+        }
+        if (item.ImageTags && item.ImageTags.Thumb) {
+            return window.ApiClient.getImageUrl(item.Id, {
+                type: 'Thumb',
+                maxWidth: 800,
+                tag: item.ImageTags.Thumb
             });
         }
         return null;
@@ -1112,6 +1265,39 @@
             audioChip = `${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}`;
         }
 
+        // HDR Detection (HDR10, HDR10+, Dolby Vision, HLG, BT2020)
+        let hdrBadge = null;
+        const videoRange = (videoStream.VideoRange || videoStream.VideoRangeType || '').toUpperCase();
+        const colorSpace = (videoStream.ColorSpace || '').toUpperCase();
+        const isHdr = videoRange.includes('HDR') || videoRange.includes('DOVI') || videoRange.includes('HLG') || colorSpace.includes('BT2020');
+        if (isHdr) {
+            let hdrName = 'HDR';
+            if (videoRange.includes('DOVI') || (videoStream.Title && videoStream.Title.toUpperCase().includes('DV'))) {
+                hdrName = '✨ Dolby Vision';
+            } else if (videoRange.includes('HDR10+') || videoRange.includes('HDR10PLUS')) {
+                hdrName = 'HDR10+';
+            } else if (videoRange.includes('HDR10')) {
+                hdrName = 'HDR10';
+            } else if (videoRange.includes('HLG')) {
+                hdrName = 'HLG';
+            }
+
+            if (isTranscode && transcodeInfo && !transcodeInfo.IsVideoDirect) {
+                hdrBadge = `${hdrName} ➔ SDR`;
+            } else {
+                hdrBadge = hdrName;
+            }
+        }
+
+        // Audio Spatial / Atmos / Lossless detection
+        let audioBadge = null;
+        const audioTitleUpper = (audioStream.Title || audioStream.DisplayTitle || '').toUpperCase();
+        if (audioTitleUpper.includes('ATMOS') || audioTitleUpper.includes('JOC')) {
+            audioBadge = 'Dolby Atmos';
+        } else if (origAudioCodec.includes('TRUEHD') || origAudioCodec.includes('DTS-HD') || origAudioCodec.includes('FLAC') || origAudioCodec.includes('ALAC')) {
+            audioBadge = 'Lossless';
+        }
+
         // Container
         let containerChip = origContainer;
         if (isTranscode && transcodeInfo && transcodeInfo.Container) {
@@ -1206,6 +1392,11 @@
             displayName = `User #${index + 1}`;
         }
 
+        // Transcode Completion Buffer
+        const transcodeCompletionPercentage = (isTranscode && transcodeInfo && transcodeInfo.CompletionPercentage != null)
+            ? Math.min(100, Math.max(0, Math.round(transcodeInfo.CompletionPercentage)))
+            : null;
+
         return {
             sessionId: session.Id,
             itemId: item.Id,
@@ -1222,6 +1413,10 @@
             isSwTranscode,
             transcodeFps,
             transcodeSpeedMultiplier,
+            transcodeCompletionPercentage,
+            hdrBadge,
+            audioBadge,
+            officialRating: item.OfficialRating || null,
             isSubtitleBurnIn,
             transcodeReasons,
             containerDisplay,
@@ -1245,6 +1440,8 @@
             secondaryTitle,
             userName: displayName,
             posterUrl: getPosterUrl(session),
+            backdropUrl: getBackdropUrl(session),
+            platformBadge: getPlatformBadge(session.Client, session.DeviceName),
             userAvatarUrl: getUserAvatarUrl(session),
             client: session.Client,
             deviceName: session.DeviceName,
@@ -1340,8 +1537,9 @@
         return `
             <div class="tautulli-card" data-session-id="${escapeHtml(card.sessionId)}">
                 ${card.posterUrl ? `<div class="tautulli-card-ambient-bg" style="background-image: url('${escapeHtml(card.posterUrl)}');"></div>` : ''}
+                ${card.backdropUrl ? `<div class="tautulli-card-fanart-backdrop" style="background-image: url('${escapeHtml(card.backdropUrl)}');"></div>` : ''}
 
-                <!-- Card Header Strip: User Avatar, Client Device, Network, & Actions -->
+                <!-- Card Header Strip: User Avatar, Client Device, Network, Platform & Actions -->
                 <div class="tautulli-card-header">
                     <div class="tautulli-user-strip">
                         <a href="${userHref}" class="tautulli-user-avatar-link" title="Manage user: ${escapeHtml(card.userName)}">
@@ -1362,6 +1560,10 @@
                         <span class="tautulli-network-pill ${card.isLan ? 'tautulli-net-lan' : 'tautulli-net-wan'}" title="Network endpoint">
                             ${card.isLan ? '🔒 LAN' : 'WAN'} ${escapeHtml(card.locationDisplay)}
                         </span>
+                        ${card.platformBadge ? `
+                        <div class="tautulli-platform-badge" style="background: ${card.platformBadge.bg}; color: ${card.platformBadge.color};" title="${escapeHtml(card.platformBadge.title)}">
+                            ${card.platformBadge.svg}
+                        </div>` : ''}
                         <div class="tautulli-action-cluster">
                             <button class="tautulli-action-btn" data-action="message-user" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" title="Send message to player">
                                 <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
@@ -1373,7 +1575,7 @@
                     </div>
                 </div>
 
-                <!-- Card Body: Poster + Stream Pipeline Matrix -->
+                <!-- Card Body: Poster + Stream Pipeline Matrix (Overlaid onto Fanart Backdrop) -->
                 <div class="tautulli-card-body">
                     <!-- Left Poster Artwork -->
                     <a href="${detailHref}" class="tautulli-poster-wrapper" title="View details: ${escapeHtml(card.primaryTitle)}">
@@ -1382,13 +1584,16 @@
 
                     <!-- Right Media & Stream Pipeline -->
                     <div class="tautulli-media-details">
-                        <!-- Media Title & Secondary Line -->
+                        <!-- Media Title & Secondary Line with Content Rating -->
                         <div class="tautulli-titles-container">
                             <div class="tautulli-title-line">
                                 <a href="${detailHref}" class="tautulli-title-primary" title="${escapeHtml(card.primaryTitle)}">
                                     ${escapeHtml(card.primaryTitle)}
                                 </a>
-                                ${card.secondaryTitle ? `<span class="tautulli-title-secondary">${escapeHtml(card.secondaryTitle)}</span>` : ''}
+                                <div class="tautulli-title-secondary">
+                                    ${card.officialRating ? `<span class="tautulli-rating-badge">${escapeHtml(card.officialRating)}</span>` : ''}
+                                    ${card.secondaryTitle ? `<span>${escapeHtml(card.secondaryTitle)}</span>` : ''}
+                                </div>
                             </div>
 
                             <!-- Engine Status Badges -->
@@ -1396,6 +1601,8 @@
                                 <span class="tautulli-badge ${badgeClass}">${badgeLabel}</span>
                                 ${hwBadgeHtml}
                                 ${speedHtml}
+                                ${card.hdrBadge ? `<span class="tautulli-badge tautulli-badge-hdr" title="High Dynamic Range">${escapeHtml(card.hdrBadge)}</span>` : ''}
+                                ${card.audioBadge ? `<span class="tautulli-badge tautulli-badge-audio" title="High Fidelity Audio">${escapeHtml(card.audioBadge)}</span>` : ''}
                                 ${burnInHtml}
                             </div>
                         </div>
@@ -1435,12 +1642,16 @@
                     <div class="tautulli-progress-row">
                         ${stateIconHtml}
                         <div class="tautulli-progress-track">
+                            ${card.transcodeCompletionPercentage != null ? `<div class="tautulli-progress-buffer" style="width: ${card.transcodeCompletionPercentage}%;" title="Transcode Buffer: ${card.transcodeCompletionPercentage}%"></div>` : ''}
                             <div class="tautulli-progress-fill" style="width: ${card.progressPercent}%;"></div>
                         </div>
                     </div>
                     <div class="tautulli-time-row">
                         <span class="tautulli-time-progress">${escapeHtml(card.timeProgressStr)}</span>
-                        <span class="${etaClass}">${escapeHtml(card.etaStr)}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${card.transcodeCompletionPercentage != null ? `<span style="color: #94a3b8; font-family: monospace; font-size: 10px;">Buffer: ${card.transcodeCompletionPercentage}%</span>` : ''}
+                            <span class="${etaClass}">${escapeHtml(card.etaStr)}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1604,6 +1815,7 @@
                     paused: c.isPaused,
                     pauseSec: Math.floor(c.pausedDurationSeconds / 5), // re-render every 5s if paused
                     pos: c.timeProgressStr,
+                    buf: c.transcodeCompletionPercentage,
                     bw: c.bandwidthDisplay,
                     hw: c.hwAccelBadge,
                     speed: c.transcodeSpeedMultiplier
