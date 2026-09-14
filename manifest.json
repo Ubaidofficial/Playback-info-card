@@ -12,8 +12,8 @@
         "changelog": "Release v0.1.0",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard/releases/download/v0.1.0/jellyfin-plugin-playbackcard.zip",
-        "checksum": "abebab5867086811d7feb6bc24dbf723",
-        "timestamp": "2026-09-14T21:57:52Z"
+        "checksum": "493d649c29a5f24e95c010402b5760fa",
+        "timestamp": "2026-09-14T22:07:52Z"
       }
     ]
   }
