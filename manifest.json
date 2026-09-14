@@ -9,11 +9,11 @@
     "versions": [
       {
         "version": "0.1.0.0",
-        "changelog": "Initial release of Playback Info Card plugin (v0.1.0)",
+        "changelog": "Release v0.1.0",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard/releases/download/v0.1.0/jellyfin-plugin-playbackcard.zip",
-        "checksum": "",
-        "timestamp": "2026-09-14T23:25:00Z"
+        "checksum": "b1d346420a43560f750ee74eff3e6102",
+        "timestamp": "2026-09-14T21:26:03Z"
       }
     ]
   }
