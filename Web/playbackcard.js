@@ -65,9 +65,14 @@
                 --lg-specular-top: inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
                 --lg-specular-left: inset 1px 0 0 0 rgba(255, 255, 255, 0.08);
                 --lg-specular-bottom: inset 0 -1px 0 0 rgba(255, 255, 255, 0.03);
+                /* Nikdelvin Chromatic Aberration Dispersion Tokens */
+                --lg-dispersion-cyan: inset 1px 0 0 0 rgba(56, 189, 248, 0.12);
+                --lg-dispersion-magenta: inset -1px 0 0 0 rgba(244, 114, 182, 0.08);
+                /* Sanjaynela Apple iOS Lens Refraction Highlight */
+                --lg-lens-highlight: radial-gradient(ellipse 70% 50% at 12% 0%, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
                 --lg-depth-shadow: 0 24px 52px -8px rgba(0, 0, 0, 0.88), 0 8px 24px -4px rgba(0, 0, 0, 0.6);
                 --lg-card-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.94) 100%), #090a10;
-                --lg-card-border: 1px solid rgba(255, 255, 255, 0.09);
+                --lg-card-border: 1px solid rgba(255, 255, 255, 0.14);
                 --lg-chip-bg: rgba(255, 255, 255, 0.04);
                 --lg-chip-border: 1px solid rgba(255, 255, 255, 0.08);
                 --lg-control-bg: rgba(255, 255, 255, 0.06);
@@ -203,6 +208,11 @@
                 box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.35);
             }
 
+            .tautulli-tool-btn:active {
+                transform: scale(0.96);
+                transition: transform 0.08s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
             .tautulli-tool-btn.active {
                 background: rgba(0, 164, 220, 0.25);
                 border-color: rgba(0, 164, 220, 0.55);
@@ -254,25 +264,37 @@
                 box-sizing: border-box;
             }
 
-            /* Session Card - 2026 Executive Studio Canvas with Liquid Glass Physics */
+            /* Session Card - 2026 Executive Studio Canvas with Liquid Glass Physics & Lens Highlight */
             .tautulli-card {
                 position: relative;
                 display: flex;
                 flex-direction: column;
                 border-radius: 18px;
                 overflow: hidden;
-                background: var(--lg-card-bg);
+                background: var(--lg-lens-highlight), var(--lg-card-bg);
                 backdrop-filter: blur(32px) saturate(185%) contrast(105%);
                 -webkit-backdrop-filter: blur(32px) saturate(185%) contrast(105%);
                 border: var(--lg-card-border);
-                box-shadow: var(--lg-specular-top), var(--lg-specular-left), var(--lg-specular-bottom), var(--lg-depth-shadow);
+                box-shadow: 
+                    var(--lg-specular-top),
+                    var(--lg-specular-left),
+                    var(--lg-dispersion-cyan),
+                    var(--lg-dispersion-magenta),
+                    var(--lg-specular-bottom),
+                    var(--lg-depth-shadow);
                 transition: transform var(--lg-duration) var(--lg-ease), box-shadow var(--lg-duration) var(--lg-ease), border-color var(--lg-duration) ease;
             }
 
             .tautulli-card:hover {
                 transform: translateY(-2px);
-                border-color: rgba(56, 189, 248, 0.35);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.28), inset 1px 0 0 0 rgba(255, 255, 255, 0.12), 0 28px 64px -10px rgba(0, 0, 0, 0.94), 0 0 24px -4px rgba(56, 189, 248, 0.18);
+                border-color: rgba(56, 189, 248, 0.4);
+                box-shadow: 
+                    inset 0 1px 0 0 rgba(255, 255, 255, 0.32),
+                    inset 1px 0 0 0 rgba(255, 255, 255, 0.16),
+                    var(--lg-dispersion-cyan),
+                    var(--lg-dispersion-magenta),
+                    0 28px 64px -10px rgba(0, 0, 0, 0.94),
+                    0 0 24px -4px rgba(56, 189, 248, 0.22);
             }
 
             /* Moonfin Dynamic Ambient Glass Layer */
@@ -482,6 +504,11 @@
                 color: #ffffff;
                 transform: translateY(-1px) scale(1.04);
                 box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.22), 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            .tautulli-action-btn:active {
+                transform: scale(0.96);
+                transition: transform 0.08s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .tautulli-action-btn-kill:hover {
@@ -862,6 +889,11 @@
                 background: rgba(255, 255, 255, 0.14);
             }
 
+            .tautulli-state-icon:active {
+                transform: scale(0.92);
+                transition: transform 0.08s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
             .tautulli-state-icon svg {
                 width: 12px;
                 height: 12px;
@@ -1017,12 +1049,17 @@
                 max-width: 600px;
                 max-height: 88vh;
                 overflow-y: auto;
-                background: linear-gradient(145deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.98) 100%), #090a10;
-                border: 1px solid rgba(255, 255, 255, 0.15);
+                background: var(--lg-lens-highlight), linear-gradient(145deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.98) 100%), #090a10;
+                border: 1px solid rgba(255, 255, 255, 0.16);
                 border-radius: 20px;
                 backdrop-filter: blur(36px) saturate(190%) contrast(105%);
                 -webkit-backdrop-filter: blur(36px) saturate(190%) contrast(105%);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.25), inset 1px 0 0 0 rgba(255, 255, 255, 0.1), 0 32px 72px -8px rgba(0, 0, 0, 0.95);
+                box-shadow: 
+                    inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+                    inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
+                    var(--lg-dispersion-cyan),
+                    var(--lg-dispersion-magenta),
+                    0 32px 72px -8px rgba(0, 0, 0, 0.95);
                 color: #e2e8f0;
                 padding: 24px;
                 box-sizing: border-box;
@@ -1081,6 +1118,10 @@
                 transform: scale(1.03);
             }
 
+            .tautulli-modal-tool-btn:active {
+                transform: scale(0.96);
+            }
+
             .tautulli-modal-close {
                 background: rgba(255, 255, 255, 0.08);
                 border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1099,6 +1140,10 @@
                 background: rgba(239, 68, 68, 0.25);
                 color: #f87171;
                 border-color: rgba(239, 68, 68, 0.5);
+            }
+
+            .tautulli-modal-close:active {
+                transform: scale(0.92);
             }
 
             .tautulli-modal-section {
@@ -1369,9 +1414,20 @@
                     width: 100%;
                     max-height: 85vh;
                     border-radius: 20px 20px 0 0;
-                    padding: 16px;
+                    padding: 14px 16px 18px 16px;
                     margin: 0;
                     box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
+                }
+
+                /* Apple iOS GlassBottomSheet presentation drag indicator (sanjaynela) */
+                .tautulli-modal::before {
+                    content: '';
+                    display: block;
+                    width: 36px;
+                    height: 4.5px;
+                    border-radius: 9999px;
+                    background: rgba(255, 255, 255, 0.32);
+                    margin: 0 auto 14px auto;
                 }
 
                 .tautulli-modal-table td {
