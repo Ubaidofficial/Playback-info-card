@@ -53,6 +53,11 @@
     const MAX_BANDWIDTH_HISTORY = 16;
     const bandwidthHistory = []; // { time, total, wan, lan }
 
+    // Watch Statistics Drawer State
+    let showWatchStats = true;
+    let cachedWatchStats = null;
+    let lastWatchStatsFetchTime = 0;
+
     // Smart Stream Guard Rules state (persisted in localStorage)
     const DEFAULT_STREAM_GUARD_RULES = {
         killPausedEnabled: false,
@@ -959,6 +964,226 @@
 
             .tautulli-sparkline-dot {
                 animation: tautulli-pulse 2s infinite ease-in-out;
+            }
+
+            /* Cellular Network Pill */
+            .tautulli-net-cellular {
+                background: rgba(245, 158, 11, 0.14);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.35);
+            }
+
+            /* Bandwidth Savings Badge */
+            .tautulli-badge-savings {
+                background: rgba(16, 185, 129, 0.14);
+                color: #6ee7b7;
+                border: 1px solid rgba(16, 185, 129, 0.35);
+                font-weight: 600;
+            }
+
+            /* SyncPlay Watch Party Badge */
+            .tautulli-badge-syncplay {
+                background: rgba(168, 85, 247, 0.15);
+                color: #d8b4fe;
+                border: 1px solid rgba(168, 85, 247, 0.38);
+                font-weight: 600;
+            }
+
+            /* Hi-Res Lossless Audio Badge */
+            .tautulli-badge-hires {
+                background: rgba(234, 179, 8, 0.15);
+                color: #fef08a;
+                border: 1px solid rgba(234, 179, 8, 0.4);
+                font-weight: 700;
+                letter-spacing: 0.02em;
+            }
+
+            /* Audiophile Vinyl Animation */
+            .tautulli-vinyl-container {
+                position: relative;
+                width: 96px;
+                height: 96px;
+                flex-shrink: 0;
+            }
+
+            .tautulli-vinyl-disc {
+                position: absolute;
+                top: 3px;
+                right: -16px;
+                width: 90px;
+                height: 90px;
+                border-radius: 50%;
+                background: radial-gradient(circle, #18181b 15%, #27272a 18%, #09090b 35%, #27272a 50%, #09090b 68%, #27272a 82%, #09090b 100%);
+                border: 1.5px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), inset 0 0 4px rgba(255, 255, 255, 0.2);
+                z-index: 0;
+                transition: transform 0.5s ease;
+            }
+
+            .tautulli-vinyl-spinning {
+                animation: tautulli-spin 7s linear infinite;
+            }
+
+            @keyframes tautulli-spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
+            /* Live Audio Spectrum Equalizer Bars */
+            .tautulli-audio-spectrum {
+                display: inline-flex;
+                align-items: flex-end;
+                gap: 2px;
+                height: 12px;
+                width: 14px;
+                margin-left: 4px;
+            }
+
+            .tautulli-spectrum-bar {
+                width: 2px;
+                background: #38bdf8;
+                border-radius: 1px;
+                animation: tautulli-spectrum-bounce 0.8s ease-in-out infinite alternate;
+            }
+
+            .tautulli-spectrum-bar:nth-child(1) { height: 40%; animation-delay: 0.1s; }
+            .tautulli-spectrum-bar:nth-child(2) { height: 90%; animation-delay: 0.3s; }
+            .tautulli-spectrum-bar:nth-child(3) { height: 60%; animation-delay: 0.2s; }
+            .tautulli-spectrum-bar:nth-child(4) { height: 100%; animation-delay: 0.4s; }
+
+            .tautulli-spectrum-paused .tautulli-spectrum-bar {
+                animation: none;
+                height: 25% !important;
+                background: #64748b;
+            }
+
+            @keyframes tautulli-spectrum-bounce {
+                0% { height: 25%; }
+                100% { height: 100%; }
+            }
+
+            /* Watch Statistics Drawer (Tautulli-Inspired Leaderboards) */
+            .tautulli-stats-drawer {
+                margin-top: 24px;
+                padding: 16px;
+                background: linear-gradient(155deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
+                backdrop-filter: blur(28px) saturate(180%);
+                -webkit-backdrop-filter: blur(28px) saturate(180%);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px;
+                box-shadow: var(--lg-specular-top), 0 12px 36px 0 rgba(0, 0, 0, 0.45);
+            }
+
+            .tautulli-stats-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 14px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .tautulli-stats-title {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 12px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #ffffff;
+            }
+
+            .tautulli-stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 16px;
+            }
+
+            .tautulli-stats-col {
+                background: rgba(255, 255, 255, 0.025);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                border-radius: 12px;
+                padding: 12px;
+            }
+
+            .tautulli-stats-col-title {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: #94a3b8;
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .tautulli-stats-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .tautulli-stats-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 6px 8px;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.04);
+                transition: background 0.2s ease, transform 0.2s ease;
+                text-decoration: none;
+                color: inherit;
+            }
+
+            .tautulli-stats-item:hover {
+                background: rgba(255, 255, 255, 0.06);
+                transform: translateX(2px);
+            }
+
+            .tautulli-stats-rank {
+                font-size: 11px;
+                font-weight: 700;
+                color: #38bdf8;
+                width: 14px;
+                text-align: center;
+            }
+
+            .tautulli-stats-thumb {
+                width: 28px;
+                height: 40px;
+                border-radius: 4px;
+                object-fit: cover;
+                background: #1e293b;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .tautulli-stats-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .tautulli-stats-name {
+                font-size: 11.5px;
+                font-weight: 600;
+                color: #f1f5f9;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-stats-meta {
+                font-size: 10px;
+                color: #94a3b8;
+            }
+
+            .tautulli-stats-metric {
+                font-size: 11px;
+                font-weight: 700;
+                color: #fcd34d;
+                font-family: monospace;
             }
 
             /* Stream Pipeline Chips (Diskovarr dashboard precision with vector glyphs) */
@@ -2550,6 +2775,20 @@
 
         // Bandwidth & Quality
         const currentBitrate = (transcodeInfo && transcodeInfo.Bitrate) || item.Bitrate || 0;
+        const origBitrate = (item.MediaStreams && item.MediaStreams[0] && item.MediaStreams[0].BitRate) || item.Bitrate || 0;
+        const targetBitrate = (transcodeInfo && transcodeInfo.Bitrate) || currentBitrate;
+        let bandwidthSavingsRatio = null;
+        let bandwidthSavingsPercent = null;
+        let bandwidthSavingsBadge = null;
+        if (isTranscode && origBitrate > targetBitrate && targetBitrate > 0) {
+            const ratio = (origBitrate / targetBitrate).toFixed(1);
+            const pct = Math.round(((origBitrate - targetBitrate) / origBitrate) * 100);
+            if (pct >= 5) {
+                bandwidthSavingsRatio = `${ratio}:1`;
+                bandwidthSavingsPercent = `${pct}%`;
+                bandwidthSavingsBadge = `${ratio}:1 (${pct}% Bandwidth Saved)`;
+            }
+        }
         const qualityDisplay = isTranscode
             ? `Transcode (${formatBitrate(currentBitrate)})`
             : `Original (${formatBitrate(currentBitrate)})`;
@@ -2567,6 +2806,24 @@
         let locationDisplay = `${cleanIp}`;
         if (isPrivacyMode) {
             locationDisplay = `[Protected]`;
+        }
+
+        // Tautulli-Inspired Connection Type (CELLULAR vs WAN vs LAN)
+        let connectionType = 'LAN';
+        let connectionClass = 'tautulli-net-lan';
+        let connectionBadge = 'LAN';
+        if (!isLan) {
+            const clientDeviceStr = `${session.Client || ''} ${session.DeviceName || ''}`.toLowerCase();
+            const isCellular = /cellular|mobile|iphone|ipad|android|galaxy|pixel|phone|streamyfin|finamp|swiftfin/i.test(clientDeviceStr);
+            if (isCellular) {
+                connectionType = 'CELLULAR';
+                connectionClass = 'tautulli-net-cellular';
+                connectionBadge = 'CELLULAR';
+            } else {
+                connectionType = 'WAN';
+                connectionClass = 'tautulli-net-wan';
+                connectionBadge = 'WAN';
+            }
         }
 
         // Transcode Reasons (filter out duplicate subtitle notice if burn-in badge is already shown)
@@ -2672,7 +2929,26 @@
             audioChannelsBadge = 'Stereo';
         }
 
-        return {
+        // Tautulli-Inspired Hi-Res Audiophile Detection
+        const sampleRateHz = audioStream.SampleRate || 0;
+        const bitDepthBits = audioStream.BitDepth || 0;
+        const isHiResAudio = Boolean(isAudioItem && (
+            (sampleRateHz >= 48000 && bitDepthBits >= 24) ||
+            (sampleRateHz >= 88200) ||
+            (origAudioCodec === 'FLAC' && (bitDepthBits >= 24 || sampleRateHz >= 48000)) ||
+            (origAudioCodec === 'DSD' || origAudioCodec === 'DSF')
+        ));
+        let hiResBadgeText = null;
+        if (isHiResAudio) {
+            const srStr = sampleRateHz >= 1000 ? `${(sampleRateHz / 1000).toFixed(0)}kHz` : `${sampleRateHz}Hz`;
+            const bdStr = bitDepthBits ? `${bitDepthBits}-bit` : '';
+            hiResBadgeText = `Hi-Res ${[srStr, bdStr, origAudioCodec].filter(Boolean).join(' ')}`.trim();
+        }
+
+        // Tautulli-Inspired SyncPlay Watch Party Group
+        const syncPlayGroupId = session.SyncPlayGroupId || session.GroupId || (session.SyncPlay && session.SyncPlay.GroupId) || null;
+
+        const model = {
             sessionId: session.Id,
             itemId: item.Id,
             userId: session.UserId,
@@ -2704,6 +2980,17 @@
             isToneMapped,
             toneMappingDetail,
             rawCleanIp: cleanIp,
+            connectionType,
+            connectionClass,
+            connectionBadge,
+            bandwidthSavingsRatio,
+            bandwidthSavingsPercent,
+            bandwidthSavingsBadge,
+            isHiResAudio,
+            hiResBadgeText,
+            syncPlayGroupId,
+            syncPlayMembersCount: 1,
+            syncPlayBadge: null,
             isMultiIpSharing: false,
             distinctWanIpCount: 1,
             wanIpList: [],
@@ -2842,6 +3129,16 @@
             `;
         }
 
+        let artworkHtml = posterHtml;
+        if (card.isAudioItem) {
+            artworkHtml = `
+                <div class="tautulli-vinyl-container" title="${escapeHtml(card.primaryTitle)}">
+                    <div class="tautulli-vinyl-disc ${card.isPaused ? '' : 'tautulli-vinyl-spinning'}"></div>
+                    ${posterHtml}
+                </div>
+            `;
+        }
+
         // User Avatar image or initials circle
         let avatarHtml = '';
         if (card.userAvatarUrl && !isPrivacyMode) {
@@ -2887,10 +3184,21 @@
                     </div>
 
                     <div class="tautulli-header-controls">
-                        <span class="tautulli-network-pill ${card.isLan ? 'tautulli-net-lan' : 'tautulli-net-wan'}" title="Network endpoint">
-                            <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;">${card.isLan ? '<path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>' : '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>'}</svg>
-                            ${card.isLan ? 'LAN' : 'WAN'} • ${escapeHtml(card.locationDisplay)}
+                        <span class="tautulli-network-pill ${escapeHtml(card.connectionClass || (card.isLan ? 'tautulli-net-lan' : 'tautulli-net-wan'))}" title="Network endpoint (${escapeHtml(card.connectionType || (card.isLan ? 'LAN' : 'WAN'))})">
+                            <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;">
+                                ${card.connectionType === 'CELLULAR' 
+                                    ? '<path d="M2 17h2v4H2v-4zm4-5h2v9H6v-9zm4-4h2v13h-2V8zm4-4h2v17h-2V4zm4-3h2v20h-2V1z"/>' 
+                                    : card.isLan 
+                                    ? '<path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>' 
+                                    : '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>'}
+                            </svg>
+                            ${card.connectionBadge || (card.isLan ? 'LAN' : 'WAN')} • ${escapeHtml(card.locationDisplay)}
                         </span>
+                        ${card.syncPlayBadge ? `
+                        <span class="tautulli-badge tautulli-badge-syncplay" title="Watch Party: Synced Playback across multiple clients">
+                            <svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+                            ${escapeHtml(card.syncPlayBadge)}
+                        </span>` : ''}
                         ${card.isMultiIpSharing ? `
                         <span class="tautulli-badge tautulli-badge-multi-ip" title="Security Alert: Account streaming from ${card.distinctWanIpCount} distinct WAN locations concurrently. Possible credential sharing.">
                             <svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
@@ -2918,7 +3226,7 @@
                 <div class="tautulli-card-body">
                     <!-- Left Poster Artwork -->
                     <a href="${detailHref}" class="tautulli-poster-wrapper" title="View details: ${escapeHtml(card.primaryTitle)}">
-                        ${posterHtml}
+                        ${artworkHtml}
                     </a>
 
                     <!-- Right Media & Stream Pipeline -->
@@ -2929,6 +3237,14 @@
                                 <a href="${detailHref}" class="tautulli-title-primary" title="${escapeHtml(card.primaryTitle)}">
                                     ${escapeHtml(card.primaryTitle)}
                                 </a>
+                                ${card.isAudioItem ? `
+                                    <div class="tautulli-audio-spectrum ${card.isPaused ? 'tautulli-spectrum-paused' : ''}" title="${card.isPaused ? 'Audio Paused' : 'Playing Audio'}">
+                                        <span class="tautulli-spectrum-bar"></span>
+                                        <span class="tautulli-spectrum-bar"></span>
+                                        <span class="tautulli-spectrum-bar"></span>
+                                        <span class="tautulli-spectrum-bar"></span>
+                                    </div>
+                                ` : ''}
                                 <div class="tautulli-title-secondary">
                                     ${card.officialRating ? `<span class="tautulli-rating-badge">${escapeHtml(card.officialRating)}</span>` : ''}
                                     ${card.secondaryTitle ? `<span>${escapeHtml(card.secondaryTitle)}</span>` : ''}
@@ -2939,6 +3255,8 @@
                             <div class="tautulli-badge-row">
                                 <span class="tautulli-badge ${badgeClass}">${badgeLabel}</span>
                                 ${card.resBadge ? `<span class="tautulli-badge tautulli-badge-res" title="Source Resolution">${escapeHtml(card.resBadge)}</span>` : ''}
+                                ${card.isHiResAudio ? `<span class="tautulli-badge tautulli-badge-hires" title="High-Resolution Lossless Studio Quality Master">${escapeHtml(card.hiResBadgeText)}</span>` : ''}
+                                ${card.bandwidthSavingsBadge ? `<span class="tautulli-badge tautulli-badge-savings" title="Bandwidth Savings Efficiency Ratio">${escapeHtml(card.bandwidthSavingsBadge)}</span>` : ''}
                                 ${hwBadgeHtml}
                                 ${speedHtml}
                                 ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow ${card.isSevereStutter ? 'tautulli-stutter-alarm' : ''}" title="${card.isSevereStutter ? 'SEVERE STUTTER ALARM: Transcode speed < 1.0x for consecutive intervals. Client is starving buffer.' : 'Transcode speed < 1.0x! Client will experience buffering.'}"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>${card.isSevereStutter ? 'STUTTER ALARM (&lt;1.0x)' : 'BUFFERING (&lt;1.0x)'}</span>` : ''}
@@ -3003,17 +3321,189 @@
     }
 
     /**
+     * Tautulli-Inspired Feature 5: Fetches server top watched statistics for the collapsible leaderboard drawer.
+     */
+    async function fetchWatchStatistics() {
+        const now = Date.now();
+        if (cachedWatchStats && (now - lastWatchStatsFetchTime < 60000)) {
+            return cachedWatchStats;
+        }
+
+        try {
+            if (window.ApiClient && typeof window.ApiClient.getItems === 'function') {
+                const userId = typeof window.ApiClient.getCurrentUserId === 'function' ? window.ApiClient.getCurrentUserId() : undefined;
+                const [topSeriesResp, topMoviesResp] = await Promise.allSettled([
+                    window.ApiClient.getItems(userId, {
+                        SortBy: 'PlayCount,SortName',
+                        SortOrder: 'Descending',
+                        IncludeItemTypes: 'Series',
+                        Limit: 5,
+                        Recursive: true,
+                        Fields: 'PrimaryImageAspectRatio,PlayState,ItemCounts'
+                    }),
+                    window.ApiClient.getItems(userId, {
+                        SortBy: 'PlayCount,SortName',
+                        SortOrder: 'Descending',
+                        IncludeItemTypes: 'Movie',
+                        Limit: 5,
+                        Recursive: true,
+                        Fields: 'PrimaryImageAspectRatio,PlayState'
+                    })
+                ]);
+
+                const seriesItems = (topSeriesResp.status === 'fulfilled' && topSeriesResp.value && topSeriesResp.value.Items) ? topSeriesResp.value.Items : [];
+                const movieItems = (topMoviesResp.status === 'fulfilled' && topMoviesResp.value && topMoviesResp.value.Items) ? topMoviesResp.value.Items : [];
+
+                if (seriesItems.length > 0 || movieItems.length > 0) {
+                    cachedWatchStats = {
+                        topSeries: seriesItems.map((item) => ({
+                            id: item.Id,
+                            name: item.Name,
+                            playCount: (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0,
+                            year: item.ProductionYear || '',
+                            imgUrl: (typeof window.ApiClient.getImageUrl === 'function')
+                                ? window.ApiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
+                                : null
+                        })),
+                        topMovies: movieItems.map((item) => ({
+                            id: item.Id,
+                            name: item.Name,
+                            playCount: (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0,
+                            year: item.ProductionYear || '',
+                            imgUrl: (typeof window.ApiClient.getImageUrl === 'function')
+                                ? window.ApiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
+                                : null
+                        }))
+                    };
+                    lastWatchStatsFetchTime = now;
+                    return cachedWatchStats;
+                }
+            }
+        } catch (err) {
+            console.warn('[PlaybackCard] Failed to fetch watch statistics:', err);
+        }
+
+        if (!cachedWatchStats) {
+            cachedWatchStats = {
+                topSeries: [],
+                topMovies: []
+            };
+        }
+        return cachedWatchStats;
+    }
+
+    /**
+     * Renders the Tautulli-inspired Watch Statistics Mini-Drawer.
+     */
+    function renderWatchStatisticsDrawer(stats) {
+        if (!stats) return '';
+        const topSeries = stats.topSeries || [];
+        const topMovies = stats.topMovies || [];
+        if (topSeries.length === 0 && topMovies.length === 0) return '';
+
+        return `
+            <div class="tautulli-stats-drawer" id="tautulli-watch-stats-drawer">
+                <div class="tautulli-stats-header">
+                    <div class="tautulli-stats-title">
+                        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#38bdf8;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                        <span>Watch Statistics (Server Leaderboards)</span>
+                    </div>
+                    <button class="tautulli-modal-tool-btn" data-action="toggle-watch-stats" style="font-size:10px;padding:3px 8px;" title="Collapse watch statistics drawer">
+                        Hide Stats ✕
+                    </button>
+                </div>
+                <div class="tautulli-stats-grid">
+                    ${topSeries.length > 0 ? `
+                    <div class="tautulli-stats-col">
+                        <div class="tautulli-stats-col-title">
+                            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;flex-shrink:0;"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+                            <span>Top Watched Series</span>
+                        </div>
+                        <div class="tautulli-stats-list">
+                            ${topSeries.map((item, idx) => `
+                                <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-item" title="${escapeHtml(item.name)} (${item.playCount} plays)">
+                                    <div class="tautulli-stats-rank">${idx + 1}</div>
+                                    ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" />` : '<div class="tautulli-stats-thumb"></div>'}
+                                    <div class="tautulli-stats-info">
+                                        <div class="tautulli-stats-name">${escapeHtml(item.name)}</div>
+                                        <div class="tautulli-stats-meta">${item.year ? escapeHtml(String(item.year)) : 'TV Series'}</div>
+                                    </div>
+                                    <div class="tautulli-stats-metric">${item.playCount} plays</div>
+                                </a>
+                            `).join('')}
+                        </div>
+                    </div>` : ''}
+
+                    ${topMovies.length > 0 ? `
+                    <div class="tautulli-stats-col">
+                        <div class="tautulli-stats-col-title">
+                            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;flex-shrink:0;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+                            <span>Top Watched Movies</span>
+                        </div>
+                        <div class="tautulli-stats-list">
+                            ${topMovies.map((item, idx) => `
+                                <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-item" title="${escapeHtml(item.name)} (${item.playCount} plays)">
+                                    <div class="tautulli-stats-rank">${idx + 1}</div>
+                                    ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" />` : '<div class="tautulli-stats-thumb"></div>'}
+                                    <div class="tautulli-stats-info">
+                                        <div class="tautulli-stats-name">${escapeHtml(item.name)}</div>
+                                        <div class="tautulli-stats-meta">${item.year ? escapeHtml(String(item.year)) : 'Movie'}</div>
+                                    </div>
+                                    <div class="tautulli-stats-metric">${item.playCount} plays</div>
+                                </a>
+                            `).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
      * Renders the overall activity container including summary header and cards.
      */
     function renderContainer(cards) {
+        const statsDrawerHtml = (showWatchStats && cachedWatchStats) ? renderWatchStatisticsDrawer(cachedWatchStats) : '';
+        const privacyBtnClass = isPrivacyMode ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
+        const statsBtnClass = showWatchStats ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
+
         if (cards.length === 0) {
             return `
+                <div class="tautulli-activity-banner">
+                    <div class="tautulli-activity-left">
+                        <div class="tautulli-activity-title">
+                            <div class="tautulli-activity-pulse" style="background:#64748b;box-shadow:none;"></div>
+                            <span>Activity</span>
+                        </div>
+                        <div class="tautulli-activity-stats">
+                            <span>Sessions: <span class="tautulli-activity-stat-highlight">0 streams</span></span>
+                            <span>|</span>
+                            <span>Bandwidth: <span class="tautulli-activity-stat-highlight">0 kbps</span></span>
+                        </div>
+                    </div>
+                    <div class="tautulli-activity-tools">
+                        <button class="${statsBtnClass}" data-action="toggle-watch-stats" title="Toggle Watch Statistics Leaderboards">
+                            <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                            <span>${showWatchStats ? 'Stats On' : 'Stats'}</span>
+                        </button>
+                        <button class="tautulli-tool-btn" data-action="open-stream-guard" title="Smart Stream Guard: Automated stream rules & policies">
+                            <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                            <span>Stream Guard</span>
+                            <span class="tautulli-guard-badge" title="Active guard policies">${(streamGuardRules.killPausedEnabled ? 1 : 0) + (streamGuardRules.kill4kSwEnabled ? 1 : 0) + (streamGuardRules.maxConcurrentStreams > 0 ? 1 : 0)}</span>
+                        </button>
+                        <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
+                            <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                            <span>${isPrivacyMode ? 'Privacy On' : 'Privacy'}</span>
+                        </button>
+                    </div>
+                </div>
                 <div class="tautulli-empty-container">
                     <svg class="tautulli-empty-icon" viewBox="0 0 24 24">
                         <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
                     </svg>
                     <div class="tautulli-empty-text">No active streams</div>
                 </div>
+                ${statsDrawerHtml}
             `;
         }
 
@@ -3086,8 +3576,6 @@
             ? `<div class="tautulli-bandwidth-visual" title="LAN: ${formatBitrate(lanBandwidth)} (${lanPercent}%) | WAN: ${formatBitrate(wanBandwidth)} (${wanPercent}%)"><div class="tautulli-bandwidth-bar-lan" style="width:${lanPercent}%;"></div><div class="tautulli-bandwidth-bar-wan" style="width:${wanPercent}%;"></div></div>`
             : '';
 
-        const privacyBtnClass = isPrivacyMode ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
-
         // Filter active cards based on current user selection
         let displayedCards = cards;
         if (currentFilter === 'transcode') {
@@ -3129,6 +3617,10 @@
                 </div>
 
                 <div class="tautulli-activity-tools">
+                    <button class="${statsBtnClass}" data-action="toggle-watch-stats" title="Toggle Watch Statistics Leaderboards">
+                        <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                        <span>${showWatchStats ? 'Stats On' : 'Stats'}</span>
+                    </button>
                     <button class="tautulli-tool-btn" data-action="open-stream-guard" title="Smart Stream Guard: Automated stream rules & policies">
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
                         <span>Stream Guard</span>
@@ -3141,6 +3633,7 @@
                 </div>
             </div>
             ${cardsContentHtml}
+            ${statsDrawerHtml}
         `;
     }
 
@@ -3656,6 +4149,14 @@
                 return;
             }
 
+            if (action === 'toggle-watch-stats') {
+                e.preventDefault();
+                showWatchStats = !showWatchStats;
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
             if (action === 'set-filter') {
                 e.preventDefault();
                 currentFilter = target.getAttribute('data-filter') || 'all';
@@ -3767,12 +4268,34 @@
                 c.bottleneck = computeBottleneckDiagnostic(c);
             });
 
+            // Tautulli Feature 4: SyncPlay watch party group clustering
+            const syncPlayGroupMap = new Map();
+            cards.forEach((c) => {
+                if (c.syncPlayGroupId) {
+                    syncPlayGroupMap.set(c.syncPlayGroupId, (syncPlayGroupMap.get(c.syncPlayGroupId) || 0) + 1);
+                }
+            });
+            cards.forEach((c) => {
+                if (c.syncPlayGroupId && syncPlayGroupMap.has(c.syncPlayGroupId)) {
+                    const count = syncPlayGroupMap.get(c.syncPlayGroupId);
+                    c.syncPlayMembersCount = count;
+                    c.syncPlayBadge = `SyncPlay (${count} Member${count > 1 ? 's' : ''})`;
+                }
+            });
+
+            // Tautulli Feature 5: Watch statistics drawer data fetching
+            if (showWatchStats && (!cachedWatchStats || Date.now() - lastWatchStatsFetchTime > 60000)) {
+                await fetchWatchStatistics();
+            }
+
             currentCardModels = cards;
 
             // Compute hash of content to avoid redundant DOM mutations
             const contentHash = JSON.stringify({
                 privacy: isPrivacyMode,
                 filter: currentFilter,
+                showStats: showWatchStats,
+                statsItemsCount: cachedWatchStats ? ((cachedWatchStats.topSeries || []).length + (cachedWatchStats.topMovies || []).length) : 0,
                 cards: cards.map((c) => ({
                     id: c.sessionId,
                     method: c.playMethod,
@@ -3785,7 +4308,11 @@
                     speed: c.transcodeSpeedMultiplier,
                     stutter: c.isSevereStutter,
                     multiIp: c.isMultiIpSharing,
-                    bottleneck: c.bottleneck ? c.bottleneck.key : ''
+                    bottleneck: c.bottleneck ? c.bottleneck.key : '',
+                    savings: c.bandwidthSavingsBadge || '',
+                    conn: c.connectionType || '',
+                    sync: c.syncPlayBadge || '',
+                    hires: c.isHiResAudio || false
                 }))
             });
 
