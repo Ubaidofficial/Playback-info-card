@@ -46,6 +46,87 @@
     let currentFilter = 'all'; // 'all', 'transcode', 'wan', 'paused'
     let currentCardModels = [];
     const sessionPausedTimestamps = new Map(); // sessionId -> timestamp when pause was first detected
+    const sessionSlowCycles = new Map(); // sessionId -> consecutive slow (<1.0x) poll cycles
+    const autoKillEventsLog = []; // { id, time, userName, title, reason }
+
+    // Smart Stream Guard Rules state (persisted in localStorage)
+    const DEFAULT_STREAM_GUARD_RULES = {
+        killPausedEnabled: false,
+        killPausedMinutes: 15,
+        kill4kSwEnabled: false,
+        maxConcurrentStreams: 0 // 0 = disabled
+    };
+
+    function loadStreamGuardRules() {
+        try {
+            const saved = localStorage.getItem('playbackcard_stream_guard_rules');
+            if (saved) {
+                return Object.assign({}, DEFAULT_STREAM_GUARD_RULES, JSON.parse(saved));
+            }
+        } catch (e) {
+            console.warn('[PlaybackCard] Could not load stream guard rules from localStorage', e);
+        }
+        return Object.assign({}, DEFAULT_STREAM_GUARD_RULES);
+    }
+
+    function saveStreamGuardRules(rules) {
+        try {
+            localStorage.setItem('playbackcard_stream_guard_rules', JSON.stringify(rules));
+        } catch (e) {
+            console.warn('[PlaybackCard] Could not save stream guard rules to localStorage', e);
+        }
+    }
+
+    let streamGuardRules = loadStreamGuardRules();
+
+    // Stream Doctor: Transcode Reasons & Client Fix Recommendations
+    const TRANSCODE_EXPLANATIONS = {
+        'ContainerNotSupported': {
+            short: 'Container Not Supported',
+            detail: 'The file container (e.g. MKV) is not natively supported by this client. Jellyfin is remuxing it to MP4/HLS.',
+            advice: 'Use Jellyfin Media Player instead of a web browser for direct container support.'
+        },
+        'VideoCodecNotSupported': {
+            short: 'Video Codec Unsupported',
+            detail: 'The video codec (e.g. HEVC/H.265 or AV1) cannot be decoded by this client hardware.',
+            advice: 'Use a client app with hardware decoding (Android TV, Apple TV, or Jellyfin Media Player).'
+        },
+        'AudioCodecNotSupported': {
+            short: 'Audio Codec Unsupported',
+            detail: 'The audio stream (e.g. TrueHD 7.1 or DTS-HD) is incompatible with client speakers/passthrough.',
+            advice: 'Select a secondary stereo or AC3 5.1 audio track in playback settings.'
+        },
+        'SubtitleCodecNotSupported': {
+            short: 'Subtitle Burn-In',
+            detail: 'Bitmap subtitles (PGS/VOBSUB) must be burned directly into the video stream by the server GPU/CPU.',
+            advice: 'Switch subtitles to a text-based format (SRT) in playback options to allow Direct Play.'
+        },
+        'VideoBitrateNotSupported': {
+            short: 'Bitrate Limit Exceeded',
+            detail: 'The stream bitrate exceeds the quality setting chosen by the client or server bandwidth cap.',
+            advice: 'Set client playback quality to "Original" or "Maximum" in settings.'
+        },
+        'VideoResolutionNotSupported': {
+            short: 'Resolution Too High',
+            detail: 'The display or client player cannot output video at this native resolution.',
+            advice: 'Ensure the client device and TV HDMI port support 4K 60Hz.'
+        },
+        'VideoProfileNotSupported': {
+            short: 'Video Profile Unsupported',
+            detail: 'The encoding profile (e.g. High 10 or Main 10) is not supported by client decoder.',
+            advice: 'Use Jellyfin Media Player or a dedicated streaming device.'
+        },
+        'SecondaryAudioNotSupported': {
+            short: 'Secondary Audio Incompatible',
+            detail: 'The selected secondary audio track requires real-time transcoding for this client.',
+            advice: 'Switch to the default primary audio track if available.'
+        },
+        'DirectPlayError': {
+            short: 'Direct Play Failed',
+            detail: 'The client player threw an error while attempting Direct Play, falling back to server transcode.',
+            advice: 'Update the client app to the latest version or restart playback.'
+        }
+    };
 
     /**
      * Injects custom CSS styling for the Liquid Glass theme and Tautulli/Jellywatch card anatomy.
@@ -77,6 +158,9 @@
                 --lg-chip-border: 1px solid rgba(255, 255, 255, 0.08);
                 --lg-control-bg: rgba(255, 255, 255, 0.06);
                 --lg-control-border: 1px solid rgba(255, 255, 255, 0.12);
+                /* GlassFin (KBH-Reeper) Specular Light Sweep & Accent Tokens */
+                --gf-hover-v: linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.08) 55%, transparent);
+                --gf-active-accent: rgba(0, 164, 220, 0.85);
             }
 
             /* Container & Activity Banner */
@@ -295,6 +379,32 @@
                     var(--lg-dispersion-magenta),
                     0 28px 64px -10px rgba(0, 0, 0, 0.94),
                     0 0 24px -4px rgba(56, 189, 248, 0.22);
+            }
+
+            .tautulli-card:active {
+                transform: scale(0.99);
+                transition: transform 0.08s ease;
+            }
+
+            /* GlassFin Specular Vertical Light Sweep on Hover */
+            .tautulli-card::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                pointer-events: none;
+                z-index: 2;
+                background: var(--gf-hover-v);
+                transform: translateY(-100%);
+                transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
+                opacity: 0;
+            }
+
+            .tautulli-card:hover::after {
+                transform: translateY(100%);
+                opacity: 1;
             }
 
             /* Moonfin Dynamic Ambient Glass Layer */
@@ -1435,6 +1545,206 @@
                     font-size: 11px;
                 }
             }
+
+            /* Stream Doctor: Interactive Explainer Panel & Fix Presets */
+            .tautulli-reason-banner {
+                cursor: pointer;
+                transition: background var(--lg-duration) ease, border-color var(--lg-duration) ease;
+            }
+
+            .tautulli-reason-banner:hover {
+                background: rgba(245, 158, 11, 0.16);
+                border-color: rgba(245, 158, 11, 0.4);
+            }
+
+            .tautulli-doctor-panel {
+                margin: 8px 0 4px 0;
+                padding: 10px 12px;
+                border-radius: 10px;
+                background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(9, 10, 16, 0.95) 100%);
+                border: 1px solid rgba(245, 158, 11, 0.25);
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.4);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                font-size: 11px;
+                line-height: 1.4;
+            }
+
+            .tautulli-doctor-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                color: #fbbf24;
+                font-weight: 700;
+                font-size: 11.5px;
+            }
+
+            .tautulli-doctor-desc {
+                color: #e2e8f0;
+            }
+
+            .tautulli-doctor-advice {
+                color: #7dd3fc;
+                background: rgba(14, 165, 233, 0.12);
+                border: 1px solid rgba(56, 189, 248, 0.25);
+                padding: 5px 8px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .tautulli-send-tip-btn {
+                background: rgba(56, 189, 248, 0.2);
+                border: 1px solid rgba(56, 189, 248, 0.4);
+                color: #38bdf8;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 3px 8px;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all var(--lg-duration) ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .tautulli-send-tip-btn:hover {
+                background: rgba(56, 189, 248, 0.35);
+                border-color: rgba(56, 189, 248, 0.65);
+                color: #ffffff;
+                transform: scale(1.02);
+            }
+
+            .tautulli-send-tip-btn:active {
+                transform: scale(0.96);
+            }
+
+            /* Severe Stutter Buffering Alarm (<1.0x transcode speed) */
+            .tautulli-stutter-alarm {
+                animation: tautulli-stutter-pulse 1.4s infinite ease-in-out !important;
+                background: rgba(239, 68, 68, 0.25) !important;
+                border-color: rgba(239, 68, 68, 0.6) !important;
+                color: #fca5a5 !important;
+            }
+
+            @keyframes tautulli-stutter-pulse {
+                0%, 100% {
+                    transform: scale(1);
+                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+                }
+                50% {
+                    transform: scale(1.06);
+                    box-shadow: 0 0 14px 2px rgba(239, 68, 68, 0.7);
+                }
+            }
+
+            /* Smart Stream Guard Rules Modal */
+            .tautulli-guard-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(56, 189, 248, 0.25);
+                color: #38bdf8;
+                border-radius: 999px;
+                padding: 1px 6px;
+                font-size: 9.5px;
+                font-weight: 700;
+                margin-left: 4px;
+            }
+
+            .tautulli-rule-card {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                padding: 12px 14px;
+                margin-bottom: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .tautulli-rule-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+            }
+
+            .tautulli-rule-title {
+                font-size: 12.5px;
+                font-weight: 600;
+                color: #f1f5f9;
+            }
+
+            .tautulli-rule-desc {
+                font-size: 11px;
+                color: #94a3b8;
+                line-height: 1.35;
+            }
+
+            .tautulli-switch {
+                position: relative;
+                display: inline-block;
+                width: 38px;
+                height: 22px;
+                flex-shrink: 0;
+            }
+
+            .tautulli-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+            .tautulli-slider {
+                position: absolute;
+                cursor: pointer;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background-color: rgba(255, 255, 255, 0.14);
+                transition: .25s cubic-bezier(0.16, 1, 0.3, 1);
+                border-radius: 34px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+
+            .tautulli-slider:before {
+                position: absolute;
+                content: "";
+                height: 14px;
+                width: 14px;
+                left: 3px;
+                bottom: 3px;
+                background-color: white;
+                transition: .25s cubic-bezier(0.16, 1, 0.3, 1);
+                border-radius: 50%;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            }
+
+            .tautulli-switch input:checked + .tautulli-slider {
+                background-color: #00a4dc;
+                border-color: #38bdf8;
+            }
+
+            .tautulli-switch input:checked + .tautulli-slider:before {
+                transform: translateX(16px);
+            }
+
+            .tautulli-rule-input {
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                border-radius: 6px;
+                color: #ffffff;
+                font-size: 11.5px;
+                padding: 4px 8px;
+                width: 60px;
+                text-align: center;
+            }
         `;
         document.head.appendChild(styleElement);
     }
@@ -1535,6 +1845,9 @@
      */
     function formatTranscodeReason(reason) {
         if (!reason) return 'Transcoding';
+        if (TRANSCODE_EXPLANATIONS[reason] && TRANSCODE_EXPLANATIONS[reason].short) {
+            return TRANSCODE_EXPLANATIONS[reason].short;
+        }
         return reason
             .replace(/([A-Z])/g, ' $1')
             .replace(/^./, (s) => s.toUpperCase())
@@ -1835,9 +2148,9 @@
     /**
      * Interactive Action: Send On-Screen Message to Player (Jellywatch feature)
      */
-    async function handleSendMessage(sessionId, userName) {
+    async function handleSendMessage(sessionId, userName, defaultMsg) {
         if (!window.ApiClient) return;
-        const msg = window.prompt(`Send on-screen message to ${userName}:`, 'Server restart in 5 minutes.');
+        const msg = defaultMsg ? defaultMsg : window.prompt(`Send on-screen message to ${userName}:`, 'Server restart in 5 minutes.');
         if (!msg || !msg.trim()) {
             return;
         }
@@ -1937,7 +2250,7 @@
         let containerDisplay = `Direct Play (${origContainer})`;
         if (isTranscode && transcodeInfo && transcodeInfo.Container) {
             const targetContainer = transcodeInfo.Container.toUpperCase();
-            containerDisplay = `Converting (${origContainer} → ${targetContainer})`;
+            containerDisplay = `Converting (${origContainer} ➔ ${targetContainer})`;
         } else if (isDirectStream) {
             containerDisplay = `Direct Stream (${origContainer})`;
         }
@@ -1953,7 +2266,7 @@
         if (isTranscode && transcodeInfo && !transcodeInfo.IsVideoDirect) {
             const targetCodec = (transcodeInfo.VideoCodec || 'H264').toUpperCase();
             const targetRes = transcodeInfo.Height ? (transcodeInfo.Height >= 2160 ? '4K' : `${transcodeInfo.Height}p`) : origVideoRes;
-            videoDisplay = `Transcode (${origVideoCodec} ${origVideoRes} → ${targetCodec} ${targetRes})`;
+            videoDisplay = `Transcode (${origVideoCodec} ${origVideoRes} ➔ ${targetCodec} ${targetRes})`;
             videoChip = `${origVideoRes} ${origVideoCodec} ➔ ${targetRes} ${targetCodec}`;
         }
 
@@ -1968,7 +2281,7 @@
         if (isTranscode && transcodeInfo && !transcodeInfo.IsAudioDirect) {
             const targetAudioCodec = (transcodeInfo.AudioCodec || 'AAC').toUpperCase();
             const targetChannels = transcodeInfo.AudioChannels === 2 ? 'Stereo' : (transcodeInfo.AudioChannels ? `${transcodeInfo.AudioChannels} Ch` : 'Stereo');
-            audioDisplay = `Transcode (${origAudioDesc} → ${targetAudioCodec} ${targetChannels})`;
+            audioDisplay = `Transcode (${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels})`;
             audioChip = `${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}`;
         }
 
@@ -2113,6 +2426,14 @@
         const isMuted = Boolean(playState.IsMuted);
         const volumeLevel = playState.VolumeLevel != null ? Math.round(playState.VolumeLevel) : null;
         const isSlowTranscode = Boolean(isTranscode && transcodeSpeedMultiplier && parseFloat(transcodeSpeedMultiplier) < 1.0);
+        let slowCycleCount = 0;
+        if (isSlowTranscode) {
+            slowCycleCount = (sessionSlowCycles.get(session.Id) || 0) + 1;
+            sessionSlowCycles.set(session.Id, slowCycleCount);
+        } else {
+            sessionSlowCycles.delete(session.Id);
+        }
+        const isSevereStutter = slowCycleCount >= 2; // Buffering alarm after 2+ consecutive checks
 
         // Resolution Badge (4K UHD, 1080p FHD, 720p HD, SD)
         let resBadge = null;
@@ -2169,8 +2490,11 @@
             isMuted,
             volumeLevel,
             isSlowTranscode,
+            isSevereStutter,
+            is4k: origVideoRes === '4K',
             isSubtitleBurnIn,
             transcodeReasons,
+            rawTranscodeReasons: (transcodeInfo && transcodeInfo.TranscodeReasons) || [],
             containerDisplay,
             containerChip,
             videoDisplay,
@@ -2241,14 +2565,41 @@
             burnInHtml = `<span class="tautulli-badge tautulli-badge-burnin" title="Subtitle format forcing transcode">Sub Burn-In</span>`;
         }
 
-        // Transcode Reasons banner HTML
+        // Transcode Reasons & Stream Doctor Explainer banner HTML
         let reasonsBannerHtml = '';
         if (card.isTranscode && card.transcodeReasons.length > 0) {
             const reasonsText = card.transcodeReasons.map(formatTranscodeReason).join(', ');
+            
+            // Build Stream Doctor explanation & advice
+            let doctorDetail = '';
+            let doctorAdvice = '';
+            const primaryReasonKey = (card.rawTranscodeReasons && card.rawTranscodeReasons[0]) || card.transcodeReasons[0];
+            if (TRANSCODE_EXPLANATIONS[primaryReasonKey]) {
+                doctorDetail = TRANSCODE_EXPLANATIONS[primaryReasonKey].detail;
+                doctorAdvice = TRANSCODE_EXPLANATIONS[primaryReasonKey].advice;
+            } else {
+                doctorDetail = `Server is transcoding video/audio pipeline: ${reasonsText}.`;
+                doctorAdvice = 'Use Jellyfin Media Player or check network bandwidth.';
+            }
+
             reasonsBannerHtml = `
-                <div class="tautulli-reason-banner" title="Transcoding trigger: ${escapeHtml(reasonsText)}">
+                <div class="tautulli-reason-banner" data-action="toggle-doctor" data-session-id="${escapeHtml(card.sessionId)}" title="Click to open Stream Doctor diagnostic and fix guide">
                     <span class="tautulli-reason-label">REASON</span>
                     <span class="tautulli-reason-val">${escapeHtml(reasonsText)}</span>
+                    <span style="margin-left:auto;color:#38bdf8;font-size:9.5px;font-weight:600;">Doctor ➔</span>
+                </div>
+                <div class="tautulli-doctor-panel" id="tautulli-doctor-${escapeHtml(card.sessionId)}" style="display:none;">
+                    <div class="tautulli-doctor-header">
+                        <span>Stream Doctor Diagnosis</span>
+                        <span style="font-size:9.5px;color:#94a3b8;">${escapeHtml(formatTranscodeReason(primaryReasonKey))}</span>
+                    </div>
+                    <div class="tautulli-doctor-desc">${escapeHtml(doctorDetail)}</div>
+                    <div class="tautulli-doctor-advice">
+                        <span>${escapeHtml(doctorAdvice)}</span>
+                        <button class="tautulli-send-tip-btn" data-action="send-fix-tip" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-tip="${escapeHtml(doctorAdvice)}" title="Send this fix recommendation as on-screen alert to player">
+                            Send Tip to Player
+                        </button>
+                    </div>
                 </div>
             `;
         }
@@ -2360,7 +2711,7 @@
                                 ${card.resBadge ? `<span class="tautulli-badge tautulli-badge-res" title="Source Resolution">${escapeHtml(card.resBadge)}</span>` : ''}
                                 ${hwBadgeHtml}
                                 ${speedHtml}
-                                ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow" title="Transcode speed < 1.0x! Client will experience buffering."><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>BUFFERING (&lt;1.0x)</span>` : ''}
+                                ${card.isSlowTranscode ? `<span class="tautulli-badge tautulli-speed-slow ${card.isSevereStutter ? 'tautulli-stutter-alarm' : ''}" title="${card.isSevereStutter ? 'SEVERE STUTTER ALARM: Transcode speed < 1.0x for consecutive intervals. Client is starving buffer.' : 'Transcode speed < 1.0x! Client will experience buffering.'}"><svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>${card.isSevereStutter ? 'STUTTER ALARM (&lt;1.0x)' : 'BUFFERING (&lt;1.0x)'}</span>` : ''}
                                 ${card.hdrBadge ? `<span class="tautulli-badge tautulli-badge-hdr" title="High Dynamic Range">${escapeHtml(card.hdrBadge)}</span>` : ''}
                                 ${card.audioBadge ? `<span class="tautulli-badge tautulli-badge-audio" title="High Fidelity Audio">${escapeHtml(card.audioBadge)}</span>` : ''}
                                 ${card.audioChannelsBadge ? `<span class="tautulli-badge tautulli-badge-surround" title="Audio Channels">${escapeHtml(card.audioChannelsBadge)}</span>` : ''}
@@ -2523,6 +2874,11 @@
                 </div>
 
                 <div class="tautulli-activity-tools">
+                    <button class="tautulli-tool-btn" data-action="open-stream-guard" title="Smart Stream Guard: Automated stream rules & policies">
+                        <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                        <span>Stream Guard</span>
+                        <span class="tautulli-guard-badge" title="Active guard policies">${(streamGuardRules.killPausedEnabled ? 1 : 0) + (streamGuardRules.kill4kSwEnabled ? 1 : 0) + (streamGuardRules.maxConcurrentStreams > 0 ? 1 : 0)}</span>
+                    </button>
                     <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                         <span>${isPrivacyMode ? 'Privacy On' : 'Privacy'}</span>
@@ -2734,6 +3090,279 @@
     }
 
     /**
+     * Keydown handler to dismiss the Stream Guard modal via Escape key.
+     */
+    function handleGuardModalEscape(e) {
+        if (e.key === 'Escape') {
+            closeStreamGuardModal();
+        }
+    }
+
+    /**
+     * Renders and displays the Smart Stream Guard configuration modal.
+     */
+    function openStreamGuardModal() {
+        closeStreamGuardModal();
+
+        const backdrop = document.createElement('div');
+        backdrop.id = 'tautulli-guard-modal-backdrop';
+        backdrop.className = 'tautulli-modal-backdrop';
+        backdrop.onclick = function (e) {
+            if (e.target === backdrop) {
+                closeStreamGuardModal();
+            }
+        };
+
+        const modal = document.createElement('div');
+        modal.className = 'tautulli-modal';
+        modal.innerHTML = `
+            <div class="tautulli-modal-header">
+                <div class="tautulli-modal-title">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                    <span>Smart Stream Guard (Automated Rules)</span>
+                </div>
+                <div class="tautulli-modal-header-actions">
+                    <button class="tautulli-modal-close" data-action="close-guard-modal" title="Close">
+                        <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Rule 1: Auto-Kill Paused Streams -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Auto-Kill Paused Streams</div>
+                        <div class="tautulli-rule-desc">Automatically terminates sessions paused longer than threshold to free transcode slots and network sockets.</div>
+                    </div>
+                    <label class="tautulli-switch">
+                        <input type="checkbox" id="guard-rule-paused" ${streamGuardRules.killPausedEnabled ? 'checked' : ''}>
+                        <span class="tautulli-slider"></span>
+                    </label>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:#cbd5e1;padding-top:4px;">
+                    <span>Terminate after:</span>
+                    <input type="number" id="guard-paused-minutes" class="tautulli-rule-input" min="1" max="120" value="${streamGuardRules.killPausedMinutes}">
+                    <span>minutes of inactivity</span>
+                </div>
+            </div>
+
+            <!-- Rule 2: Block 4K Software Transcodes -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Block 4K CPU Software Transcodes</div>
+                        <div class="tautulli-rule-desc">Instantly terminates unaccelerated 4K CPU transcodes that peg CPU at 100% and alerts the client player with educational advice.</div>
+                    </div>
+                    <label class="tautulli-switch">
+                        <input type="checkbox" id="guard-rule-4k" ${streamGuardRules.kill4kSwEnabled ? 'checked' : ''}>
+                        <span class="tautulli-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Rule 3: Concurrent Streams per User Cap -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Concurrent Streams Limit per User</div>
+                        <div class="tautulli-rule-desc">Prevents account sharing by terminating the newest excess playback session if a user exceeds maximum simultaneous streams.</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input type="number" id="guard-concurrent-limit" class="tautulli-rule-input" min="0" max="10" value="${streamGuardRules.maxConcurrentStreams}">
+                        <span style="font-size:11px;color:#94a3b8;">(0 = unlimited)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto-Kill Event Log -->
+            <div style="margin-top:16px;">
+                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>Recent Guard Enforcement Log (${autoKillEventsLog.length})</span>
+                    ${autoKillEventsLog.length > 0 ? `<span style="font-size:10px;color:#94a3b8;cursor:pointer;" id="guard-clear-log">Clear Log</span>` : ''}
+                </div>
+                <div style="max-height:140px;overflow-y:auto;border-radius:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);padding:6px 10px;">
+                    ${autoKillEventsLog.length === 0 
+                        ? `<div style="font-size:11px;color:#64748b;text-align:center;padding:12px 0;">No automated enforcement actions triggered yet</div>`
+                        : autoKillEventsLog.map(item => `
+                            <div style="font-size:11px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;gap:8px;">
+                                <span style="color:#f87171;font-weight:600;">[Auto-Killed] ${escapeHtml(item.userName)}</span>
+                                <span style="color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.title)}</span>
+                                <span style="color:#fbbf24;font-size:10px;flex-shrink:0;">${escapeHtml(item.reason)}</span>
+                            </div>
+                        `).join('')}
+                </div>
+            </div>
+
+            <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px;">
+                <button class="tautulli-modal-tool-btn" id="guard-save-btn" style="background:rgba(0,164,220,0.3);border-color:#38bdf8;color:#ffffff;font-size:12px;padding:6px 16px;">
+                    Save &amp; Apply Guard Rules
+                </button>
+            </div>
+        `;
+
+        modal.querySelector('[data-action="close-guard-modal"]').onclick = closeStreamGuardModal;
+
+        const clearLogBtn = modal.querySelector('#guard-clear-log');
+        if (clearLogBtn) {
+            clearLogBtn.onclick = function () {
+                autoKillEventsLog.length = 0;
+                openStreamGuardModal();
+            };
+        }
+
+        const saveBtn = modal.querySelector('#guard-save-btn');
+        if (saveBtn) {
+            saveBtn.onclick = function () {
+                const pausedChk = modal.querySelector('#guard-rule-paused');
+                const pausedMin = modal.querySelector('#guard-paused-minutes');
+                const fourKChk = modal.querySelector('#guard-rule-4k');
+                const concurrentInp = modal.querySelector('#guard-concurrent-limit');
+
+                streamGuardRules.killPausedEnabled = pausedChk ? pausedChk.checked : false;
+                streamGuardRules.killPausedMinutes = pausedMin ? Math.max(1, parseInt(pausedMin.value, 10) || 15) : 15;
+                streamGuardRules.kill4kSwEnabled = fourKChk ? fourKChk.checked : false;
+                streamGuardRules.maxConcurrentStreams = concurrentInp ? Math.max(0, parseInt(concurrentInp.value, 10) || 0) : 0;
+
+                saveStreamGuardRules(streamGuardRules);
+                closeStreamGuardModal();
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+            };
+        }
+
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        document.addEventListener('keydown', handleGuardModalEscape);
+    }
+
+    /**
+     * Closes the active Stream Guard modal if open.
+     */
+    function closeStreamGuardModal() {
+        document.removeEventListener('keydown', handleGuardModalEscape);
+        const existing = document.getElementById('tautulli-guard-modal-backdrop');
+        if (existing) {
+            existing.remove();
+        }
+    }
+
+    /**
+     * Executes automatic termination of a non-compliant playback session (Smart Stream Guard).
+     */
+    async function executeAutoKill(sessionId, userName, mediaTitle, ruleReason, clientMessage) {
+        if (!window.ApiClient || !sessionId) return;
+        try {
+            // Log the auto-kill event
+            autoKillEventsLog.unshift({
+                id: sessionId,
+                time: new Date().toLocaleTimeString(),
+                userName: userName || 'User',
+                title: mediaTitle || 'Media',
+                reason: ruleReason
+            });
+            if (autoKillEventsLog.length > 30) autoKillEventsLog.pop();
+
+            // Send polite educational on-screen message to client player first
+            if (clientMessage && typeof window.ApiClient.ajax === 'function') {
+                try {
+                    await window.ApiClient.ajax({
+                        type: 'POST',
+                        url: window.ApiClient.getUrl(`Sessions/${sessionId}/Message`),
+                        data: JSON.stringify({
+                            Text: clientMessage,
+                            Header: 'Playback Notice',
+                            TimeoutMs: 6000
+                        }),
+                        contentType: 'application/json'
+                    });
+                } catch (msgErr) {
+                    console.warn('[PlaybackCard] Could not send notice prior to auto-kill:', msgErr);
+                }
+            }
+
+            // Terminate the playback session
+            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
+                await window.ApiClient.sendPlaystateCommand(sessionId, 'Stop');
+            } else if (typeof window.ApiClient.ajax === 'function') {
+                await window.ApiClient.ajax({
+                    type: 'POST',
+                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/Stop`)
+                });
+            }
+            console.info(`[PlaybackCard] Stream Guard auto-killed session ${sessionId} (${userName}): ${ruleReason}`);
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to auto-kill session:', err);
+        }
+    }
+
+    /**
+     * Evaluates active sessions against Smart Stream Guard rules after each poll.
+     */
+    async function evaluateAutoKillRules(cards) {
+        if (!cards || cards.length === 0) return;
+
+        // Rule 1: Auto-Kill Paused Streams
+        if (streamGuardRules.killPausedEnabled && streamGuardRules.killPausedMinutes > 0) {
+            const maxPausedSeconds = streamGuardRules.killPausedMinutes * 60;
+            for (const card of cards) {
+                if (card.isPaused && card.pausedDurationSeconds >= maxPausedSeconds) {
+                    await executeAutoKill(
+                        card.sessionId,
+                        card.userName,
+                        card.primaryTitle,
+                        `Paused > ${streamGuardRules.killPausedMinutes}m`,
+                        `Playback was automatically closed after being paused for more than ${streamGuardRules.killPausedMinutes} minutes to conserve server resources.`
+                    );
+                    return; // one action per evaluation cycle
+                }
+            }
+        }
+
+        // Rule 2: Block 4K CPU Software Transcodes
+        if (streamGuardRules.kill4kSwEnabled) {
+            for (const card of cards) {
+                if (card.isTranscode && card.isSwTranscode && card.is4k) {
+                    await executeAutoKill(
+                        card.sessionId,
+                        card.userName,
+                        card.primaryTitle,
+                        '4K Software Transcode Blocked',
+                        '4K CPU transcoding is disabled to protect server performance. Please select Original Quality or 1080p.'
+                    );
+                    return;
+                }
+            }
+        }
+
+        // Rule 3: Concurrent Streams per User Cap
+        if (streamGuardRules.maxConcurrentStreams > 0) {
+            const userCounts = new Map();
+            for (const card of cards) {
+                const uid = card.userId || card.userName;
+                const list = userCounts.get(uid) || [];
+                list.push(card);
+                userCounts.set(uid, list);
+            }
+
+            for (const [uid, list] of userCounts.entries()) {
+                if (list.length > streamGuardRules.maxConcurrentStreams) {
+                    // Kill the newest excess stream
+                    const excessCard = list[list.length - 1];
+                    await executeAutoKill(
+                        excessCard.sessionId,
+                        excessCard.userName,
+                        excessCard.primaryTitle,
+                        `Concurrent Cap (> ${streamGuardRules.maxConcurrentStreams})`,
+                        `Maximum simultaneous streams limit (${streamGuardRules.maxConcurrentStreams}) reached for this account.`
+                    );
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
      * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Privacy, Filter, Inspect).
      */
     function attachContainerEvents(container) {
@@ -2761,6 +3390,28 @@
             const sessionId = target.getAttribute('data-session-id');
             const userName = target.getAttribute('data-user') || 'User';
             const mediaTitle = target.getAttribute('data-title') || 'Media';
+
+            if (action === 'open-stream-guard') {
+                e.preventDefault();
+                openStreamGuardModal();
+                return;
+            }
+
+            if (action === 'toggle-doctor') {
+                e.preventDefault();
+                const docPanel = container.querySelector(`#tautulli-doctor-${sessionId}`);
+                if (docPanel) {
+                    docPanel.style.display = docPanel.style.display === 'none' ? 'flex' : 'none';
+                }
+                return;
+            }
+
+            if (action === 'send-fix-tip') {
+                e.preventDefault();
+                const tipText = target.getAttribute('data-tip') || 'Please check playback settings.';
+                handleSendMessage(sessionId, userName, tipText);
+                return;
+            }
 
             if (action === 'inspect-stream') {
                 e.preventDefault();
@@ -2827,7 +3478,8 @@
                     buf: c.transcodeCompletionPercentage,
                     bw: c.bandwidthDisplay,
                     hw: c.hwAccelBadge,
-                    speed: c.transcodeSpeedMultiplier
+                    speed: c.transcodeSpeedMultiplier,
+                    stutter: c.isSevereStutter
                 }))
             });
 
@@ -2836,6 +3488,9 @@
                 container.innerHTML = renderContainer(cards);
                 attachContainerEvents(container);
             }
+
+            // Smart Stream Guard automated policy evaluation
+            await evaluateAutoKillRules(cards);
         } catch (err) {
             console.warn('[PlaybackCard] Failed to fetch active playback sessions:', err);
         } finally {

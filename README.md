@@ -12,7 +12,7 @@
   <a href="https://jellyfin.org"><img src="https://img.shields.io/badge/Jellyfin-10.9%2B%20%7C%20v12%2B-blue.svg" alt="Jellyfin" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-  <a href="https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard/releases"><img src="https://img.shields.io/github/v/release/Ubaidofficial/jellyfin-plugin-playbackcard?label=Release" alt="Release" /></a>
+  <a href="https://github.com/Ubaidofficial/Playback-info-card/releases"><img src="https://img.shields.io/github/v/release/Ubaidofficial/Playback-info-card?label=Release" alt="Release" /></a>
 </p>
 
 <p align="center">
@@ -51,21 +51,29 @@
 ### Stream Monitoring
 - **Real-time polling** of `ApiClient.getSessions()` every 3 seconds with state-hash diffing to prevent unnecessary DOM repaints
 - **Color-coded stream method badges**: Direct Play (green), Direct Stream (blue), Transcode (red) with throttle status
-- **Transcode reason badges**: Parses reason flags (Container Not Supported, Video Bitrate Limit Exceeded, Audio Codec Not Supported, etc.)
-- **Container conversion paths**: Explicit transformation display (e.g., `MKV --> MP4`)
+- **Stream Doctor & Plain-English Explainer**: Demystifies cryptic transcode reasons into clear diagnostics and actionable player fix recommendations
+- **1-Click Fix Tip to Player**: Sends instant on-screen advice to client players with instructions on how to Direct Play
+- **Container conversion paths**: Explicit transformation display (e.g., `MKV ➔ MP4`)
 - **Audio and video codec breakdown**: Source and target codecs, resolutions, channels, and language tracks
-- **Progress bar with ETA**: Dynamically calculated expected completion time
+- **Progress bar with ETA & Transcode Buffer**: Dynamically calculated expected completion time and transcode buffer completion percentage
 
-### Hardware & Performance
-- **Hardware acceleration badges**: NVENC, QuickSync, VAAPI, VideoToolbox, AMF vs Software Transcode detection
+### Hardware, Safety & Automated Guard
+- **Smart Stream Guard (Automated Rules Engine)**:
+  - **Auto-Kill Paused Streams**: Automatically closes playback sessions paused beyond configurable threshold (default: 15 min)
+  - **Block 4K Software Transcodes**: Instantly stops unaccelerated 4K CPU transcodes and alerts user with educational notification
+  - **Concurrent Stream Limiter**: Enforces simultaneous streams quota per user account to prevent credential sharing
+  - **Recent Guard Log**: Live history of automated rule enforcements
+- **Buffer Starvation & Stutter Alarm**: Proactively monitors transcode speed multiplier; flashes pulsating red warning when speed drops below 1.0x across consecutive poll cycles
+- **Hardware acceleration badges**: NVENC, QuickSync, VAAPI, VideoToolbox, AMF vs CPU Software Transcode detection
 - **Transcode performance metrics**: Real-time transcode FPS and playback speed multiplier (e.g., `2.4x`)
 - **Paused stream timer**: Counts elapsed pause duration to identify resource locks
 - **Subtitle burn-in diagnostics**: Identifies forced transcode causes (PGS, VOBSUB bitmap subtitles)
 - **Bandwidth breakdown**: Total bandwidth, LAN bandwidth, and WAN upload in the activity banner
 
-### Admin Controls
+### Admin Controls & Interactivity
+- **Stream Guard Policy Manager**: Integrated configuration modal with live toggles and persistence
 - **Kill stream**: Terminate any active session instantly
-- **Send message**: Push a message directly to the client device
+- **Send message**: Push a custom message directly to the client device
 - **Pause / Resume**: Toggle playback state remotely
 - **Privacy mode**: One-click toggle to mask IPs and usernames for screenshots or live demos
 - **Stream filters**: Filter by All, Transcode, WAN, or Paused sessions
@@ -77,11 +85,12 @@
 
 ### Liquid Glass Design System
 - **Frosted glass surfaces**: `backdrop-filter: blur(16px) saturate(180%)` with obsidian dark base (`#090a10`)
+- **GlassFin Specular Light Sweep**: Dynamic vertical specular gradient translation on hover (`--gf-hover-v`), inspired by KBH-Reeper's GlassFin theme
 - **iOS Liquid Glass lens refraction**: Top-leading radial gradient simulating Apple GlassKit optics
 - **Chromatic dispersion rims**: Cyan and magenta edge aberration for depth realism
 - **GlinUI 5-level elevation architecture**: Consistent depth hierarchy across cards, chips, buttons, and modals
 - **Meniscus specular highlights**: Top, left, and bottom rim bevels for physical glass appearance
-- **Tactile spring physics**: `:active` press states with `scale(0.96)` and spring-curve easing
+- **Tactile spring physics**: `:active` press states with `scale(0.96)` to `scale(0.99)` and spring-curve easing
 - **iOS bottom-sheet drag handle**: Mobile capsule indicator for sheet-style interaction on small screens
 
 ### Engineering
@@ -111,7 +120,7 @@ Install directly from the Jellyfin Web UI with automatic updates:
    - **Repository Name**: `Playback Info Card`
    - **Repository URL**:
      ```
-     https://raw.githubusercontent.com/Ubaidofficial/jellyfin-plugin-playbackcard/main/manifest.json
+     https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json
      ```
 4. Click **Save**
 5. Switch to the **Catalog** tab under Plugins
@@ -124,7 +133,7 @@ The playback card will automatically appear at the top of your Admin Dashboard w
 
 ### Method 2: Manual Installation (Release ZIP)
 
-1. Download `jellyfin-plugin-playbackcard.zip` from the [Latest Release](https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard/releases/latest)
+1. Download `Playback-info-card.zip` from the [Latest Release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest)
 2. Locate your Jellyfin plugins directory:
    - **Linux**: `/var/lib/jellyfin/plugins`
    - **Windows**: `%ProgramData%\Jellyfin\Server\plugins`
@@ -133,7 +142,7 @@ The playback card will automatically appear at the top of your Admin Dashboard w
 3. Create a folder and extract:
    ```bash
    mkdir -p /var/lib/jellyfin/plugins/PlaybackCard
-   unzip jellyfin-plugin-playbackcard.zip -d /var/lib/jellyfin/plugins/PlaybackCard
+   unzip Playback-info-card.zip -d /var/lib/jellyfin/plugins/PlaybackCard
    ```
 4. Verify the folder contains:
    - `Jellyfin.Plugin.PlaybackCard.dll`
@@ -145,8 +154,8 @@ The playback card will automatically appear at the top of your Admin Dashboard w
 ### Method 3: Build from Source
 
 ```bash
-git clone https://github.com/Ubaidofficial/jellyfin-plugin-playbackcard.git
-cd jellyfin-plugin-playbackcard
+git clone https://github.com/Ubaidofficial/Playback-info-card.git
+cd Playback-info-card
 dotnet build -c Release
 ```
 
@@ -157,7 +166,7 @@ Copy the compiled DLL from `bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll`
 ## Project Structure
 
 ```
-jellyfin-plugin-playbackcard/
+Playback-info-card/
   JellyfinPlaybackCard.csproj    .NET 8 SDK project with embedded web resources
   Plugin.cs                      Plugin entry point (IHasWebPages)
   PluginConfiguration.cs         Configuration (BasePluginConfiguration)
