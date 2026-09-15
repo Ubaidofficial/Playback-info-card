@@ -2246,15 +2246,87 @@
     function getPlatformBadge(client, deviceName) {
         const combined = `${client || ''} ${deviceName || ''}`.toLowerCase();
 
-        // 1. Apple Safari (Official multi-color compass with blue gradient dial & red/white needle)
-        if (combined.includes('safari')) {
+        // 1. Brave Browser (High priority check before Chrome)
+        if (combined.includes('brave')) {
             return {
-                title: 'Apple Safari',
-                svg: `<svg viewBox="0 0 24 24"><defs><linearGradient id="safari-dial" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00a3ff"/><stop offset="100%" stop-color="#0066eb"/></linearGradient></defs><circle cx="12" cy="12" r="11" fill="url(#safari-dial)" stroke="#2ea6ff" stroke-width="0.5"/><path d="M12 2.5v1.5M12 20v1.5M2.5 12H4M20 12h1.5M5.28 5.28l1.06 1.06M17.66 17.66l1.06 1.06M5.28 18.72l1.06-1.06M17.66 6.34l1.06-1.06" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" stroke-linecap="round"/><polygon points="16.5,7.5 13,11 11,13" fill="#ff3b30"/><polygon points="7.5,16.5 11,13 13,11" fill="#ffffff"/><circle cx="12" cy="12" r="1.3" fill="#ff3b30"/></svg>`
+                title: 'Brave Browser',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#FB542B" d="M12 2l-7 3.5v7.2c0 5 3.5 9.3 7 10.3 3.5-1 7-5.3 7-10.3V5.5L12 2zm3.8 13.8c-.8.8-2.2 1.4-3.8 1.4s-3-.6-3.8-1.4l-.8-1.8 1.4-.4c.6.6 1.7 1 3.2 1s2.6-.4 3.2-1l1.4.4-.8 1.8zm-.8-4.3c-.6.3-1.6.5-3 .5s-2.4-.2-3-.5l-.5-1.2 1.2-.3c.6.3 1.3.4 2.3.4s1.7-.1 2.3-.4l1.2.3-.5 1.2z"/></svg>`
             };
         }
 
-        // 2. Google Chrome (Official 4-color emblem: red, yellow, green, blue center)
+        // 2. Streamyfin (Trending Flutter client for Jellyfin)
+        if (combined.includes('streamyfin')) {
+            return {
+                title: 'Streamyfin',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#8B5CF6"/><path fill="#ffffff" d="M8 6.5l10.5 5.5L8 17.5V6.5zm2 3.5v4l4-2-4-2z"/></svg>`
+            };
+        }
+
+        // 3. Finamp (Dedicated Jellyfin music client)
+        if (combined.includes('finamp')) {
+            return {
+                title: 'Finamp Player',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0284C7"/><path fill="#ffffff" d="M12 3a9 9 0 0 0-9 9v7a2 2 0 0 0 2 2h2v-7H5v-2a7 7 0 0 1 14 0v2h-2v7h2a2 2 0 0 0 2-2v-7a9 9 0 0 0-9-9zm-1 9v4h2v-4h-2zm-4 1v2h2v-2H7zm8 0v2h2v-2h-2z"/></svg>`
+            };
+        }
+
+        // 4. Findroid (Native Android client)
+        if (combined.includes('findroid')) {
+            return {
+                title: 'Findroid Client',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0D9488"/><path fill="#ffffff" d="M6 18h12v-7a6 6 0 0 0-12 0v7zm3-4a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm6 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2zM7.5 7.5l-1.5-2m10.5 2l1.5-2" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/></svg>`
+            };
+        }
+
+        // 5. Feishin (Modern desktop music player)
+        if (combined.includes('feishin')) {
+            return {
+                title: 'Feishin Player',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#6366F1"/><path fill="#ffffff" d="M12 4l8 4.5v7L12 20l-8-4.5v-7L12 4zm0 3.5L6.5 10.6l5.5 3.1 5.5-3.1L12 7.5z"/></svg>`
+            };
+        }
+
+        // 6. Nvidia Shield TV
+        if (combined.includes('shield')) {
+            return {
+                title: 'Nvidia Shield TV',
+                svg: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#76B900"/><path fill="#000000" d="M12 5.5c-4.2 0-7 2.3-7 4.2 0 1.2.9 2.2 2.3 2.7l-1 1.6C4.8 13.3 4 12 4 10.5 4 7.6 7.8 4 12 4s8 3.6 8 6.5c0 1.5-.8 2.8-2.3 3.5l-1-1.6c1.4-.5 2.3-1.5 2.3-2.7 0-1.9-2.8-4.2-7-4.2zm0 3c-2.8 0-4.5 1.5-4.5 2.7 0 .8.6 1.4 1.5 1.7L8 14.5c-1-.5-1.5-1.3-1.5-2.3 0-1.9 2.4-3.7 5.5-3.7s5.5 1.8 5.5 3.7c0 1-.5 1.8-1.5 2.3l-1-1.6c.9-.3 1.5-.9 1.5-1.7 0-1.2-1.7-2.7-4.5-2.7z"/></svg>`
+            };
+        }
+
+        // 7. Chromecast / Google Cast
+        if (combined.includes('chromecast') || combined.includes('google cast')) {
+            return {
+                title: 'Google Cast / Chromecast',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M1 18v3h3a3 3 0 0 0-3-3zm0-4v2a5 5 0 0 1 5 5h2a7 7 0 0 0-7-7zm0-4v2a9 9 0 0 1 9 9h2c0-6.08-4.92-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>`
+            };
+        }
+
+        // 8. Opera / Opera GX
+        if (combined.includes('opera') || combined.includes('opr')) {
+            return {
+                title: 'Opera Browser',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#FF1B2D" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 17.5c-3.1 0-4.8-3.1-4.8-7.5s1.7-7.5 4.8-7.5 4.8 3.1 4.8 7.5-1.7 7.5-4.8 7.5z"/></svg>`
+            };
+        }
+
+        // 9. Vivaldi Browser
+        if (combined.includes('vivaldi')) {
+            return {
+                title: 'Vivaldi Browser',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#EF3939"/><path fill="#ffffff" d="M12 17.5a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11zm1.2-8.5h-2.4l-1.3 5.5h2.2l.5-2h1.6l.5 2h2.2L13.2 9z"/></svg>`
+            };
+        }
+
+        // 10. Apple Safari (Official multi-color compass with blue gradient dial & red/white needle)
+        if (combined.includes('safari')) {
+            return {
+                title: 'Apple Safari',
+                svg: `<svg viewBox="0 0 24 24"><defs><linearGradient id="safari-dial" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00a3ff"/><stop offset="100%" stop-color="#0066eb"/></linearGradient></defs><circle cx="12" cy="12" r="11" fill="url(#safari-dial)" stroke="#2ea6ff" stroke-width="0.5"/><path d="M12 2.5v1.5M12 20v1.5M2.5 12H4M20 12h1.5M5.28 5.28l1.06 1.06M17.66 17.66l1.06 1.06M5.28 18.72l1.06-1.06M17.66 6.34l1.06-1.06" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" stroke-linecap="round"/><polygon points="16.5,7.5 13,11 11,13 7.5,16.5 11,13 13,11" fill="#ff3b30"/><polygon points="7.5,16.5 11,13 13,11" fill="#ffffff"/><circle cx="12" cy="12" r="1.3" fill="#ff3b30"/></svg>`
+            };
+        }
+
+        // 11. Google Chrome (Official 4-color emblem: red, yellow, green, blue center)
         if (combined.includes('chrome')) {
             return {
                 title: 'Google Chrome',
@@ -2262,7 +2334,7 @@
             };
         }
 
-        // 3. Mozilla Firefox (Official multi-color flame fox & blue globe)
+        // 12. Mozilla Firefox (Official multi-color flame fox & blue globe)
         if (combined.includes('firefox')) {
             return {
                 title: 'Mozilla Firefox',
@@ -2270,7 +2342,7 @@
             };
         }
 
-        // 4. Microsoft Edge (Official multi-color wave logo)
+        // 13. Microsoft Edge (Official multi-color wave logo)
         if (combined.includes('edg')) {
             return {
                 title: 'Microsoft Edge',
@@ -2278,15 +2350,15 @@
             };
         }
 
-        // 5. Android / Google TV (Official Android #3DDC84 bugdroid)
-        if (combined.includes('android') || combined.includes('pixel') || combined.includes('shield')) {
+        // 14. Android / Google TV (Official Android #3DDC84 bugdroid)
+        if (combined.includes('android') || combined.includes('pixel')) {
             return {
                 title: 'Android / Google TV',
                 svg: `<svg viewBox="0 0 24 24"><path fill="#3DDC84" d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`
             };
         }
 
-        // 6. Apple TV / Apple / iOS / macOS (Official Apple logo in silver)
+        // 15. Apple TV / Apple / iOS / macOS (Official Apple logo in silver)
         if (combined.includes('apple tv') || combined.includes('appletv') || combined.includes('apple') || combined.includes('ios') || combined.includes('macos') || combined.includes('iphone') || combined.includes('ipad')) {
             return {
                 title: combined.includes('tv') ? 'Apple TV' : 'Apple / iOS',
@@ -2294,7 +2366,7 @@
             };
         }
 
-        // 7. Jellyfin Web / Client (Official Jellyfin faceted gradient logo)
+        // 16. Jellyfin Web / Client (Official Jellyfin faceted gradient logo)
         if (combined.includes('jellyfin') || combined.includes('jelly fin')) {
             return {
                 title: 'Jellyfin Web',
@@ -2302,7 +2374,7 @@
             };
         }
 
-        // 8. Kodi Media Center (Official Kodi blue diamond)
+        // 17. Kodi Media Center (Official Kodi blue diamond)
         if (combined.includes('kodi')) {
             return {
                 title: 'Kodi Media Center',
@@ -2310,7 +2382,7 @@
             };
         }
 
-        // 9. Infuse Player (Official Infuse red/orange flame)
+        // 18. Infuse Player (Official Infuse red/orange flame)
         if (combined.includes('infuse')) {
             return {
                 title: 'Infuse Player',
@@ -2318,7 +2390,7 @@
             };
         }
 
-        // 10. Swiftfin (Official Swiftfin cyan logo)
+        // 19. Swiftfin (Official Swiftfin cyan logo)
         if (combined.includes('swiftfin')) {
             return {
                 title: 'Swiftfin Client',
@@ -2326,7 +2398,7 @@
             };
         }
 
-        // 11. Sony PlayStation (Official multi-color PS logo)
+        // 20. Sony PlayStation (Official multi-color PS logo)
         if (combined.includes('playstation') || combined.includes('ps4') || combined.includes('ps5')) {
             return {
                 title: 'PlayStation',
@@ -2334,7 +2406,7 @@
             };
         }
 
-        // 12. Microsoft Xbox (Official Xbox green sphere)
+        // 21. Microsoft Xbox (Official Xbox green sphere)
         if (combined.includes('xbox')) {
             return {
                 title: 'Xbox Console',
@@ -2342,7 +2414,7 @@
             };
         }
 
-        // 13. Roku (Official Roku purple logo)
+        // 22. Roku (Official Roku purple logo)
         if (combined.includes('roku')) {
             return {
                 title: 'Roku',
@@ -2350,7 +2422,7 @@
             };
         }
 
-        // 14. Amazon Fire TV (Official Fire TV orange)
+        // 23. Amazon Fire TV
         if (combined.includes('fire') || combined.includes('amazon')) {
             return {
                 title: 'Amazon Fire TV',
@@ -2358,7 +2430,7 @@
             };
         }
 
-        // 15. LG webOS TV (Official LG logo)
+        // 24. LG webOS TV (Official LG logo)
         if (combined.includes('webos') || combined.includes('lg')) {
             return {
                 title: 'LG webOS TV',
@@ -2366,7 +2438,7 @@
             };
         }
 
-        // 16. Samsung Tizen TV (Official Samsung blue logo)
+        // 25. Samsung Tizen TV (Official Samsung blue logo)
         if (combined.includes('tizen') || combined.includes('samsung')) {
             return {
                 title: 'Samsung Tizen TV',
