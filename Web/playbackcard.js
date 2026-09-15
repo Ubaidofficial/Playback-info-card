@@ -52,6 +52,17 @@
     try {
         etaDisplayMode = localStorage.getItem('jellyfin_playbackcard_eta_mode') || 'clock';
     } catch (e) {}
+    let currentSort = 'default'; // 'default', 'bandwidth', 'transcode', 'progress', 'user'
+    try {
+        currentSort = localStorage.getItem('jellyfin_playbackcard_sort') || 'default';
+    } catch (e) {}
+    let currentPollInterval = CONFIG.POLL_INTERVAL_MS;
+    try {
+        const savedPoll = parseInt(localStorage.getItem('jellyfin_playbackcard_poll_interval'), 10);
+        if ([1000, 3000, 5000, 10000].includes(savedPoll)) {
+            currentPollInterval = savedPoll;
+        }
+    } catch (e) {}
     const sessionPausedTimestamps = new Map(); // sessionId -> timestamp when pause was first detected
 
     // Rolling Telemetry History
@@ -104,7 +115,7 @@
                         CONFIG.POLL_INTERVAL_MS = newInterval;
                         if (isDashboardActive && pollIntervalId != null) {
                             clearInterval(pollIntervalId);
-                            pollIntervalId = setInterval(fetchAndRenderSessions, CONFIG.POLL_INTERVAL_MS);
+                            pollIntervalId = setInterval(fetchAndRenderSessions, currentPollInterval);
                         }
                     }
                 }
@@ -1439,14 +1450,15 @@
                 0%, 100% { opacity: 1; transform: scale(1); }
                 50% { opacity: 0.4; transform: scale(0.75); }
             }
-            /* Live Bandwidth History Sparkline */
+            /* Live Bandwidth History Sparkline & Interactive Tooltip */
             .tautulli-sparkline-wrap {
+                position: relative;
                 display: inline-flex;
                 align-items: center;
                 margin-left: 8px;
                 vertical-align: middle;
                 height: 24px;
-                cursor: pointer;
+                cursor: crosshair;
             }
 
             .tautulli-sparkline-svg {
@@ -1456,6 +1468,44 @@
 
             .tautulli-sparkline-dot {
                 animation: tautulli-pulse 2s infinite ease-in-out;
+            }
+
+            .tautulli-sparkline-cursor {
+                pointer-events: none;
+                transition: x1 0.05s ease, x2 0.05s ease;
+            }
+
+            .tautulli-sparkline-tooltip {
+                position: absolute;
+                bottom: calc(100% + 8px);
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(10, 14, 23, 0.95);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border: 1px solid rgba(56, 189, 248, 0.35);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 12px rgba(56, 189, 248, 0.18);
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11px;
+                line-height: 1.35;
+                color: #f1f5f9;
+                white-space: nowrap;
+                pointer-events: none;
+                z-index: 1000;
+                transition: opacity 0.12s ease;
+            }
+
+            .tautulli-sparkline-tooltip-val {
+                font-weight: 700;
+                color: #38bdf8;
+                font-feature-settings: 'tnum';
+            }
+
+            .tautulli-sparkline-tooltip-sub {
+                font-size: 10px;
+                color: #94a3b8;
+                margin-top: 2px;
             }
 
             /* Cellular Network Pill */
@@ -2014,6 +2064,19 @@
     /**
      * Escapes HTML entities to prevent XSS.
      */
+    /**
+     * Human-readable label for stream sort modes.
+     */
+    function getSortLabel(sortMode) {
+        switch (sortMode) {
+            case 'bandwidth': return 'Bandwidth';
+            case 'transcode': return 'Transcodes';
+            case 'progress': return 'Progress';
+            case 'user': return 'User A-Z';
+            default: return 'Default';
+        }
+    }
+
     function escapeHtml(str) {
         if (str == null) return '';
         return String(str)
@@ -2197,11 +2260,12 @@
         const lastPt = pts[pts.length - 1];
         const fillPath = `M ${firstX},${height} L ${pts.map((p) => `${p.x},${p.y}`).join(' L ')} L ${lastPt.x},${height} Z`;
 
+        const ptsJson = escapeHtml(JSON.stringify(pts));
         const peakRate = formatBitrate(Math.max(...history.map((h) => h.total)));
         const curRate = formatBitrate(lastPt.total);
 
         return `
-            <div class="tautulli-sparkline-wrap" title="Rolling Bandwidth Trend (${history.length * 3}s window) · Peak: ${peakRate} · Current: ${curRate}">
+            <div class="tautulli-sparkline-wrap" data-points="${ptsJson}" data-peak="${escapeHtml(peakRate)}" title="Rolling Bandwidth Trend · Peak: ${peakRate} · Current: ${curRate}">
                 <svg class="tautulli-sparkline-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
                     <defs>
                         <linearGradient id="tautulli-sparkline-grad" x1="0" y1="0" x2="0" y2="1">
@@ -2211,8 +2275,10 @@
                     </defs>
                     <path d="${fillPath}" fill="url(#tautulli-sparkline-grad)" />
                     <polyline points="${polylinePts}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                    <line class="tautulli-sparkline-cursor" x1="0" y1="0" x2="0" y2="${height}" style="display:none;stroke:#38bdf8;stroke-width:1.2;stroke-dasharray:2,2;opacity:0.9;" />
                     <circle cx="${lastPt.x}" cy="${lastPt.y}" r="2.5" fill="#38bdf8" class="tautulli-sparkline-dot" />
                 </svg>
+                <div class="tautulli-sparkline-tooltip" style="display:none;"></div>
             </div>
         `;
     }
@@ -3496,6 +3562,13 @@
                         </div>
                     </div>
                     <div class="tautulli-activity-tools">
+                        <button class="tautulli-tool-btn" data-action="cycle-poll" title="Telemetry Polling Interval: ${currentPollInterval / 1000}s. Click to cycle: 1s, 3s, 5s, 10s.">
+                            <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="9"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3"/>
+                            </svg>
+                            <span>${currentPollInterval / 1000}s</span>
+                        </button>
                         <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
                             <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                             <span>${isPrivacyMode ? 'Privacy On' : 'Privacy'}</span>
@@ -3580,6 +3653,17 @@
             displayedCards = cards.filter((c) => c.isPaused);
         }
 
+        // Multi-Stream Sorting
+        if (currentSort === 'bandwidth') {
+            displayedCards = [...displayedCards].sort((a, b) => (b.bandwidthNumber || 0) - (a.bandwidthNumber || 0));
+        } else if (currentSort === 'transcode') {
+            displayedCards = [...displayedCards].sort((a, b) => (b.isTranscode ? 1 : 0) - (a.isTranscode ? 1 : 0));
+        } else if (currentSort === 'progress') {
+            displayedCards = [...displayedCards].sort((a, b) => (b.playbackPercent || 0) - (a.playbackPercent || 0));
+        } else if (currentSort === 'user') {
+            displayedCards = [...displayedCards].sort((a, b) => (a.userName || '').localeCompare(b.userName || ''));
+        }
+
         const cardsContentHtml = displayedCards.length > 0
             ? `<div class="tautulli-grid">${displayedCards.map(renderSessionCard).join('')}</div>`
             : `
@@ -3611,6 +3695,20 @@
                 </div>
 
                 <div class="tautulli-activity-tools">
+                    ${totalStreams > 1 ? `
+                    <button class="tautulli-tool-btn" data-action="cycle-sort" title="Sort active streams (${getSortLabel(currentSort)}). Click to cycle: Default, Bandwidth, Transcodes, Progress, User.">
+                        <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/>
+                        </svg>
+                        <span>Sort: ${getSortLabel(currentSort)}</span>
+                    </button>` : ''}
+                    <button class="tautulli-tool-btn" data-action="cycle-poll" title="Telemetry Polling Interval: ${currentPollInterval / 1000}s. Click to cycle: 1s (Real-time), 3s (Balanced), 5s (Eco), 10s (Low-power).">
+                        <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="9"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3"/>
+                        </svg>
+                        <span>${currentPollInterval / 1000}s</span>
+                    </button>
                     <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                         <span>${isPrivacyMode ? 'Privacy On' : 'Privacy'}</span>
@@ -3662,6 +3760,36 @@
             if (action === 'set-filter') {
                 e.preventDefault();
                 currentFilter = target.getAttribute('data-filter') || 'all';
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
+            if (action === 'cycle-sort') {
+                e.preventDefault();
+                const sorts = ['default', 'bandwidth', 'transcode', 'progress', 'user'];
+                const nextIdx = (sorts.indexOf(currentSort) + 1) % sorts.length;
+                currentSort = sorts[nextIdx];
+                try {
+                    localStorage.setItem('jellyfin_playbackcard_sort', currentSort);
+                } catch (err) {}
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
+            if (action === 'cycle-poll') {
+                e.preventDefault();
+                const intervals = [1000, 3000, 5000, 10000];
+                const nextIdx = (intervals.indexOf(currentPollInterval) + 1) % intervals.length;
+                currentPollInterval = intervals[nextIdx];
+                try {
+                    localStorage.setItem('jellyfin_playbackcard_poll_interval', currentPollInterval.toString());
+                } catch (err) {}
+                if (isDashboardActive && pollIntervalId != null) {
+                    clearInterval(pollIntervalId);
+                    pollIntervalId = setInterval(fetchAndRenderSessions, currentPollInterval);
+                }
                 lastRenderedHash = '';
                 fetchAndRenderSessions();
                 return;
@@ -3726,6 +3854,65 @@
                 const isMuted = target.getAttribute('data-muted') === 'true';
                 handleToggleMute(sessionId, isMuted);
             }
+        };
+
+        // Interactive Sparkline Scrubber & Telemetry Tooltip
+        container.onmousemove = function (e) {
+            const wrap = e.target.closest('.tautulli-sparkline-wrap');
+            if (!wrap) {
+                const tt = container.querySelector('.tautulli-sparkline-tooltip');
+                if (tt) tt.style.display = 'none';
+                const cursor = container.querySelector('.tautulli-sparkline-cursor');
+                if (cursor) cursor.style.display = 'none';
+                return;
+            }
+            const ptsData = wrap.getAttribute('data-points');
+            if (!ptsData) return;
+            try {
+                const pts = JSON.parse(ptsData);
+                if (!pts || pts.length === 0) return;
+                const rect = wrap.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+
+                let closest = pts[0];
+                let minDist = Math.abs(mouseX - closest.x);
+                for (let i = 1; i < pts.length; i++) {
+                    const d = Math.abs(mouseX - pts[i].x);
+                    if (d < minDist) {
+                        minDist = d;
+                        closest = pts[i];
+                    }
+                }
+
+                const cursor = wrap.querySelector('.tautulli-sparkline-cursor');
+                if (cursor) {
+                    cursor.setAttribute('x1', closest.x);
+                    cursor.setAttribute('x2', closest.x);
+                    cursor.style.display = 'block';
+                }
+
+                const tt = wrap.querySelector('.tautulli-sparkline-tooltip');
+                if (tt) {
+                    const timeAgo = closest.time ? formatTimeAgo(new Date(closest.time).toISOString()) : 'Recent';
+                    const lanBw = formatBitrate(closest.lan || 0);
+                    const wanBw = formatBitrate(closest.wan || 0);
+                    tt.innerHTML = `
+                        <div class="tautulli-sparkline-tooltip-val">${formatBitrate(closest.total)}</div>
+                        <div class="tautulli-sparkline-tooltip-sub">LAN: ${lanBw} · WAN: ${wanBw}</div>
+                        <div class="tautulli-sparkline-tooltip-sub">${timeAgo} · Peak: ${wrap.getAttribute('data-peak') || 'N/A'}</div>
+                    `;
+                    tt.style.display = 'block';
+                    const clampedX = Math.max(30, Math.min(rect.width - 30, closest.x));
+                    tt.style.left = clampedX + 'px';
+                }
+            } catch (err) {}
+        };
+
+        container.onmouseleave = function () {
+            const tt = container.querySelector('.tautulli-sparkline-tooltip');
+            if (tt) tt.style.display = 'none';
+            const cursor = container.querySelector('.tautulli-sparkline-cursor');
+            if (cursor) cursor.style.display = 'none';
         };
     }
 
@@ -3807,6 +3994,8 @@
                 placement: placementMode,
                 privacy: isPrivacyMode,
                 filter: currentFilter,
+                sort: currentSort,
+                poll: currentPollInterval,
                 etaMode: etaDisplayMode,
                 idleCount: idleSessions.length,
                 cards: cards.map((c) => ({
