@@ -73,19 +73,29 @@
      */
     let isConfigLoaded = false;
     async function loadServerConfiguration() {
+        // When running standalone in the browser (e.g. via DevTools console or user script),
+        // querying the server plugin endpoint triggers an HTTP 401 because the plugin
+        // assembly is not installed in the Jellyfin server. Only query if actually installed.
+        const isInstalledPlugin = Boolean(
+            (typeof document !== 'undefined' && typeof document.querySelector === 'function' && document.querySelector(`script[src*="${CONFIG.PLUGIN_ID}"]`)) ||
+            (typeof window !== 'undefined' && window.location && typeof window.location.href === 'string' && window.location.href.includes(CONFIG.PLUGIN_ID)) ||
+            (typeof window !== 'undefined' && window.PlaybackInfoEnableServerConfig === true)
+        );
+        if (!isInstalledPlugin) {
+            return;
+        }
+
         const apiClient = getApiClient();
         if (!apiClient || typeof apiClient.getPluginConfiguration !== 'function') return;
         try {
-            // Only attempt plugin config if we're likely running as an installed plugin
-        // (prevents 404 console errors when script is injected manually via DevTools)
-        let config = null;
-        try {
-            if (typeof apiClient.getPluginConfiguration === 'function') {
-                config = await apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID);
+            let config = null;
+            try {
+                if (typeof apiClient.getPluginConfiguration === 'function') {
+                    config = await apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID);
+                }
+            } catch (_) {
+                // Plugin not installed or running standalone — safely ignore
             }
-        } catch (_) {
-            // Plugin not installed or running standalone via console — safely ignore
-        }
             if (config && typeof config === 'object') {
                 isConfigLoaded = true;
                 if (config.PollingIntervalSeconds && config.PollingIntervalSeconds >= 1) {
@@ -2233,64 +2243,64 @@
 
         if (combined.includes('apple tv') || combined.includes('appletv')) {
             return {
-                bg: 'rgba(255, 255, 255, 0.08)',
-                color: '#f8fafc',
+                bg: '#1c1c1e',
+                color: '#ffffff',
                 title: 'Apple TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('webos') || combined.includes('lg')) {
             return {
-                bg: 'rgba(165, 0, 52, 0.25)',
-                color: '#fda4af',
+                bg: '#a50034',
+                color: '#ffffff',
                 title: 'LG webOS TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('tizen') || combined.includes('samsung')) {
             return {
-                bg: 'rgba(15, 121, 175, 0.25)',
-                color: '#7dd3fc',
+                bg: '#0f79af',
+                color: '#ffffff',
                 title: 'Samsung Tizen TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
         if (combined.includes('playstation') || combined.includes('ps4') || combined.includes('ps5')) {
             return {
-                bg: 'rgba(0, 55, 145, 0.3)',
-                color: '#93c5fd',
+                bg: '#003791',
+                color: '#ffffff',
                 title: 'PlayStation',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H9v2H7v-2H5v-2h2V9h2v2h2v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
             };
         }
         if (combined.includes('xbox')) {
             return {
-                bg: 'rgba(16, 124, 16, 0.25)',
-                color: '#86efac',
+                bg: '#107c10',
+                color: '#ffffff',
                 title: 'Xbox Console',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.88 15.53c-1.04.52-2.39.84-3.88.84s-2.84-.32-3.88-.84c-.45-.23-.84-.5-1.19-.8 1.13-1.01 2.99-2.36 5.07-2.36s3.94 1.35 5.07 2.36c-.35.3-.74.57-1.19.8zm2.4-2.28c-.89-.92-2.28-1.99-4.28-2.58 1.62-.97 3.39-1.28 4.14-1.34.46 1.19.64 2.52.14 3.92zm-12.56 0c-.5-1.4-.32-2.73.14-3.92.75.06 2.52.37 4.14 1.34-2 .59-3.39 1.66-4.28 2.58z"/></svg>`
             };
         }
         if (combined.includes('swiftfin')) {
             return {
-                bg: 'rgba(0, 164, 220, 0.25)',
-                color: '#38bdf8',
+                bg: '#00a4dc',
+                color: '#ffffff',
                 title: 'Swiftfin Client',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>`
             };
         }
         if (combined.includes('infuse')) {
             return {
-                bg: 'rgba(255, 75, 58, 0.25)',
-                color: '#fca5a5',
+                bg: '#ff4b3a',
+                color: '#ffffff',
                 title: 'Infuse Player',
                 svg: `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`
             };
         }
         if (combined.includes('kodi')) {
             return {
-                bg: 'rgba(23, 178, 231, 0.25)',
-                color: '#7dd3fc',
+                bg: '#17b2e7',
+                color: '#ffffff',
                 title: 'Kodi Media Center',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 3.83L18.17 12 12 18.17 5.83 12 12 5.83z"/></svg>`
             };
@@ -2313,16 +2323,16 @@
         }
         if (combined.includes('apple') || combined.includes('ios') || combined.includes('macos') || combined.includes('iphone') || combined.includes('ipad')) {
             return {
-                bg: 'rgba(255, 255, 255, 0.08)',
-                color: '#f8fafc',
+                bg: '#1c1c1e',
+                color: '#ffffff',
                 title: 'Apple / iOS / macOS',
                 svg: `<svg viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.87c.66-.82 1.11-1.96.99-3.1-.96.04-2.12.65-2.8 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.13-.47 2.79-1.29z"/></svg>`
             };
         }
         if (combined.includes('fire') || combined.includes('amazon')) {
             return {
-                bg: 'rgba(255, 153, 0, 0.25)',
-                color: '#fcd34d',
+                bg: '#ff9900',
+                color: '#ffffff',
                 title: 'Amazon Fire TV',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
@@ -2337,24 +2347,24 @@
         }
         if (combined.includes('firefox')) {
             return {
-                bg: 'rgba(255, 113, 57, 0.22)',
-                color: '#fdba74',
+                bg: '#ff7139',
+                color: '#ffffff',
                 title: 'Mozilla Firefox',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
             };
         }
         if (combined.includes('edg')) {
             return {
-                bg: 'rgba(0, 120, 215, 0.25)',
-                color: '#7dd3fc',
+                bg: '#0078d7',
+                color: '#ffffff',
                 title: 'Microsoft Edge',
                 svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
             };
         }
         if (combined.includes('roku')) {
             return {
-                bg: 'rgba(102, 45, 145, 0.3)',
-                color: '#d8b4fe',
+                bg: '#662d91',
+                color: '#ffffff',
                 title: 'Roku',
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
@@ -2362,16 +2372,16 @@
         // Jellyfin Web (explicit — shows Jellyfin's characteristic ◈ logo shape)
         if (combined.includes('jellyfin') || combined.includes('jelly fin')) {
             return {
-                bg: 'rgba(0, 164, 220, 0.22)',
-                color: '#38bdf8',
+                bg: '#00a4dc',
+                color: '#ffffff',
                 title: 'Jellyfin Web',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>`
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 4.5l6.5 6.5-6.5 6.5-6.5-6.5L12 6.5zm0 3.5l-3 3 3 3 3-3-3-3z"/></svg>`
             };
         }
         // Generic web player fallback (monitor icon)
         return {
-            bg: 'rgba(255, 255, 255, 0.06)',
-            color: '#94a3b8',
+            bg: '#334155',
+            color: '#ffffff',
             title: client || 'Web Player',
             svg: `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`
         };
