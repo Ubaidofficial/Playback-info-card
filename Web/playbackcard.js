@@ -2492,6 +2492,20 @@
     }
 
     /**
+     * Formats file size in bytes into clean human-readable strings (e.g. 4.8 GB, 850 MB).
+     */
+    function formatFileSize(bytes) {
+        if (!bytes || isNaN(bytes) || bytes <= 0) return null;
+        if (bytes >= 1073741824) {
+            return `${(bytes / 1073741824).toFixed(1)} GB`;
+        }
+        if (bytes >= 1048576) {
+            return `${Math.round(bytes / 1048576)} MB`;
+        }
+        return `${Math.round(bytes / 1024)} KB`;
+    }
+
+    /**
      * Resolves unified resolution info (short code and badge text) considering both width and height,
      * properly handling cinemascope aspect ratios (e.g. 1920x804 is 1080p, 1280x536 is 720p).
      */
@@ -3934,7 +3948,7 @@
                     IncludeItemTypes: 'Movie',
                     Limit: 10,
                     Recursive: true,
-                    Fields: 'PrimaryImageAspectRatio,UserData,ImageTags'
+                    Fields: 'PrimaryImageAspectRatio,UserData,ImageTags,MediaSources,MediaStreams,Container'
                 }),
                 apiClient.getItems(userId, {
                     SortBy: 'PlayCount,SortName',
@@ -3942,7 +3956,7 @@
                     IncludeItemTypes: 'Episode',
                     Limit: 50,
                     Recursive: true,
-                    Fields: 'SeriesId,SeriesName,SeriesPrimaryImageTag,UserData,ImageTags'
+                    Fields: 'SeriesId,SeriesName,SeriesPrimaryImageTag,UserData,ImageTags,MediaSources,MediaStreams,Container'
                 })
             ]);
 
@@ -3956,12 +3970,18 @@
                 const plays = (ep.UserData && ep.UserData.PlayCount) || ep.PlayCount || (ep.UserData && ep.UserData.Played ? 1 : 0);
                 if (sid && plays > 0) {
                     if (!seriesPlayMap.has(sid)) {
+                        const ms = (ep.MediaSources && ep.MediaSources[0]) || {};
+                        const vs = (ms.MediaStreams && ms.MediaStreams.find((s) => s.Type === 'Video')) || (ep.MediaStreams && ep.MediaStreams.find((s) => s.Type === 'Video')) || {};
+                        const resInfo = resolveResolutionInfo(vs.Width, vs.Height);
+                        const resShort = (vs.Width || vs.Height) ? resInfo.short : null;
                         seriesPlayMap.set(sid, {
                             id: ep.SeriesId || ep.Id,
                             name: ep.SeriesName || ep.Name,
                             playCount: 0,
                             year: ep.ProductionYear || '',
                             type: 'TV Series',
+                            resolution: resShort,
+                            codec: (vs.Codec || '').toUpperCase(),
                             imageTag: ep.SeriesPrimaryImageTag || (ep.ImageTags && ep.ImageTags.Primary) || null
                         });
                     }
@@ -3975,12 +3995,35 @@
             movieItems.forEach((m) => {
                 const plays = (m.UserData && m.UserData.PlayCount) || m.PlayCount || 0;
                 const imgTag = (m.ImageTags && m.ImageTags.Primary) || m.PrimaryImageTag || undefined;
+
+                const ms = (m.MediaSources && m.MediaSources[0]) || {};
+                const vs = (ms.MediaStreams && ms.MediaStreams.find((s) => s.Type === 'Video')) || (m.MediaStreams && m.MediaStreams.find((s) => s.Type === 'Video')) || {};
+                const as = (ms.MediaStreams && ms.MediaStreams.find((s) => s.Type === 'Audio')) || (m.MediaStreams && m.MediaStreams.find((s) => s.Type === 'Audio')) || {};
+
+                const resInfo = resolveResolutionInfo(vs.Width, vs.Height);
+                const resShort = (vs.Width || vs.Height) ? resInfo.short : null;
+                const codec = (vs.Codec || '').toUpperCase();
+                const sizeBytes = ms.Size || m.Size || 0;
+                const sizeStr = formatFileSize(sizeBytes);
+                const bitrateNum = ms.Bitrate || m.Bitrate || 0;
+                const bitrateStr = bitrateNum > 0 ? formatBitrate(bitrateNum) : null;
+                const container = (ms.Container || m.Container || '').toUpperCase();
+                const audioCodec = (as.Codec || '').toUpperCase();
+                const audioChannels = as.Channels === 6 ? '5.1' : as.Channels === 8 ? '7.1' : as.Channels === 2 ? 'Stereo' : '';
+                const audioDesc = [audioCodec, audioChannels].filter(Boolean).join(' ');
+
                 combinedList.push({
                     id: m.Id,
                     name: m.Name,
                     playCount: plays,
                     year: m.ProductionYear || '',
                     type: 'Movie',
+                    resolution: resShort,
+                    codec: codec,
+                    size: sizeStr,
+                    bitrate: bitrateStr,
+                    container: container,
+                    audioDesc: audioDesc,
                     imgUrl: (typeof apiClient.getImageUrl === 'function')
                         ? apiClient.getImageUrl(m.Id, { type: 'Primary', maxHeight: 200, tag: imgTag })
                         : null
@@ -3995,6 +4038,12 @@
                     playCount: s.playCount,
                     year: s.year,
                     type: 'TV Series',
+                    resolution: s.resolution,
+                    codec: s.codec,
+                    size: null,
+                    bitrate: null,
+                    container: null,
+                    audioDesc: null,
                     imgUrl: (typeof apiClient.getImageUrl === 'function')
                         ? apiClient.getImageUrl(s.id, { type: 'Primary', maxHeight: 200, tag: s.imageTag || undefined })
                         : null
@@ -4064,9 +4113,28 @@
                     ${top3.map((item, idx) => {
                         const rankClass = idx === 0 ? 'tautulli-stats-rank-1' : (idx === 1 ? 'tautulli-stats-rank-2' : 'tautulli-stats-rank-3');
                         const rankLabel = `#${idx + 1}`;
-                        const metaStr = [item.type, item.year].filter(Boolean).join(' · ');
+
+                        // Compact meta line: e.g. "2019 · 1080p · 4.8 GB"
+                        const metaParts = [];
+                        if (item.year) metaParts.push(item.year);
+                        if (item.resolution) metaParts.push(item.resolution);
+                        if (item.size) metaParts.push(item.size);
+                        else if (item.codec) metaParts.push(item.codec);
+                        else if (item.type) metaParts.push(item.type);
+                        const metaStr = metaParts.join(' · ') || item.type || 'Movie';
+
+                        // Detailed hover spec sheet tooltip
+                        const specParts = [
+                            item.resolution ? `${item.resolution}${item.codec ? ' ' + item.codec : ''}` : '',
+                            item.size ? `Size: ${item.size}` : '',
+                            item.bitrate ? `Bitrate: ${item.bitrate}` : '',
+                            item.container ? `Format: ${item.container}` : '',
+                            item.audioDesc ? `Audio: ${item.audioDesc}` : ''
+                        ].filter(Boolean).join(' | ');
+                        const tooltipText = `${item.name}${item.year ? ' (' + item.year + ')' : ''} · ${item.playCount} plays${specParts ? ' • ' + specParts : ''}`;
+
                         return `
-                            <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-top3-card" style="text-decoration:none!important;color:#f1f5f9!important;" title="${escapeHtml(item.name)} (${item.playCount} plays)">
+                            <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-top3-card" style="text-decoration:none!important;color:#f1f5f9!important;" title="${escapeHtml(tooltipText)}">
                                 <div class="tautulli-stats-top3-rank ${rankClass}">${rankLabel}</div>
                                 ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.style.display='none'" />` : '<div class="tautulli-stats-thumb" style="display:flex;align-items:center;justify-content:center;color:#64748b;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></div>'}
                                 <div class="tautulli-stats-info">
