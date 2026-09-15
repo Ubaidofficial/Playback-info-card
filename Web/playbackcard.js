@@ -58,13 +58,10 @@
     let cachedWatchStats = null;
     let lastWatchStatsFetchTime = 0;
 
-    // Placement state: 'replace-devices' (default) vs 'top-banner'
-    let placementMode = 'replace-devices';
+    // Placement state: locked to 'replace-devices' in place of default Devices section
+    const placementMode = 'replace-devices';
     try {
-        const savedPlacement = localStorage.getItem('jellyfin_playbackcard_placement');
-        if (savedPlacement === 'top-banner' || savedPlacement === 'replace-devices') {
-            placementMode = savedPlacement;
-        }
+        localStorage.removeItem('jellyfin_playbackcard_placement');
     } catch (e) {}
     let defaultDevicesElement = null;
 
@@ -3682,10 +3679,6 @@
                         </div>
                     </div>
                     <div class="tautulli-activity-tools">
-                        <button class="tautulli-tool-btn" data-action="toggle-placement" title="Switch Placement: Replace Devices vs Top Banner">
-                            <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
-                            <span>${placementMode === 'replace-devices' ? 'In Devices' : 'Top Banner'}</span>
-                        </button>
                         <button class="${statsBtnClass}" data-action="toggle-watch-stats" title="Toggle Watch Statistics Leaderboards">
                             <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                             <span>${showWatchStats ? 'Stats On' : 'Stats'}</span>
@@ -3847,10 +3840,6 @@
                 </div>
 
                 <div class="tautulli-activity-tools">
-                    <button class="tautulli-tool-btn" data-action="toggle-placement" title="Switch Placement: Replace Devices vs Top Banner">
-                        <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
-                        <span>${placementMode === 'replace-devices' ? 'In Devices' : 'Top Banner'}</span>
-                    </button>
                     <button class="${statsBtnClass}" data-action="toggle-watch-stats" title="Toggle Watch Statistics Leaderboards">
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                         <span>${showWatchStats ? 'Stats On' : 'Stats'}</span>
@@ -4375,18 +4364,6 @@
             if (!target) return;
 
             const action = target.getAttribute('data-action');
-            if (action === 'toggle-placement') {
-                e.preventDefault();
-                placementMode = (placementMode === 'replace-devices') ? 'top-banner' : 'replace-devices';
-                try {
-                    localStorage.setItem('jellyfin_playbackcard_placement', placementMode);
-                } catch (err) {}
-                lastRenderedHash = '';
-                setupDashboardContainer(document.body);
-                fetchAndRenderSessions();
-                return;
-            }
-
             if (action === 'edit-device-alias') {
                 e.preventDefault();
                 e.stopPropagation();
@@ -4682,9 +4659,19 @@
      * Finds the Devices section in the dashboard to enable seamless in-place replacement.
      */
     function findDevicesSection(viewElement) {
-        const root = (viewElement && typeof viewElement.querySelector === 'function') ? viewElement : document;
+        // Find the main dashboard page area, explicitly excluding the sidebar navigation drawer
+        const dashboardPage = document.querySelector('.dashboardPage, .content-primary, .dashboardForm, div[data-role="page"]:not(.hide), .view:not(.hide)');
+        const root = (viewElement && typeof viewElement.querySelector === 'function' && !viewElement.classList.contains('mainDrawer'))
+            ? viewElement
+            : (dashboardPage || document.body);
 
-        // 1. Direct active devices class or ID across Jellyfin versions
+        // Helper to check if an element is inside the sidebar or navigation drawer
+        function isInsideSidebar(el) {
+            if (!el || typeof el.closest !== 'function') return false;
+            return Boolean(el.closest('.mainDrawer, .sidebar, nav, aside, [data-role="panel"], .drawer-content, .navMenu, .mainAnimatedPages > .drawer'));
+        }
+
+        // 1. Direct active devices class or ID inside dashboard
         const directSelectors = [
             '.activeDevices',
             '#activeDevices',
@@ -4695,24 +4682,34 @@
         ];
         for (const sel of directSelectors) {
             try {
-                const el = root.querySelector(sel);
-                if (el) {
-                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, [data-role="section"]');
+                const candidates = Array.from(root.querySelectorAll(sel));
+                for (const el of candidates) {
+                    if (isInsideSidebar(el)) continue;
+                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, div[class*="section"], div[class*="Section"]');
                     return parentSection || el;
                 }
             } catch (e) {}
         }
 
-        // 2. Headings or link tags matching "Devices"
+        // 2. Headings or link tags matching "Devices" inside dashboard
         try {
             const candidates = Array.from(root.querySelectorAll('a, h2, h3, h4, .sectionTitle, .sectionTitleContainer'));
             for (const el of candidates) {
+                if (isInsideSidebar(el)) continue;
                 const href = (el.getAttribute('href') || '').toLowerCase();
                 const text = (el.textContent || '').trim().toLowerCase();
                 if (href.includes('devices') || text === 'devices' || text.startsWith('devices')) {
-                    const section = el.closest('.dashboardSection, .dashboardColumnSection, section, [data-role="section"]');
-                    if (section && section !== document.body && section !== root) {
-                        return section;
+                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, div[class*="section"], div[class*="Section"]');
+                    if (parentSection && parentSection !== document.body && parentSection !== root && !isInsideSidebar(parentSection)) {
+                        return parentSection;
+                    }
+                    // Find the section container enclosing this header and its sibling device cards
+                    let curr = el;
+                    while (curr && curr.parentElement && curr.parentElement !== root && curr.parentElement !== document.body) {
+                        if (curr.parentElement.querySelector('.activeDevices, .card, [data-role="controlgroup"]')) {
+                            return curr.parentElement;
+                        }
+                        curr = curr.parentElement;
                     }
                     return el.parentElement || el;
                 }
@@ -4783,22 +4780,18 @@
             </div>
         `;
 
-        if (placementMode === 'replace-devices') {
-            const devicesTarget = findDevicesSection(viewElement);
-            if (devicesTarget && devicesTarget.parentNode) {
-                defaultDevicesElement = devicesTarget;
-                devicesTarget.style.display = 'none';
-                devicesTarget.setAttribute('data-playbackcard-replaced', 'true');
-                devicesTarget.parentNode.insertBefore(container, devicesTarget);
-                attachContainerEvents(container);
-                return true;
-            }
+        // Always target and replace the Devices section
+        const devicesTarget = findDevicesSection(viewElement);
+        if (devicesTarget && devicesTarget.parentNode) {
+            defaultDevicesElement = devicesTarget;
+            devicesTarget.style.setProperty('display', 'none', 'important');
+            devicesTarget.setAttribute('data-playbackcard-replaced', 'true');
+            devicesTarget.parentNode.insertBefore(container, devicesTarget);
+            attachContainerEvents(container);
+            return true;
         }
 
-        if (defaultDevicesElement && defaultDevicesElement.style) {
-            defaultDevicesElement.style.display = '';
-        }
-
+        // Fallback: If devices section not yet in DOM, insert into dashboard target
         const target = findDashboardTarget(viewElement);
         if (!target) {
             return false;
@@ -4879,11 +4872,15 @@
             const existing = document.getElementById(CONFIG.CONTAINER_ID);
             const isAttached = existing && document.body && (typeof document.body.contains === 'function' ? document.body.contains(existing) : true);
 
-            // In replace-devices mode, ensure default devices section stays hidden
-            if (placementMode === 'replace-devices') {
-                const devicesTarget = findDevicesSection(document.body);
-                if (devicesTarget && devicesTarget.style && devicesTarget.style.display !== 'none') {
-                    devicesTarget.style.display = 'none';
+            const devicesTarget = findDevicesSection(document.body);
+            if (devicesTarget) {
+                // Ensure default devices section stays hidden
+                if (devicesTarget.style && devicesTarget.style.display !== 'none') {
+                    devicesTarget.style.setProperty('display', 'none', 'important');
+                }
+                // If container was mounted elsewhere (e.g. at the top of the dashboard), move it to replace Devices!
+                if (existing && devicesTarget.parentNode && existing.nextSibling !== devicesTarget) {
+                    devicesTarget.parentNode.insertBefore(existing, devicesTarget);
                 }
             }
 
