@@ -471,7 +471,8 @@
                 height: 100%;
                 background-size: cover;
                 background-position: center right;
-                opacity: 0.42;
+                opacity: 0.40;
+                filter: blur(8px) saturate(125%) brightness(0.65);
                 pointer-events: none;
                 z-index: 0;
                 mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.96) 65%, black 100%);
@@ -784,7 +785,7 @@
                 flex-direction: column;
                 gap: 4px;
                 min-width: 0;
-                padding-right: 36px;
+                padding-right: 86px;
                 position: relative;
             }
             /* Readable scrim — soft mask dissolve from left so text is readable yet fanart bleeds through */
@@ -792,7 +793,7 @@
                 content: '';
                 position: absolute;
                 inset: -14px -14px -14px -18px;
-                background: linear-gradient(to right, rgba(5,6,14,0.88) 0%, rgba(5,6,14,0.78) 45%, rgba(5,6,14,0.5) 75%, rgba(5,6,14,0.1) 100%);
+                background: linear-gradient(to right, rgba(5,6,14,0.88) 0%, rgba(5,6,14,0.78) 40%, rgba(5,6,14,0.65) 75%, rgba(5,6,14,0.45) 100%);
                 pointer-events: none;
                 z-index: 0;
             }
@@ -913,7 +914,7 @@
                 align-items: flex-end;
                 gap: 2px;
                 z-index: 3;
-                pointer-events: none;
+                pointer-events: auto;
             }
 
             .tautulli-time-progress {
@@ -1376,17 +1377,17 @@
                 filter: brightness(0.5) saturate(0.35);
             }
 
-            /* Year Badge (dim, Tautulli-style) */
+            /* Year Badge (clean, refined pill) */
             .tautulli-year-badge {
                 display: inline-block;
                 font-size: 9px;
                 font-weight: 600;
-                color: #475569;
-                background: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.07);
-                border-radius: 3px;
-                padding: 1px 4px;
-                margin-left: 5px;
+                color: #94a3b8;
+                background: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 4px;
+                padding: 1px 5px;
+                margin-right: 6px;
                 vertical-align: middle;
                 letter-spacing: 0.04em;
                 flex-shrink: 0;
@@ -1399,8 +1400,8 @@
                 height: 5px;
                 border-radius: 50%;
                 background: #22c55e;
-                margin-left: 5px;
-                vertical-align: middle;
+                margin-left: 6px;
+                vertical-align: 1px;
                 animation: tautulli-bw-pulse-anim 2s ease-in-out infinite;
                 flex-shrink: 0;
             }
@@ -3327,8 +3328,8 @@
                         </div>
                         <div class="tautulli-meta-line-2">
                             <span class="tautulli-meta-type-icon">${typeIconSvg}</span>
-                            <span class="tautulli-meta-sub">${escapeHtml(card.secondaryTitle || '')}</span>
                             ${(card.mediaItemYear && !card.isAudioItem && !card.isLiveStream) ? `<span class="tautulli-year-badge">${escapeHtml(String(card.mediaItemYear))}</span>` : ''}
+                            <span class="tautulli-meta-sub">${escapeHtml(card.secondaryTitle || '')}</span>
                         </div>
                     </div>
                     <div class="tautulli-meta-right">
