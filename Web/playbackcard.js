@@ -80,11 +80,17 @@
         // (prevents 404 console errors when script is injected manually via DevTools)
         let config = null;
         try {
-            const testRes = await fetch(`${apiClient.serverAddress()}/Plugins/${CONFIG.PLUGIN_ID}/Configuration`, {
-                headers: { 'X-Emby-Authorization': `MediaBrowser Token="${apiClient.accessToken()}"` }
+            const configUrl = `${apiClient.serverAddress()}/Plugins/${CONFIG.PLUGIN_ID}/Configuration`;
+            const token = typeof apiClient.accessToken === 'function' ? apiClient.accessToken() : '';
+            const testRes = await fetch(configUrl, {
+                headers: token ? { 'X-Emby-Authorization': `MediaBrowser Token="${token}"` } : {}
             });
+            // Only use config if endpoint exists and returns valid JSON (skip 401/404 silently)
             if (testRes.ok) {
-                config = await testRes.json();
+                const ct = testRes.headers.get('content-type') || '';
+                if (ct.includes('json')) {
+                    config = await testRes.json();
+                }
             }
         } catch (_) {}
             if (config && typeof config === 'object') {
@@ -681,7 +687,7 @@
                 display: flex;
                 gap: 14px;
                 padding: 14px;
-                background: rgba(0, 0, 0, 0.18);
+                background: rgba(0, 0, 0, 0.04);
                 min-height: 155px;
             }
 
@@ -1287,6 +1293,44 @@
             }
             .tautulli-poster-paused .tautulli-poster-fallback {
                 filter: brightness(0.5) saturate(0.35);
+            }
+
+            /* Year Badge (dim, Tautulli-style) */
+            .tautulli-year-badge {
+                display: inline-block;
+                font-size: 9px;
+                font-weight: 600;
+                color: #475569;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 3px;
+                padding: 1px 4px;
+                margin-left: 5px;
+                vertical-align: middle;
+                letter-spacing: 0.04em;
+                flex-shrink: 0;
+            }
+
+            /* Live Bandwidth Pulse Dot */
+            .tautulli-bw-pulse {
+                display: inline-block;
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: #22c55e;
+                margin-left: 5px;
+                vertical-align: middle;
+                animation: tautulli-bw-pulse-anim 2s ease-in-out infinite;
+                flex-shrink: 0;
+            }
+            .tautulli-bw-pulse.paused {
+                background: #f59e0b;
+                animation: none;
+                opacity: 0.6;
+            }
+            @keyframes tautulli-bw-pulse-anim {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.4; transform: scale(0.75); }
             }
             /* Live Bandwidth History Sparkline */
             .tautulli-sparkline-wrap {
@@ -2128,6 +2172,16 @@
                 svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
             };
         }
+        // Jellyfin Web (explicit — shows Jellyfin's characteristic ◈ logo shape)
+        if (combined.includes('jellyfin') || combined.includes('jelly fin')) {
+            return {
+                bg: 'rgba(0, 164, 220, 0.22)',
+                color: '#38bdf8',
+                title: 'Jellyfin Web',
+                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/></svg>`
+            };
+        }
+        // Generic web player fallback (monitor icon)
         return {
             bg: 'rgba(255, 255, 255, 0.06)',
             color: '#94a3b8',
@@ -2740,7 +2794,7 @@
             primaryTitle = item.SeriesName || item.Name;
             const seasonNum = item.ParentIndexNumber != null ? item.ParentIndexNumber : 1;
             const episodeNum = item.IndexNumber != null ? item.IndexNumber : 1;
-            secondaryTitle = `S${seasonNum}:E${episodeNum} · ${item.Name}`;
+            secondaryTitle = `S${seasonNum} · E${episodeNum} · ${item.Name}`;
         } else if (isAudioItem) {
             primaryTitle = item.Name;
             const artists = (item.Artists || []).join(', ') || item.AlbumArtist || 'Artist';
@@ -3028,7 +3082,7 @@
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">BANDWIDTH</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.bandwidthDisplay)}"><strong>${escapeHtml(card.bandwidthDisplay)}</strong></span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.bandwidthDisplay)}"><strong>${escapeHtml(card.bandwidthDisplay)}</strong><span class="tautulli-bw-pulse${card.isPaused ? ' paused' : ''}"></span></span>
                         </div>
                         <div class="tautulli-spec-row tautulli-spec-row-clickable" data-action="copy-filepath" data-filepath="${escapeHtml(card.filePath || card.fileDisplay)}" title="Click to copy file path: ${escapeHtml(card.filePath || card.fileDisplay)}">
                             <span class="tautulli-spec-label">FILE</span>
@@ -3071,6 +3125,7 @@
                         <div class="tautulli-meta-line-2">
                             <span class="tautulli-meta-type-icon">${typeIconSvg}</span>
                             <span class="tautulli-meta-sub">${escapeHtml(card.secondaryTitle || '')}</span>
+                            ${card.mediaItemYear ? `<span class="tautulli-year-badge">${escapeHtml(String(card.mediaItemYear))}</span>` : ''}
                         </div>
                     </div>
                     <div class="tautulli-meta-right">
