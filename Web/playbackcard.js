@@ -30,7 +30,9 @@
     const CONFIG = {
         CONTAINER_ID: 'jellyfin-playback-card-container',
         STYLES_ID: 'jellyfin-playback-card-styles',
+        PLUGIN_ID: 'b7e6f831-2794-4d82-8419-7c48ef2e2a39',
         POLL_INTERVAL_MS: 3000,
+        SHOW_IDLE_SESSIONS: false,
         ACCENT_COLOR: '#00a4dc',
         COLOR_DIRECT_PLAY: '#2ecc71',
         COLOR_DIRECT_STREAM: '#3498db',
@@ -96,11 +98,26 @@
         return Object.assign({}, DEFAULT_STREAM_GUARD_RULES);
     }
 
-    function saveStreamGuardRules(rules) {
+    function saveStreamGuardRules(rules, syncToServer = true) {
         try {
             localStorage.setItem('playbackcard_stream_guard_rules', JSON.stringify(rules));
         } catch (e) {
             console.warn('[PlaybackCard] Could not save stream guard rules to localStorage', e);
+        }
+        if (syncToServer) {
+            const apiClient = getApiClient();
+            if (apiClient && typeof apiClient.getPluginConfiguration === 'function' && typeof apiClient.updatePluginConfiguration === 'function') {
+                apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID).then((serverConfig) => {
+                    if (serverConfig) {
+                        serverConfig.KillPausedEnabled = rules.killPausedEnabled;
+                        serverConfig.KillPausedMinutes = rules.killPausedMinutes;
+                        serverConfig.Kill4kSwEnabled = rules.kill4kSwEnabled;
+                        serverConfig.MaxConcurrentStreams = rules.maxConcurrentStreams;
+                        serverConfig.ExemptAdmins = rules.exemptAdmins;
+                        return apiClient.updatePluginConfiguration(CONFIG.PLUGIN_ID, serverConfig);
+                    }
+                }).catch((e) => console.warn('[PlaybackCard] Could not sync Stream Guard rules to server', e));
+            }
         }
     }
 
@@ -132,15 +149,97 @@
         return Object.assign({}, DEFAULT_SERVARR_CONFIG);
     }
 
-    function saveServarrConfig(cfg) {
+    function saveServarrConfig(cfg, syncToServer = true) {
         try {
             localStorage.setItem('playbackcard_servarr_config', JSON.stringify(cfg));
         } catch (e) {
             console.warn('[PlaybackCard] Could not save Servarr config to localStorage', e);
         }
+        if (syncToServer) {
+            const apiClient = getApiClient();
+            if (apiClient && typeof apiClient.getPluginConfiguration === 'function' && typeof apiClient.updatePluginConfiguration === 'function') {
+                apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID).then((serverConfig) => {
+                    if (serverConfig) {
+                        serverConfig.BazarrUrl = cfg.bazarrUrl || '';
+                        serverConfig.BazarrApiKey = cfg.bazarrApiKey || '';
+                        serverConfig.RadarrUrl = cfg.radarrUrl || '';
+                        serverConfig.RadarrApiKey = cfg.radarrApiKey || '';
+                        serverConfig.SonarrUrl = cfg.sonarrUrl || '';
+                        serverConfig.SonarrApiKey = cfg.sonarrApiKey || '';
+                        return apiClient.updatePluginConfiguration(CONFIG.PLUGIN_ID, serverConfig);
+                    }
+                }).catch((e) => console.warn('[PlaybackCard] Could not sync Servarr config to server', e));
+            }
+        }
     }
 
     let servarrConfig = loadServarrConfig();
+
+    /**
+     * Loads plugin configuration from the Jellyfin server.
+     * Updates polling interval, accent color, show idle sessions, Stream Guard rules, and Servarr integrations.
+     */
+    let isConfigLoaded = false;
+    async function loadServerConfiguration() {
+        const apiClient = getApiClient();
+        if (!apiClient || typeof apiClient.getPluginConfiguration !== 'function') return;
+        try {
+            const config = await apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID);
+            if (config) {
+                isConfigLoaded = true;
+                if (config.PollingIntervalSeconds && config.PollingIntervalSeconds >= 1) {
+                    const newInterval = config.PollingIntervalSeconds * 1000;
+                    if (newInterval !== CONFIG.POLL_INTERVAL_MS) {
+                        CONFIG.POLL_INTERVAL_MS = newInterval;
+                        if (isDashboardActive && pollIntervalId != null) {
+                            clearInterval(pollIntervalId);
+                            pollIntervalId = setInterval(fetchAndRenderSessions, CONFIG.POLL_INTERVAL_MS);
+                        }
+                    }
+                }
+                if (config.AccentColor) {
+                    const cleanAccent = config.AccentColor.trim();
+                    if (cleanAccent && cleanAccent !== CONFIG.ACCENT_COLOR) {
+                        CONFIG.ACCENT_COLOR = cleanAccent;
+                        injectStyles();
+                    }
+                }
+                if (typeof config.ShowIdleSessions === 'boolean') {
+                    CONFIG.SHOW_IDLE_SESSIONS = config.ShowIdleSessions;
+                }
+                // Server Stream Guard rules sync
+                if (typeof config.KillPausedEnabled === 'boolean') {
+                    streamGuardRules.killPausedEnabled = config.KillPausedEnabled;
+                }
+                if (config.KillPausedMinutes) {
+                    streamGuardRules.killPausedMinutes = config.KillPausedMinutes;
+                }
+                if (typeof config.Kill4kSwEnabled === 'boolean') {
+                    streamGuardRules.kill4kSwEnabled = config.Kill4kSwEnabled;
+                }
+                if (typeof config.MaxConcurrentStreams === 'number') {
+                    streamGuardRules.maxConcurrentStreams = config.MaxConcurrentStreams;
+                }
+                if (typeof config.ExemptAdmins === 'boolean') {
+                    streamGuardRules.exemptAdmins = config.ExemptAdmins;
+                }
+                saveStreamGuardRules(streamGuardRules, false);
+
+                // Server Servarr config sync
+                if (config.BazarrUrl || config.BazarrApiKey || config.RadarrUrl || config.RadarrApiKey || config.SonarrUrl || config.SonarrApiKey) {
+                    servarrConfig.bazarrUrl = config.BazarrUrl || servarrConfig.bazarrUrl;
+                    servarrConfig.bazarrApiKey = config.BazarrApiKey || servarrConfig.bazarrApiKey;
+                    servarrConfig.radarrUrl = config.RadarrUrl || servarrConfig.radarrUrl;
+                    servarrConfig.radarrApiKey = config.RadarrApiKey || servarrConfig.radarrApiKey;
+                    servarrConfig.sonarrUrl = config.SonarrUrl || servarrConfig.sonarrUrl;
+                    servarrConfig.sonarrApiKey = config.SonarrApiKey || servarrConfig.sonarrApiKey;
+                    saveServarrConfig(servarrConfig, false);
+                }
+            }
+        } catch (err) {
+            // Configuration might not be present or server running older version
+        }
+    }
 
     /**
      * Checks whether a session belongs to an administrator.
@@ -280,6 +379,8 @@
 
         styleElement.textContent = `
             :root {
+                /* Playback Card Accent Token */
+                --jpc-accent: ${CONFIG.ACCENT_COLOR || '#00a4dc'};
                 /* Liquid Glass Physics & Elevation Tokens (LiquidGlass-UI, GlinUI, OpenGlass) */
                 --lg-ease: cubic-bezier(0.16, 1, 0.3, 1);
                 --lg-duration: 0.24s;
@@ -300,7 +401,7 @@
                 --lg-control-border: 1px solid rgba(255, 255, 255, 0.12);
                 /* GlassFin (KBH-Reeper) Specular Light Sweep & Accent Tokens */
                 --gf-hover-v: linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.08) 55%, transparent);
-                --gf-active-accent: rgba(0, 164, 220, 0.85);
+                --gf-active-accent: var(--jpc-accent, rgba(0, 164, 220, 0.85));
             }
 
             /* Container & Activity Banner */
@@ -1142,6 +1243,33 @@
                 letter-spacing: 0.02em;
             }
 
+            /* Live Broadcast Badge & Dot Pulse */
+            .tautulli-badge-live {
+                background: rgba(239, 68, 68, 0.16) !important;
+                color: #f87171 !important;
+                border: 1px solid rgba(239, 68, 68, 0.4) !important;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .tautulli-live-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background-color: #ef4444;
+                box-shadow: 0 0 6px #ef4444;
+                animation: tautulli-live-pulse 1.4s ease-in-out infinite;
+                flex-shrink: 0;
+            }
+
+            @keyframes tautulli-live-pulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.3; transform: scale(0.8); }
+            }
+
             /* Audiophile Vinyl Animation */
             .tautulli-vinyl-container {
                 position: relative;
@@ -1721,6 +1849,16 @@
 
             .tautulli-progress-fill.paused::after {
                 box-shadow: 0 0 8px #fbbf24, 0 0 2px #ffffff;
+            }
+
+            .tautulli-progress-fill.live {
+                background: linear-gradient(90deg, #dc2626 0%, #f43f5e 100%) !important;
+                box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
+                transition: none;
+            }
+
+            .tautulli-progress-fill.live::after {
+                box-shadow: 0 0 8px #f43f5e, 0 0 2px #ffffff;
             }
 
             .tautulli-time-row {
@@ -3534,10 +3672,21 @@
             transcodeReasons = transcodeReasons.filter((r) => r !== 'SubtitleCodecNotSupported');
         }
 
+        // Detect Live TV / Infinite Stream
+        const isLiveStream = Boolean(
+            item.IsLiveStream ||
+            (playState && playState.IsLiveStream) ||
+            (transcodeInfo && transcodeInfo.IsInfiniteStream) ||
+            item.Type === 'LiveTvProgram' ||
+            item.Type === 'TvChannel' ||
+            item.Type === 'LiveTvChannel' ||
+            Boolean(item.ChannelId)
+        );
+
         // Timing & Paused tracking
         const positionTicks = playState.PositionTicks || 0;
         const runTimeTicks = item.RunTimeTicks || 0;
-        const progressRatio = runTimeTicks > 0 ? Math.min(1, Math.max(0, positionTicks / runTimeTicks)) : 0;
+        const progressRatio = runTimeTicks > 0 ? Math.min(1, Math.max(0, positionTicks / runTimeTicks)) : (isLiveStream ? 1.0 : 0);
         const progressPercent = (progressRatio * 100).toFixed(1);
 
         const currentSeconds = Math.floor(positionTicks / 10000000);
@@ -3556,8 +3705,18 @@
             sessionPausedTimestamps.delete(session.Id);
         }
 
-        const timeProgressStr = `${formatDuration(currentSeconds)} / ${formatDuration(totalSeconds)}`;
-        const etaStr = formatETA(remainingSeconds, playState.IsPaused, pausedDurationSeconds);
+        let timeProgressStr = `${formatDuration(currentSeconds)} / ${formatDuration(totalSeconds)}`;
+        let etaStr = formatETA(remainingSeconds, playState.IsPaused, pausedDurationSeconds);
+
+        if (isLiveStream) {
+            if (totalSeconds > 0) {
+                timeProgressStr = `${formatDuration(currentSeconds)} / ${formatDuration(totalSeconds)}`;
+                etaStr = playState.IsPaused ? formatETA(0, true, pausedDurationSeconds) : (remainingSeconds > 0 ? formatETA(remainingSeconds, false, 0) : 'Live Broadcast');
+            } else {
+                timeProgressStr = currentSeconds > 0 ? `${formatDuration(currentSeconds)} elapsed` : 'Live Broadcast';
+                etaStr = playState.IsPaused ? formatETA(0, true, pausedDurationSeconds) : 'Live Stream';
+            }
+        }
 
         // Titles & Navigation
         let primaryTitle = item.Name || 'Unknown Title';
@@ -3573,6 +3732,11 @@
             primaryTitle = item.Name;
             const artists = (item.Artists || []).join(', ') || item.AlbumArtist || 'Artist';
             secondaryTitle = `${artists} · ${item.Album || 'Single'}`;
+        } else if (isLiveStream) {
+            primaryTitle = item.Name || item.ChannelName || 'Live TV';
+            const chName = (item.ChannelName && item.ChannelName !== item.Name) ? item.ChannelName : '';
+            const prgTime = totalSeconds > 0 ? formatDuration(totalSeconds) : '';
+            secondaryTitle = [chName, prgTime, 'Live Broadcast'].filter(Boolean).join(' · ');
         } else {
             const durationStr = totalSeconds > 0 ? formatDuration(totalSeconds) : '';
             const yearStr = item.ProductionYear ? String(item.ProductionYear) : '';
@@ -3765,7 +3929,8 @@
             deviceName: resolveDeviceModel(session),
             rawDeviceName: session.DeviceName || '',
             deviceId: session.DeviceId || session.DeviceName || session.Id,
-            isAudioItem
+            isAudioItem,
+            isLiveStream
         };
 
         model.bottleneck = computeBottleneckDiagnostic(model);
@@ -4008,6 +4173,7 @@
                             <!-- Engine Status Badges -->
                             <div class="tautulli-badge-row">
                                 <span class="tautulli-badge ${badgeClass}">${badgeLabel}</span>
+                                ${card.isLiveStream ? '<span class="tautulli-badge tautulli-badge-live" title="Live Broadcast Stream"><span class="tautulli-live-dot"></span>LIVE</span>' : ''}
                                 ${card.resBadge ? `<span class="tautulli-badge tautulli-badge-res" title="Source Resolution">${escapeHtml(card.resBadge)}</span>` : ''}
                                 ${card.isHiResAudio ? `<span class="tautulli-badge tautulli-badge-hires" title="High-Resolution Lossless Studio Quality Master">${escapeHtml(card.hiResBadgeText)}</span>` : ''}
                                 ${card.bandwidthSavingsBadge ? `<span class="tautulli-badge tautulli-badge-savings" title="Bandwidth Savings Efficiency Ratio">${escapeHtml(card.bandwidthSavingsBadge)}</span>` : ''}
@@ -4059,7 +4225,7 @@
                         ${stateIconHtml}
                         <div class="tautulli-progress-track">
                             ${card.transcodeCompletionPercentage != null ? `<div class="tautulli-progress-buffer" style="width: ${card.transcodeCompletionPercentage}%;" title="Transcode Buffer: ${card.transcodeCompletionPercentage}%"></div>` : ''}
-                            <div class="tautulli-progress-fill ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
+                            <div class="tautulli-progress-fill ${card.isLiveStream ? 'live' : ''} ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
                         </div>
                     </div>
                     <div class="tautulli-time-row">
@@ -4405,6 +4571,40 @@
     }
 
     /**
+     * Renders the connected devices grid chips.
+     */
+    function renderConnectedDevicesHtml(idleSessions) {
+        if (!idleSessions || idleSessions.length === 0) return '';
+        return `
+            <div class="tautulli-connected-devices-container">
+                <div class="tautulli-connected-devices-title">
+                    <svg style="width:12px;height:12px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v10H4z m-2 12h20v2H2z"/></svg>
+                    <span>Connected Devices (${idleSessions.length})</span>
+                </div>
+                <div class="tautulli-connected-devices-grid">
+                    ${idleSessions.map(s => {
+                        const devName = escapeHtml(resolveDeviceModel(s));
+                        const client = escapeHtml(s.Client || '');
+                        const user = escapeHtml(s.UserName || 'User');
+                        return `
+                            <div class="tautulli-connected-device-chip" data-action="edit-device-alias" data-device-key="${escapeHtml(s.DeviceId || s.DeviceName || s.Id)}" data-current-name="${devName}" style="cursor:pointer;" title="Click to rename or set accurate device model (e.g. iPhone 16 Pro Max)">
+                                <div class="tautulli-connected-device-icon">
+                                    <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                                </div>
+                                <div class="tautulli-connected-device-info">
+                                    <div class="tautulli-connected-device-name">${devName} ✎</div>
+                                    <div class="tautulli-connected-device-meta">${user} · ${client}</div>
+                                </div>
+                                <div class="tautulli-connected-device-status" title="Active Jellyfin Session">Online</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
      * Renders the overall activity container including summary header and cards.
      */
     function renderContainer(cards, idleSessions) {
@@ -4424,6 +4624,7 @@
                             <span>Sessions: <span class="tautulli-activity-stat-highlight">0 streams</span></span>
                             <span>|</span>
                             <span>Bandwidth: <span class="tautulli-activity-stat-highlight">0 kbps</span></span>
+                            ${(idleSessions && idleSessions.length > 0) ? `<span>|</span><span>Connected: <span class="tautulli-activity-stat-highlight">${idleSessions.length} device${idleSessions.length > 1 ? 's' : ''}</span></span>` : ''}
                         </div>
                     </div>
                     <div class="tautulli-activity-tools">
@@ -4452,32 +4653,7 @@
                         <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
                     </svg>
                     <div class="tautulli-empty-text">No active streams</div>
-                    ${(idleSessions && idleSessions.length > 0) ? `
-                    <div class="tautulli-connected-devices-container">
-                        <div class="tautulli-connected-devices-title">
-                            <svg style="width:12px;height:12px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v10H4z m-2 12h20v2H2z"/></svg>
-                            <span>Connected Devices (${idleSessions.length})</span>
-                        </div>
-                        <div class="tautulli-connected-devices-grid">
-                            ${idleSessions.map(s => {
-                                const devName = escapeHtml(resolveDeviceModel(s));
-                                const client = escapeHtml(s.Client || '');
-                                const user = escapeHtml(s.UserName || 'User');
-                                return `
-                                    <div class="tautulli-connected-device-chip" data-action="edit-device-alias" data-device-key="${escapeHtml(s.DeviceId || s.DeviceName || s.Id)}" data-current-name="${devName}" style="cursor:pointer;" title="Click to rename or set accurate device model (e.g. iPhone 16 Pro Max)">
-                                        <div class="tautulli-connected-device-icon">
-                                            <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-                                        </div>
-                                        <div class="tautulli-connected-device-info">
-                                            <div class="tautulli-connected-device-name">${devName} ✎</div>
-                                            <div class="tautulli-connected-device-meta">${user} · ${client}</div>
-                                        </div>
-                                        <div class="tautulli-connected-device-status" title="Active Jellyfin Session">Online</div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>` : ''}
+                    ${renderConnectedDevicesHtml(idleSessions)}
                 </div>
                 ${statsDrawerHtml}
             `;
@@ -4599,6 +4775,7 @@
                         <span>Sessions: <span class="tautulli-activity-stat-highlight">${totalStreams} stream${totalStreams > 1 ? 's' : ''}</span> ${breakdownStr}</span>
                         <span>|</span>
                         <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span>${bandwidthVisualHtml}${sparklineHtml}</span>
+                        ${(idleSessions && idleSessions.length > 0) ? `<span>|</span><span>Connected: <span class="tautulli-activity-stat-highlight">${idleSessions.length} device${idleSessions.length > 1 ? 's' : ''}</span></span>` : ''}
                     </div>
                     ${multiIpAlertBannerHtml}
                     ${pipelineStatusHtml}
@@ -4633,6 +4810,7 @@
                 </div>
             </div>
             ${cardsContentHtml}
+            ${(CONFIG.SHOW_IDLE_SESSIONS && idleSessions && idleSessions.length > 0) ? renderConnectedDevicesHtml(idleSessions) : ''}
             ${statsDrawerHtml}
         `;
     }
@@ -5702,7 +5880,21 @@
                         const remainingSec = Math.max(0, card.totalSeconds - card.currentSeconds);
                         const etaEl = cardEl.querySelector('.tautulli-time-eta');
                         if (etaEl) {
-                            etaEl.textContent = formatETA(remainingSec, false, 0);
+                            etaEl.textContent = card.isLiveStream ? 'Live Stream' : formatETA(remainingSec, false, 0);
+                        }
+                    } else if (card.isLiveStream) {
+                        card.currentSeconds += 1;
+                        const fillEl = cardEl.querySelector('.tautulli-progress-fill');
+                        if (fillEl) {
+                            fillEl.style.width = '100%';
+                        }
+                        const timeProgressEl = cardEl.querySelector('.tautulli-time-progress');
+                        if (timeProgressEl) {
+                            timeProgressEl.textContent = `${formatDuration(card.currentSeconds)} elapsed`;
+                        }
+                        const etaEl = cardEl.querySelector('.tautulli-time-eta');
+                        if (etaEl) {
+                            etaEl.textContent = 'Live Stream';
                         }
                     }
                 } else {
@@ -5733,6 +5925,7 @@
         stopPolling();
         isDashboardActive = true;
         lastRenderedHash = '';
+        loadServerConfiguration();
         fetchAndRenderSessions();
         pollIntervalId = setInterval(fetchAndRenderSessions, CONFIG.POLL_INTERVAL_MS);
         startLiveTicker();
