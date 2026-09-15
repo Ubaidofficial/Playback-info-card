@@ -5,6 +5,10 @@
 <h1 align="center">Playback Info Card for Jellyfin</h1>
 
 <p align="center">
+  <strong>Stop guessing why your server is buffering. Mission-control stream intelligence, deep hardware telemetry, and remote admin controls &mdash; natively inside your Jellyfin dashboard.</strong>
+</p>
+
+<p align="center">
   <code>Jellyfin.Plugin.PlaybackCard</code>
 </p>
 
@@ -12,115 +16,109 @@
   <a href="https://jellyfin.org"><img src="https://img.shields.io/badge/Jellyfin-10.9%2B%20%7C%20v12%2B-blue.svg" alt="Jellyfin" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Release-v0.2.0-blue.svg" alt="Release: v0.2.0" />
-</p>
-
-<p align="center">
-  A native, real-time playback monitoring plugin for <strong>Jellyfin Media Server</strong> that brings <strong>Tautulli-grade session telemetry</strong> and <strong>Moonfin Liquid Glass</strong> aesthetics directly into the Admin Dashboard &mdash; zero external services, zero disk writes, zero dependencies.
+  <img src="https://img.shields.io/badge/Release-v0.2.0-00a4dc.svg" alt="Release: v0.2.0" />
+  <img src="https://img.shields.io/badge/Dependencies-Zero-emerald.svg" alt="Dependencies: Zero" />
 </p>
 
 ---
 
-## Highlights
+## Why Playback Info Card?
 
-- **Tautulli-Grade Specification Matrix**: Clean, dense two-column telemetry table with explicit rows for Player, Product, Quality, Stream, Container, Video, Audio, Subtitle, Location, Bandwidth, and File path.
-- **25 Official Vector Brand Badges**: Offline, multi-color vector SVGs for all major clients (Apple Safari, Chrome, Firefox, Edge, Brave, Streamyfin, Finamp, Findroid, Feishin, Android, Apple TV, Chromecast, Nvidia Shield, PlayStation, Xbox, Roku, Fire TV, LG webOS, Samsung Tizen, Kodi, Infuse, Swiftfin, Jellyfin Web).
-- **Multi-Stream Smart Sorting**: Instant sorting of concurrent playback sessions by Bandwidth (highest bitrate first), Transcodes First, Progress / ETA, or User Name.
-- **Interactive Bandwidth Sparkline & Scrubber**: Rolling bandwidth trendline with interactive hairline cursor scrubber and frosted telemetry tooltip detailing LAN vs WAN breakdown and peak throughput.
-- **Configurable Polling Engine**: 1-click cycle between 1s (Real-time), 3s (Balanced), 5s (Eco), and 10s (Low-power) with instant live timer restart and persistent storage.
-- **Frosted Glass Time HUD Capsule**: Floating backdrop-blurred widget with real-time ETA or elapsed/total duration toggle and live 1-second ticker.
-- **Liquid Glass & Moonfin Aesthetics**: Obsidian glass foundation with specular light sweeps, GlinUI elevation depth, and subtle chromatic rims.
-- **Admin Remote Control**: Remote Play/Pause, Mute, direct client messaging, and one-click stream termination.
-- **100% Native & Self-Contained**: Injected seamlessly into Jellyfin Web's SPA lifecycle. Zero external API calls, zero database writes, and zero performance overhead.
+Ever had a family member or friend text you asking why their movie is buffering, leaving you scrambling through server logs trying to figure out what happened?
+
+- *Is the GPU pegged?*
+- *Did Jellyfin decide to transcode 4K HDR down to 1080p on the CPU because of PGS subtitles?*
+- *Is the client Wi-Fi dropping packets, or is the WAN upload saturated?*
+
+**Playback Info Card eliminates the mystery.** It transforms the standard Jellyfin Admin Dashboard into a high-performance flight deck. You get instant, plain-English hardware diagnostics, real-time transcode multipliers and FPS, granular LAN vs. WAN bandwidth tracking, and one-click remote session controls &mdash; all wrapped in an ultra-modern Liquid Glass interface.
+
+**Zero external Docker containers. Zero database locks. Zero bloated background daemons. Just pure native speed.**
 
 ---
 
 ## Screenshots
 
-### Studio UI Preview & Telemetry Matrix
-> Multi-stream dashboard view featuring 4K HDR Direct Play (Apple TV 4K), Hardware Transcode (Chrome), and Hi-Res Lossless Audio (Finamp) with the live bandwidth visualizer and sparkline.
+### Studio Dashboard & Telemetry Matrix
+> Multi-stream flight deck featuring 4K HDR Direct Play, Hardware NVENC Transcoding, and Lossless Hi-Res Audio with real-time bandwidth analytics.
 
 <p align="center">
   <img src="screenshots/ui-preview.png" alt="Studio UI Preview" width="900" />
 </p>
 
-### Session Card Detail
-> Close-up of active playback card showing video/audio specs, hardware acceleration, and quick actions.
+### Stream Hardware Telemetry Detail
+> High-density diagnostic inspection showing GPU acceleration type, live transcode multiplier, frame rate, container paths, and copyable file paths.
 
 <p align="center">
-  <img src="screenshots/card-detail.jpg" alt="Session Card Detail" width="750" />
+  <img src="screenshots/card-detail.png" alt="Stream Hardware Telemetry Detail" width="750" />
 </p>
 
-### Mobile Responsive View
-> Adaptive layout optimized for phone screens and tablets with touch-friendly controls.
+### Mobile-Responsive View
+> Full-featured mobile layout with touch-friendly controls, responsive time stacks, and ergonomic action buttons for administration on the go.
 
 <p align="center">
-  <img src="screenshots/mobile-view.jpg" alt="Mobile View" width="380" />
+  <img src="screenshots/mobile-view.png" alt="Mobile-Responsive View" width="380" />
 </p>
 
 ---
 
-## Features
+## Key Features
 
-### Tautulli-Grade Telemetry Matrix
-- **Structured Spec Table**:
-  - `PRODUCT`: Client application and version
-  - `PLAYER`: Clean device model (e.g. `Apple TV 4K`, `MacBook Pro`, `Pixel 9 Pro`)
-  - `QUALITY`: Resolution & dynamic range (e.g. `1080p SDR`, `4K HDR10`, `Dolby Vision BT.2020`)
-  - `STREAM`: Stream method badge (`DIRECT PLAY`, `DIRECT STREAM`, or `TRANSCODE`) with transcode reason tooltip
-  - `CONTAINER`: Media container path (e.g. `MKV ➔ MP4` or `Direct Play MKV`)
-  - `VIDEO`: Video codec, bitrate, frame rate, and bit-depth
-  - `AUDIO`: Audio codec, channel configuration (`5.1`, `7.1`, `Stereo`), bitrate, and sample rate
-  - `SUBTITLE`: Language, subtitle format (`SRT`, `PGS`, `ASS`), and burn-in diagnostic status
+### 1. Cinema-Grade Hardware Telemetry Matrix
+- **Complete Two-Column Diagnostic Table**:
+  - `PRODUCT`: Client application and build version
+  - `PLAYER`: Clean, recognized hardware model (e.g. `Apple TV 4K`, `MacBook Pro`, `Pixel 9 Pro`)
+  - `QUALITY`: Display resolution, bit-depth, and dynamic range (`4K HDR10`, `Dolby Vision BT.2020`, `1080p SDR`)
+  - `STREAM`: High-visibility status badge (`DIRECT PLAY`, `DIRECT STREAM`, `TRANSCODE`) with transcode reason tooltips
+  - `CONTAINER`: Media pipeline paths (e.g. `MKV ➔ MP4` or `Direct Play MKV`)
+  - `VIDEO`: Video codec, bitrate, frame rate, and profile
+  - `AUDIO`: Audio codec, channel configuration (`5.1`, `7.1`, `Stereo`), sample rate (`48kHz`, `96kHz`), and bitrates
+  - `SUBTITLE`: Active subtitle track, format (`SRT`, `PGS`, `ASS`), and burn-in status
   - `LOCATION`: Network origin with connection badge (`LAN`, `WAN`, `CELLULAR`) and client IP
-  - `BANDWIDTH`: Real-time session bandwidth utilization
+  - `BANDWIDTH`: Real-time session bandwidth throughput
   - `FILE`: Click-to-copy source media path with file size and instant "Copied!" feedback
-- **Hardware Acceleration Telemetry**: Automatic detection of NVENC, QuickSync (QSV), VAAPI, VideoToolbox (Apple Silicon), AMF (AMD), or CPU Software transcoding.
-- **Transcode Performance Metrics**: Real-time transcode FPS counter and playback speed multiplier (e.g. `2.5x`) with stutter alerts if speed falls below `1.0x`.
+- **Hardware Acceleration Detection**: Automatic identification of NVENC, Intel QuickSync (QSV), VAAPI, Apple VideoToolbox, AMD AMF, or CPU software encoding.
+- **Live Transcode Performance & FPS**: Real-time FPS metrics and transcode speed multiplier (`2.5x @ 60 FPS`) with automatic low-speed stutter alarms if speed falls below `1.0x`.
 
-### 25 Official Client Brand Badges
-- 100% inline, high-fidelity vector SVGs rendered directly inside the card header:
+### 2. 25 Official Vector Brand Badges (100% Offline)
+- Crisp, high-fidelity multi-color vector SVGs embedded directly into the interface:
   - **Browsers**: Apple Safari, Google Chrome, Mozilla Firefox, Microsoft Edge, Brave, Opera GX, Vivaldi
   - **Jellyfin Community Clients**: Streamyfin, Finamp, Findroid, Feishin, Swiftfin, Jellyfin Web
-  - **Ecosystem & OS**: Apple TV, Apple iOS/macOS, Google Android, Nvidia Shield TV, Google Chromecast, Amazon Fire TV, Roku
-  - **Home Theater & Consoles**: Kodi, Infuse, Sony PlayStation, Microsoft Xbox, LG webOS, Samsung Tizen
-- Completely offline: no third-party CDNs, no tracking pixels, zero latency.
+  - **TV & Ecosystems**: Apple TV, Apple iOS/macOS, Google Android, Nvidia Shield TV, Google Chromecast, Amazon Fire TV, Roku
+  - **Consoles & Home Theater**: Kodi, Infuse, Sony PlayStation, Microsoft Xbox, LG webOS, Samsung Tizen
+- **100% Local**: No external CDN calls, no tracking pixels, zero latency &mdash; fully operational in air-gapped homelabs.
 
-### Live Activity Banner, Sparkline & Smart Sorting
-- **Stream Activity Header**: Live stream count with pulsing emerald indicator for active playback or amber for paused sessions.
-- **Segmented Bandwidth Counter**: Total bandwidth consumption broken down into LAN and WAN upload rates.
-- **Rolling Bandwidth Sparkline with Interactive Scrubber**: Smooth SVG micro-trendline displaying bandwidth velocity; hover over any point to reveal an interactive cursor hairline and frosted tooltip with LAN/WAN stats and peak throughput.
-- **Multi-Stream Smart Sorting**: 1-click sort toggle in the activity toolbar that smoothly orders cards by:
+### 3. Live Bandwidth Visualizer & Interactive Sparkline
+- **Real-Time Bandwidth Sparkline**: Rolling bandwidth trendline showing server throughput over time. Hover over any point to activate the interactive hairline cursor and reveal a frosted glass tooltip detailing exact throughput, LAN vs. WAN split, and peak velocity.
+- **LAN vs. WAN Segmented Counter**: Instant breakdown of internal home network traffic versus outbound WAN upload utilization.
+- **Smart Multi-Stream Sorting**: Sort concurrent streams on the fly by:
   - `Default`: Server session order
   - `Bandwidth`: Highest bitrate stream first
-  - `Transcodes`: Transcoding streams prioritized at the top
+  - `Transcodes`: Active transcoding sessions pinned to the top
   - `Progress`: Longest duration / highest percentage watched
   - `User A-Z`: Alphabetical by user account name
-- **Configurable Polling Engine**: 1-click pill (`⏱ 3s`) that toggles between `1s` (Real-time), `3s` (Balanced), `5s` (Eco), and `10s` (Low-power); restarts the polling loop dynamically without reloading the page.
-- **Connected / Idle Devices Drawer**: Collapsible panel listing connected inactive clients with last-seen timestamps.
+- **Configurable Polling Engine**: 1-click toolbar pill (`⏱ 3s`) cycling between `1s` (Real-time), `3s` (Balanced default), `5s` (Eco), and `10s` (Low-power); restarts the polling loop dynamically without reloading the page.
 - **Privacy Mode (`[O] Privacy`)**: One-click toggle that masks user account names and IP addresses for stream-safe screenshots and screen shares.
-- **Instant Stream Filters**: Filter sessions on the fly by `All`, `Transcode`, `WAN`, or `Paused`.
+- **Instant Stream Filter Pills**: Filter sessions by `All`, `Transcode`, `WAN`, or `Paused`.
 
-### Frosted Glass Time HUD Capsule
+### 4. Frosted Glass Time HUD Capsule
 - Floating glass capsule with `backdrop-filter: blur(14px)` and specular border bevel.
-- **Dynamic Time Mode**: Displays expected completion time (`ETA 10:45 PM`) or paused duration (`Paused 04:12`).
-- **Interactive Toggle**: Click to instantly toggle between ETA and `Elapsed / Total` (`18:41 / 20:30 (91%)`).
-- **Live 1-Second Ticker**: Smoothly advances progress bar and time counters between server polling cycles.
+- **Dual Time Mode**: Displays expected completion time (`ETA 10:45 PM`) or paused elapsed duration (`Paused 04:12`).
+- **Interactive Duration Toggle**: Click to toggle between ETA and `Elapsed / Total` (`34:10 / 56:00 (61%)`).
+- **Smooth 1-Second Ticker**: Smoothly advances progress bar and time counters between 3-second server polling cycles.
 - **Dual-Layer Progress Bar**: Visualizes current playback position alongside the transcode buffer fill.
 
-### Remote Session Controls
-- **Play / Pause**: Remotely pause or resume client playback.
-- **Mute / Unmute**: Remotely toggle audio on the client device.
-- **Direct Client Messaging**: Send an instant pop-up notification directly to the user's screen.
-- **Kill Stream**: Immediately terminate an unwanted session with confirmation.
+### 5. Remote Session Command
+- **Remote Play / Pause**: Freeze or resume client playback with one click.
+- **Remote Mute / Unmute**: Remotely mute or unmute client audio.
+- **Direct Client Messaging**: Send pop-up alerts to users' screens before scheduled server maintenance.
+- **One-Click Stream Termination**: Instantly kill bandwidth-hogging or unauthorized sessions.
 
-### Liquid Glass & Moonfin Design System
-- **Obsidian Dark Foundation**: Deep glass base (`#090a10`) with heavy backdrop blur and saturation boost.
-- **Moonfin Specular Sweeps**: Dynamic subtle highlight reflections across card surfaces.
-- **GlinUI Elevation**: Consistent 5-level visual hierarchy separating cards, badges, buttons, and drawers.
-- **Zero AI Bloat**: Pure typography, official branding, and clean geometry &mdash; no cartoon emojis.
+### 6. Liquid Glass Obsidian Design System
+- Deep obsidian base (`#080a0f`) with physical glass refraction, meniscus border bevels, and subtle specular optics.
+- Zero cartoon emojis, zero generic dashboard clutter &mdash; engineered like high-end aerospace instrumentation.
+- Responsive on all screen sizes &mdash; from multi-monitor ultrawide displays down to mobile phones with tactile touch-action zones.
 
-### Engineering & Performance
+### 7. Engineered for Performance
 - **Zero Memory Leaks**: Full integration with Jellyfin Web's Single Page Application lifecycle (`viewshow`, `viewhide`, `viewdestroy`).
 - **State Hashing**: Prevents redundant DOM re-renders to maintain 60 FPS smooth scrolling.
 - **Zero Server Overhead**: 100% in-memory client telemetry querying standard `ApiClient.getSessions()`. Zero disk I/O, zero database locks.
@@ -200,7 +198,7 @@ Playback-info-card/
   plugin.json                    Plugin metadata
   Web/
     playbackcard.js              Client-side engine: CSS, DOM renderer, API poller
-  screenshots/                   README preview images
+  screenshots/                   High-resolution README preview images
   LICENSE                        MIT License
 ```
 
@@ -212,7 +210,6 @@ Playback-info-card/
 |-------------|--------------------|---------------------------------------------------------------------------------------------------------|
 | **Jellyfin** | Fully Supported   | Native plugin via `IHasWebPages`. Tested on 10.9+ and v12.                                              |
 | **Emby**     | Adaptable         | Emby shares historical roots but uses a proprietary SDK. The vanilla JS engine can be adapted as a userscript. |
-| **Plex**     | Not Supported     | Plex Web is a closed React app. Use [Tautulli](https://tautulli.com) for Plex stream monitoring.        |
 
 ---
 
@@ -222,11 +219,11 @@ The plugin registers itself as an `IHasWebPages` provider, injecting `playbackca
 
 1. **Detects** the dashboard page via URL matching (`/dashboard.html` or SPA routes)
 2. **Injects** a CSS stylesheet with all Liquid Glass design tokens
-3. **Polls** `ApiClient.getSessions()` every 3 seconds (or user-configured interval)
+3. **Polls** `ApiClient.getSessions()` every 3 seconds (or your configured interval)
 4. **Renders** session cards with full telemetry into a container above `.dashboardForm`
 5. **Manages** its own lifecycle via `viewshow`/`viewhide`/`viewdestroy` events to prevent memory leaks
 
-All data is transient. The plugin writes **zero data** to disk or databases.
+All telemetry is transient and in-memory. The plugin writes **zero data** to disk or databases.
 
 ---
 
