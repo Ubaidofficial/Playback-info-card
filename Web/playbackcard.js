@@ -148,6 +148,52 @@
     };
 
     /**
+     * Device Nicknames / Model Aliases (e.g. "iPhone 16 Pro Max", "Living Room Apple TV 4K").
+     */
+    function getDeviceAliases() {
+        try {
+            const saved = localStorage.getItem('playbackcard_device_aliases');
+            if (saved) return JSON.parse(saved);
+        } catch (e) {}
+        return {};
+    }
+
+    function saveDeviceAlias(key, alias) {
+        try {
+            const aliases = getDeviceAliases();
+            if (alias && alias.trim()) {
+                aliases[key] = alias.trim();
+            } else {
+                delete aliases[key];
+            }
+            localStorage.setItem('playbackcard_device_aliases', JSON.stringify(aliases));
+        } catch (e) {}
+    }
+
+    function cleanDeviceName(rawName) {
+        if (!rawName) return 'Device';
+        let name = rawName.trim();
+        // Remove duplicated adjacent words, e.g. "iPhone iPhone" -> "iPhone", "iPad iPad" -> "iPad"
+        name = name.replace(/\b([a-zA-Z0-9_-]+)\s+\1\b/gi, '$1');
+        return name;
+    }
+
+    function resolveDeviceModel(session) {
+        if (!session) return 'Device';
+        const key = session.DeviceId || session.DeviceName || session.Id;
+        const aliases = getDeviceAliases();
+        if (aliases[key]) {
+            return aliases[key];
+        }
+        if (session.DeviceName && aliases[session.DeviceName]) {
+            return aliases[session.DeviceName];
+        }
+
+        // Clean up duplicated names like "iPhone iPhone"
+        return cleanDeviceName(session.DeviceName || 'Browser');
+    }
+
+    /**
      * Injects custom CSS styling for the Liquid Glass theme and Tautulli/Jellywatch card anatomy.
      */
     function injectStyles() {
@@ -185,7 +231,7 @@
             /* Container & Activity Banner */
             #${CONFIG.CONTAINER_ID} {
                 width: 100%;
-                margin: 0 0 28px 0;
+                margin: 22px 0 28px 0;
                 padding: 0;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
                 box-sizing: border-box;
@@ -3071,7 +3117,7 @@
             itemId: item.Id,
             userId: session.UserId,
             product: session.Client || 'Jellyfin Web',
-            player: session.DeviceName || 'Browser',
+            player: resolveDeviceModel(session),
             qualityDisplay,
             playMethod,
             isDirectPlay,
@@ -3149,7 +3195,9 @@
             platformBadge: getPlatformBadge(session.Client, session.DeviceName),
             userAvatarUrl: getUserAvatarUrl(session),
             client: session.Client,
-            deviceName: session.DeviceName,
+            deviceName: resolveDeviceModel(session),
+            rawDeviceName: session.DeviceName || '',
+            deviceId: session.DeviceId || session.DeviceName || session.Id,
             isAudioItem
         };
 
@@ -3295,7 +3343,7 @@
                                 ${escapeHtml(card.userName)}
                             </a>
                             <span class="tautulli-meta-dot">•</span>
-                            <span class="tautulli-device-text" title="${escapeHtml(card.player)}">${escapeHtml(card.player)}</span>
+                            <span class="tautulli-device-text" data-action="edit-device-alias" data-device-key="${escapeHtml(card.deviceId || card.player)}" data-current-name="${escapeHtml(card.player)}" title="Click to rename or set accurate phone model (e.g. iPhone 16 Pro Max)">${escapeHtml(card.player)}</span>
                             <span class="tautulli-meta-dot">•</span>
                             <span class="tautulli-client-badge" title="${escapeHtml(card.product)}">${escapeHtml(card.product)}</span>
                         </div>
@@ -3447,55 +3495,89 @@
             return cachedWatchStats;
         }
 
+        const apiClient = getApiClient();
+        if (!apiClient || typeof apiClient.getItems !== 'function') {
+            return cachedWatchStats || { topSeries: [], topMovies: [] };
+        }
+
         try {
-            if (window.ApiClient && typeof window.ApiClient.getItems === 'function') {
-                const userId = typeof window.ApiClient.getCurrentUserId === 'function' ? window.ApiClient.getCurrentUserId() : undefined;
-                const [topSeriesResp, topMoviesResp] = await Promise.allSettled([
-                    window.ApiClient.getItems(userId, {
-                        SortBy: 'PlayCount,SortName',
-                        SortOrder: 'Descending',
-                        IncludeItemTypes: 'Series',
-                        Limit: 5,
-                        Recursive: true,
-                        Fields: 'PrimaryImageAspectRatio,PlayState,ItemCounts'
-                    }),
-                    window.ApiClient.getItems(userId, {
-                        SortBy: 'PlayCount,SortName',
-                        SortOrder: 'Descending',
-                        IncludeItemTypes: 'Movie',
-                        Limit: 5,
-                        Recursive: true,
-                        Fields: 'PrimaryImageAspectRatio,PlayState'
-                    })
-                ]);
+            const userId = typeof apiClient.getCurrentUserId === 'function' ? apiClient.getCurrentUserId() : undefined;
+            const [topSeriesResp, topEpisodesResp, topMoviesResp] = await Promise.allSettled([
+                apiClient.getItems(userId, {
+                    SortBy: 'SortName',
+                    IncludeItemTypes: 'Series',
+                    Limit: 30,
+                    Recursive: true,
+                    Fields: 'PrimaryImageAspectRatio,PlayState,ItemCounts'
+                }),
+                apiClient.getItems(userId, {
+                    SortBy: 'PlayCount,SortName',
+                    SortOrder: 'Descending',
+                    IncludeItemTypes: 'Episode',
+                    Limit: 500,
+                    Recursive: true,
+                    Fields: 'SeriesId,SeriesName,PlayState'
+                }),
+                apiClient.getItems(userId, {
+                    SortBy: 'PlayCount,SortName',
+                    SortOrder: 'Descending',
+                    IncludeItemTypes: 'Movie',
+                    Limit: 5,
+                    Recursive: true,
+                    Fields: 'PrimaryImageAspectRatio,PlayState'
+                })
+            ]);
 
-                const seriesItems = (topSeriesResp.status === 'fulfilled' && topSeriesResp.value && topSeriesResp.value.Items) ? topSeriesResp.value.Items : [];
-                const movieItems = (topMoviesResp.status === 'fulfilled' && topMoviesResp.value && topMoviesResp.value.Items) ? topMoviesResp.value.Items : [];
+            const seriesItems = (topSeriesResp.status === 'fulfilled' && topSeriesResp.value && topSeriesResp.value.Items) ? topSeriesResp.value.Items : [];
+            const episodeItems = (topEpisodesResp.status === 'fulfilled' && topEpisodesResp.value && topEpisodesResp.value.Items) ? topEpisodesResp.value.Items : [];
+            const movieItems = (topMoviesResp.status === 'fulfilled' && topMoviesResp.value && topMoviesResp.value.Items) ? topMoviesResp.value.Items : [];
 
-                if (seriesItems.length > 0 || movieItems.length > 0) {
-                    cachedWatchStats = {
-                        topSeries: seriesItems.map((item) => ({
-                            id: item.Id,
-                            name: item.Name,
-                            playCount: (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0,
-                            year: item.ProductionYear || '',
-                            imgUrl: (typeof window.ApiClient.getImageUrl === 'function')
-                                ? window.ApiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
-                                : null
-                        })),
-                        topMovies: movieItems.map((item) => ({
-                            id: item.Id,
-                            name: item.Name,
-                            playCount: (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0,
-                            year: item.ProductionYear || '',
-                            imgUrl: (typeof window.ApiClient.getImageUrl === 'function')
-                                ? window.ApiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
-                                : null
-                        }))
-                    };
-                    lastWatchStatsFetchTime = now;
-                    return cachedWatchStats;
+            // Aggregate watched episode counts per TV series
+            const seriesPlayMap = new Map();
+            episodeItems.forEach((ep) => {
+                const sid = ep.SeriesId;
+                const plays = (ep.UserData && ep.UserData.PlayCount) || ep.PlayCount || (ep.UserData && ep.UserData.Played ? 1 : 0);
+                if (sid && plays > 0) {
+                    seriesPlayMap.set(sid, (seriesPlayMap.get(sid) || 0) + plays);
                 }
+            });
+
+            // Calculate true play count for each series
+            const mappedSeries = seriesItems.map((item) => {
+                const epPlays = seriesPlayMap.get(item.Id) || 0;
+                const directPlays = (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0;
+                return {
+                    id: item.Id,
+                    name: item.Name,
+                    playCount: Math.max(epPlays, directPlays),
+                    year: item.ProductionYear || '',
+                    imgUrl: (typeof apiClient.getImageUrl === 'function')
+                        ? apiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
+                        : null
+                };
+            });
+
+            // Sort series by playCount descending, then take top 5
+            mappedSeries.sort((a, b) => b.playCount - a.playCount);
+            const finalTopSeries = mappedSeries.slice(0, 5);
+
+            const finalTopMovies = movieItems.map((item) => ({
+                id: item.Id,
+                name: item.Name,
+                playCount: (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0,
+                year: item.ProductionYear || '',
+                imgUrl: (typeof apiClient.getImageUrl === 'function')
+                    ? apiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
+                    : null
+            }));
+
+            if (finalTopSeries.length > 0 || finalTopMovies.length > 0) {
+                cachedWatchStats = {
+                    topSeries: finalTopSeries,
+                    topMovies: finalTopMovies
+                };
+                lastWatchStatsFetchTime = now;
+                return cachedWatchStats;
             }
         } catch (err) {
             console.warn('[PlaybackCard] Failed to fetch watch statistics:', err);
@@ -3632,16 +3714,16 @@
                         </div>
                         <div class="tautulli-connected-devices-grid">
                             ${idleSessions.map(s => {
-                                const devName = escapeHtml(s.DeviceName || s.Client || 'Unknown Device');
+                                const devName = escapeHtml(resolveDeviceModel(s));
                                 const client = escapeHtml(s.Client || '');
                                 const user = escapeHtml(s.UserName || 'User');
                                 return `
-                                    <div class="tautulli-connected-device-chip">
+                                    <div class="tautulli-connected-device-chip" data-action="edit-device-alias" data-device-key="${escapeHtml(s.DeviceId || s.DeviceName || s.Id)}" data-current-name="${devName}" style="cursor:pointer;" title="Click to rename or set accurate device model (e.g. iPhone 16 Pro Max)">
                                         <div class="tautulli-connected-device-icon">
                                             <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
                                         </div>
                                         <div class="tautulli-connected-device-info">
-                                            <div class="tautulli-connected-device-name">${devName}</div>
+                                            <div class="tautulli-connected-device-name">${devName} ✎</div>
                                             <div class="tautulli-connected-device-meta">${user} · ${client}</div>
                                         </div>
                                         <div class="tautulli-connected-device-status" title="Active Jellyfin Session">Online</div>
@@ -4302,6 +4384,20 @@
                 lastRenderedHash = '';
                 setupDashboardContainer(document.body);
                 fetchAndRenderSessions();
+                return;
+            }
+
+            if (action === 'edit-device-alias') {
+                e.preventDefault();
+                e.stopPropagation();
+                const key = target.getAttribute('data-device-key');
+                const currentName = target.getAttribute('data-current-name') || '';
+                const newName = prompt('Enter accurate device model / nickname (e.g. iPhone 16 Pro Max):', currentName);
+                if (newName !== null) {
+                    saveDeviceAlias(key, newName);
+                    lastRenderedHash = '';
+                    fetchAndRenderSessions();
+                }
                 return;
             }
 
