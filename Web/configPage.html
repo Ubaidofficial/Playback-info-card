@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Playback Info Card Configuration</title>
+</head>
+<body>
+    <div data-role="page" class="page type-interior pluginConfigurationPage playbackCardConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form class="playbackCardConfigurationForm">
+                    <div class="sectionTitleContainer flex align-items-center">
+                        <h2 class="sectionTitle">Playback Info Card Settings</h2>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 0.9em; margin-bottom: 1.5em;">
+                        Configure real-time monitoring, fluid progress interpolation, and visual dashboard preferences for the Playback Info Card.
+                    </p>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="txtPollingInterval">Client Polling Interval (Seconds)</label>
+                        <input is="emby-input" type="number" id="txtPollingInterval" min="1" max="30" step="1" required />
+                        <div class="fieldDescription">How often the admin dashboard queries the Jellyfin server for new playback sessions (Default: 3 seconds).</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="chkShowIdleSessions" />
+                            <span>Show Idle Connected Devices</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Display online devices and clients connected to the server even when they are not actively streaming media.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel" for="txtAccentColor">Theme Accent Color</label>
+                        <input is="emby-input" type="text" id="txtAccentColor" placeholder="#00a4dc" />
+                        <div class="fieldDescription">Hex color code for active progress bars and highlight metrics (Default: #00a4dc).</div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>Save Settings</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            (function () {
+                var pluginId = 'b7e6f831-2794-4d82-8419-7c48ef2e2a39';
+
+                function loadConfig(page) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        page.querySelector('#txtPollingInterval').value = config.PollingIntervalSeconds || 3;
+                        page.querySelector('#chkShowIdleSessions').checked = config.ShowIdleSessions || false;
+                        page.querySelector('#txtAccentColor').value = config.AccentColor || '#00a4dc';
+                        Dashboard.hideLoadingMsg();
+                    }).catch(function (err) {
+                        Dashboard.hideLoadingMsg();
+                        console.error('[PlaybackCard] Failed to load plugin configuration:', err);
+                    });
+                }
+
+                function saveConfig(page, e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.PollingIntervalSeconds = parseInt(page.querySelector('#txtPollingInterval').value, 10) || 3;
+                        config.ShowIdleSessions = page.querySelector('#chkShowIdleSessions').checked;
+                        config.AccentColor = page.querySelector('#txtAccentColor').value.trim() || '#00a4dc';
+
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        }).catch(function (err) {
+                            Dashboard.hideLoadingMsg();
+                            console.error('[PlaybackCard] Failed to save plugin configuration:', err);
+                        });
+                    });
+                }
+
+                document.addEventListener('viewshow', function (e) {
+                    if (e.target.classList.contains('pluginConfigurationPage')) {
+                        loadConfig(e.target);
+                    }
+                });
+
+                var form = document.querySelector('.playbackCardConfigurationForm');
+                if (form) {
+                    form.addEventListener('submit', function (e) {
+                        saveConfig(document.querySelector('.pluginConfigurationPage'), e);
+                    });
+                }
+            })();
+        </script>
+    </div>
+</body>
+</html>
