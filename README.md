@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="screenshots/card-detail.jpg" alt="Playback Info Card" width="600" />
+  <img src="screenshots/dashboard-live.png" alt="Playback Info Card" width="850" />
 </p>
 
 <h1 align="center">Playback Info Card for Jellyfin</h1>
@@ -16,100 +16,106 @@
 </p>
 
 <p align="center">
-  A native, real-time playback monitoring plugin for <strong>Jellyfin Media Server</strong> that brings Tautulli-grade session telemetry directly into the Admin Dashboard &mdash; zero external services, zero disk writes, zero dependencies.
+  A native, real-time playback monitoring plugin for <strong>Jellyfin Media Server</strong> that brings <strong>Tautulli-grade session telemetry</strong> and <strong>Moonfin Liquid Glass</strong> aesthetics directly into the Admin Dashboard &mdash; zero external services, zero disk writes, zero dependencies.
 </p>
+
+---
+
+## Highlights
+
+- **Tautulli-Grade Specification Matrix**: Clean, dense two-column telemetry table with explicit rows for Player, Product, Quality, Stream, Container, Video, Audio, Subtitle, Location, Bandwidth, and File path.
+- **25 Official Vector Brand Badges**: Offline, multi-color vector SVGs for all major clients (Apple Safari, Chrome, Firefox, Edge, Brave, Streamyfin, Finamp, Findroid, Feishin, Android, Apple TV, Chromecast, Nvidia Shield, PlayStation, Xbox, Roku, Fire TV, LG webOS, Samsung Tizen, Kodi, Infuse, Swiftfin, Jellyfin Web).
+- **Frosted Glass Time HUD Capsule**: Floating backdrop-blurred widget with real-time ETA or elapsed/total duration toggle and live 1-second ticker.
+- **Liquid Glass & Moonfin Aesthetics**: Obsidian glass foundation with specular light sweeps, GlinUI elevation depth, and subtle chromatic rims.
+- **Live Bandwidth Telemetry & Rolling Sparkline**: Segmented LAN vs WAN breakdown, live stream count, and real-time bandwidth velocity trendline.
+- **Admin Remote Control**: Remote Play/Pause, Mute, direct client messaging, and one-click stream termination.
+- **100% Native & Self-Contained**: Injected seamlessly into Jellyfin Web's SPA lifecycle. Zero external API calls, zero database writes, and zero performance overhead.
 
 ---
 
 ## Screenshots
 
-### Dashboard Overview
-> Multiple active streams with live telemetry, bandwidth stats, and activity summary.
+### Live Admin Dashboard
+> Tautulli-grade telemetry matrix, official vector client badges, frosted time HUD capsule, and live bandwidth sparkline.
 
 <p align="center">
-  <img src="screenshots/dashboard-overview.jpg" alt="Dashboard Overview" width="800" />
+  <img src="screenshots/dashboard-live.png" alt="Live Dashboard Overview" width="850" />
 </p>
 
 ### Session Card Detail
-> Single session card showing poster art, stream method, codec details, progress, and action controls.
+> Close-up of active playback card showing video/audio specs, hardware acceleration, and quick actions.
 
 <p align="center">
-  <img src="screenshots/card-detail.jpg" alt="Card Detail" width="700" />
+  <img src="screenshots/card-detail.jpg" alt="Session Card Detail" width="750" />
 </p>
 
 ### Mobile Responsive View
-> Fully responsive layout optimized for phones and tablets with iOS-style bottom sheet interactions.
+> Adaptive layout optimized for phone screens and tablets with touch-friendly controls.
 
 <p align="center">
-  <img src="screenshots/mobile-view.jpg" alt="Mobile View" width="350" />
+  <img src="screenshots/mobile-view.jpg" alt="Mobile View" width="380" />
 </p>
 
 ---
 
 ## Features
 
-### Stream Monitoring
-- **Real-time polling** of `ApiClient.getSessions()` every 3 seconds with state-hash diffing to prevent unnecessary DOM repaints
-- **Color-coded stream method badges**: Direct Play (green), Direct Stream (blue), Transcode (red) with throttle status
-- **Stream Doctor & Plain-English Explainer**: Demystifies cryptic transcode reasons into clear diagnostics and actionable player fix recommendations
-- **1-Click Fix Tip to Player**: Sends instant on-screen advice to client players with instructions on how to Direct Play
-- **Container conversion paths**: Explicit transformation display (e.g., `MKV ➔ MP4`)
-- **Audio and video codec breakdown**: Source and target codecs, resolutions, channels, and language tracks
-- **Progress bar with ETA & Transcode Buffer**: Dynamically calculated expected completion time and transcode buffer completion percentage
+### Tautulli-Grade Telemetry Matrix
+- **Structured Spec Table**:
+  - `PRODUCT`: Client application and version
+  - `PLAYER`: Clean device model (e.g. `iPhone 15 Pro`, `Mac`, `Shield TV`)
+  - `QUALITY`: Resolution & dynamic range (e.g. `1080p SDR`, `4K HDR10`, `Dolby Vision BT.2020`)
+  - `STREAM`: Stream method badge (`DIRECT PLAY`, `DIRECT STREAM`, or `TRANSCODE`) with transcode reason tooltip
+  - `CONTAINER`: Media container path (e.g. `MKV ➔ MP4` or `Direct Play MKV`)
+  - `VIDEO`: Video codec, bitrate, frame rate, and bit-depth
+  - `AUDIO`: Audio codec, channel configuration (`5.1`, `7.1`, `Stereo`), bitrate, and sample rate
+  - `SUBTITLE`: Language, subtitle format (`SRT`, `PGS`, `ASS`), and burn-in diagnostic status
+  - `LOCATION`: Network origin with connection badge (`LAN`, `WAN`, `CELLULAR`) and client IP
+  - `BANDWIDTH`: Real-time session bandwidth utilization
+  - `FILE`: Click-to-copy source media path with file size and instant "Copied!" feedback
+- **Hardware Acceleration Telemetry**: Automatic detection of NVENC, QuickSync (QSV), VAAPI, VideoToolbox (Apple Silicon), AMF (AMD), or CPU Software transcoding.
+- **Transcode Performance Metrics**: Real-time transcode FPS counter and playback speed multiplier (e.g. `2.4x`) with stutter alerts if speed falls below `1.0x`.
 
-### Hardware, Safety & Automated Guard
-- **Smart Stream Guard (Automated Rules Engine)**:
-  - **Auto-Kill Paused Streams**: Automatically closes playback sessions paused beyond configurable threshold (default: 15 min)
-  - **Block 4K Software Transcodes**: Instantly stops unaccelerated 4K CPU transcodes and alerts user with educational notification
-  - **Concurrent Stream Limiter**: Enforces simultaneous streams quota per user account to prevent credential sharing
-  - **Recent Guard Log**: Live history of automated rule enforcements
-- **Buffer Starvation & Stutter Alarm**: Proactively monitors transcode speed multiplier; flashes pulsating red warning when speed drops below 1.0x across consecutive poll cycles
-- **Bottleneck Splitter ("Who is to Blame? Server vs Client Wi-Fi")**: Algorithmic root-cause diagnostic pill and inspector breakdown that objectively proves whether a stream stutter is caused by Server GPU/CPU overload, marginal encoder capacity, or Client Wi-Fi / WAN congestion
-- **Tracearr-Grade Multi-IP Sharing Detection**: Real-time analysis flagging concurrent playback on multiple distinct WAN IP addresses under a single user account, with banner security alerts and card badges
-- **Live Bandwidth Rolling Sparkline**: Smooth SVG micro-trendline embedded in the activity banner displaying real-time bandwidth velocity, gradient area fill, and peak/current transfer rates over a rolling window
-- **HDR-to-SDR Tone Mapping Telemetry**: Explicit detection of HDR10 (PQ), HLG, and Dolby Vision wide color gamuts (BT.2020) transcoding to BT.709 SDR with VPP/OpenCL tone mapping tags
-- **Hardware acceleration badges**: NVENC, QuickSync, VAAPI, VideoToolbox, AMF vs CPU Software Transcode detection
-- **Transcode performance metrics**: Real-time transcode FPS and playback speed multiplier (e.g., `2.4x`)
-- **Paused stream timer**: Counts elapsed pause duration to identify resource locks
-- **Subtitle burn-in diagnostics**: Identifies forced transcode causes (PGS, VOBSUB bitmap subtitles)
-- **Bandwidth breakdown**: Total bandwidth, LAN bandwidth, and WAN upload in the activity banner
+### 25 Official Client Brand Badges
+- 100% inline, high-fidelity vector SVGs rendered directly inside the card header:
+  - **Browsers**: Apple Safari, Google Chrome, Mozilla Firefox, Microsoft Edge, Brave, Opera GX, Vivaldi
+  - **Jellyfin Community Clients**: Streamyfin, Finamp, Findroid, Feishin, Swiftfin, Jellyfin Web
+  - **Ecosystem & OS**: Apple TV, Apple iOS/macOS, Google Android, Nvidia Shield TV, Google Chromecast, Amazon Fire TV, Roku
+  - **Home Theater & Consoles**: Kodi, Infuse, Sony PlayStation, Microsoft Xbox, LG webOS, Samsung Tizen
+- Completely offline: no third-party CDNs, no tracking pixels, zero latency.
 
-### Admin Controls & Interactivity
-- **Stream Guard Policy Manager**: Integrated configuration modal with live toggles and persistence
-- **Kill stream**: Terminate any active session instantly
-- **Send message**: Push a custom message directly to the client device
-- **Pause / Resume**: Toggle playback state remotely
-- **Privacy mode**: One-click toggle to mask IPs and usernames for screenshots or live demos
-- **Stream filters**: Filter by All, Transcode, WAN, or Paused sessions
+### Frosted Glass Time HUD Capsule
+- Floating glass capsule with `backdrop-filter: blur(14px)` and specular border bevel.
+- **Dynamic Time Mode**: Displays expected completion time (`ETA 10:45 PM`) or paused duration (`Paused 04:12`).
+- **Interactive Toggle**: Click to instantly toggle between ETA and `Elapsed / Total` (`18:41 / 20:30 (91%)`).
+- **Live 1-Second Ticker**: Smoothly advances progress bar and time counters between 3-second server polling cycles.
+- **Dual-Layer Progress Bar**: Visualizes current playback position alongside the transcode buffer fill.
 
-### Tautulli-Inspired "10x Better" Suite
-- **Bitrate Compression Efficiency Ratio & Bandwidth Savings Pill**: Automatically computes real-time original-to-transcode bandwidth compression ratios (e.g. `10:1 (90% Bandwidth Saved)`) to showcase server bandwidth savings.
-- **Enhanced Connection Types (CELLULAR vs WAN vs LAN)**: Precision network indicator that distinguishes mobile cellular streams (`CELLULAR` with antenna icon) from home broadband (`WAN`) and local network (`LAN`).
-- **Dedicated Audiophile Music Mode**: Custom spinning vinyl record turntable animation, live animated 4-band equalizer soundwave spectrum, and Hi-Res studio quality badges (`Hi-Res 96kHz 24-bit FLAC`).
-- **SyncPlay / Watch Party Clustering**: Cross-session tracking that groups concurrent watchers into a unified cluster (`SyncPlay (X Members)`).
-- **Collapsible Watch Statistics Mini-Drawer**: Integrated server activity leaderboards ranking Top Watched TV Series and Top Watched Movies with play counts and artwork, accessible even when 0 streams are active.
+### Live Activity Banner & Bandwidth Sparkline
+- **Stream Activity Header**: Live stream count with pulsing emerald indicator for active playback or amber for paused sessions.
+- **Segmented Bandwidth Counter**: Total bandwidth consumption broken down into LAN and WAN upload rates.
+- **Rolling Bandwidth Sparkline**: Smooth SVG micro-trendline displaying bandwidth velocity, peak throughput, and gradient fill.
+- **Connected / Idle Devices Drawer**: Collapsible panel listing connected inactive clients with last-seen timestamps.
+- **Privacy Mode (`[O] Privacy`)**: One-click toggle that masks user account names and IP addresses for stream-safe screenshots and screen shares.
+- **Instant Stream Filters**: Filter sessions on the fly by `All`, `Transcode`, `WAN`, or `Paused`.
 
-### Navigation & Media Support
-- **Deep navigation links**: Click poster or title to open media details; click username for user settings
-- **Audio / Music mode**: Full support for music streams with Artist, Album, Sample Rate, and codec display (FLAC, MP3, etc.)
-- **Platform-specific icons**: SVG icons for Android, Safari/Apple, FireTV, Roku, and Web clients
+### Remote Session Controls
+- **Play / Pause**: Remotely pause or resume client playback.
+- **Mute / Unmute**: Remotely toggle audio on the client device.
+- **Direct Client Messaging**: Send an instant pop-up notification directly to the user's screen.
+- **Kill Stream**: Immediately terminate an unwanted session with confirmation.
 
-### Liquid Glass Design System
-- **Frosted glass surfaces**: `backdrop-filter: blur(16px) saturate(180%)` with obsidian dark base (`#090a10`)
-- **GlassFin Specular Light Sweep**: Dynamic vertical specular gradient translation on hover (`--gf-hover-v`), inspired by KBH-Reeper's GlassFin theme
-- **iOS Liquid Glass lens refraction**: Top-leading radial gradient simulating Apple GlassKit optics
-- **Chromatic dispersion rims**: Cyan and magenta edge aberration for depth realism
-- **GlinUI 5-level elevation architecture**: Consistent depth hierarchy across cards, chips, buttons, and modals
-- **Meniscus specular highlights**: Top, left, and bottom rim bevels for physical glass appearance
-- **Tactile spring physics**: `:active` press states with `scale(0.96)` to `scale(0.99)` and spring-curve easing
-- **iOS bottom-sheet drag handle**: Mobile capsule indicator for sheet-style interaction on small screens
+### Liquid Glass & Moonfin Design System
+- **Obsidian Dark Foundation**: Deep glass base (`#090a10`) with heavy backdrop blur and saturation boost.
+- **Moonfin Specular Sweeps**: Dynamic subtle highlight reflections across card surfaces.
+- **GlinUI Elevation**: Consistent 5-level visual hierarchy separating cards, badges, buttons, and drawers.
+- **Zero AI Bloat**: Pure typography, official branding, and clean geometry &mdash; no cartoon emojis.
 
-### Engineering
-- **Zero memory leaks**: Hooks into Jellyfin Web's SPA lifecycle (`viewshow`, `viewhide`, `viewdestroy`)
-- **State hashing**: Prevents unnecessary DOM repaints and preserves scroll position
-- **Isolated DOM rendering**: Zero scroll reset, zero global state mutation
-- **Self-contained**: Single JavaScript file with no external dependencies
-- **Responsive**: Optimized breakpoints for desktop (1200px+), tablet (768px-1199px), and mobile (<480px)
+### Engineering & Performance
+- **Zero Memory Leaks**: Full integration with Jellyfin Web's Single Page Application lifecycle (`viewshow`, `viewhide`, `viewdestroy`).
+- **State Hashing**: Prevents redundant DOM re-renders to maintain 60 FPS smooth scrolling.
+- **Zero Server Overhead**: 100% in-memory client telemetry querying standard `ApiClient.getSessions()`. Zero disk I/O, zero database locks.
+- **Standalone Compatibility**: Graceful fallback guards ensuring 0 console errors when run standalone or as an installed plugin.
 
 ---
 
@@ -138,7 +144,7 @@ Install directly from the Jellyfin Web UI with automatic updates:
 6. Find **Playback Info Card**, click **Install**, and select the latest version
 7. **Restart** your Jellyfin Server
 
-The playback card will automatically appear at the top of your Admin Dashboard when any streams are active.
+The playback card will automatically appear at the top of your Admin Dashboard whenever streams are active.
 
 ---
 
@@ -233,5 +239,5 @@ This project is licensed under the [MIT License](LICENSE).
 ---
 
 <p align="center">
-  Built for the Jellyfin community
+  Built with &hearts; for the Jellyfin community
 </p>
