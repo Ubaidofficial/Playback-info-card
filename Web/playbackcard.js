@@ -178,8 +178,8 @@
                 /* Sanjaynela Apple iOS Lens Refraction Highlight */
                 --lg-lens-highlight: radial-gradient(ellipse 70% 50% at 12% 0%, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
                 --lg-depth-shadow: 0 24px 52px -8px rgba(0, 0, 0, 0.88), 0 8px 24px -4px rgba(0, 0, 0, 0.6);
-                --lg-card-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.94) 100%), #090a10;
-                --lg-card-border: 1px solid rgba(255, 255, 255, 0.14);
+                --lg-card-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(9, 10, 16, 0.72) 100%), #090a10;
+                --lg-card-border: 1px solid rgba(255, 255, 255, 0.18);
                 --lg-chip-bg: rgba(255, 255, 255, 0.04);
                 --lg-chip-border: 1px solid rgba(255, 255, 255, 0.08);
                 --lg-control-bg: rgba(255, 255, 255, 0.06);
@@ -412,6 +412,20 @@
                 transition: transform 0.08s ease;
             }
 
+            /* Moonfin Glass Noise Grain Texture (3% opacity physical texture) */
+            .tautulli-card::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 3;
+                border-radius: 18px;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+                background-size: 180px 180px;
+                opacity: 0.028;
+                mix-blend-mode: overlay;
+            }
+
             /* GlassFin Specular Vertical Light Sweep on Hover */
             .tautulli-card::after {
                 content: '';
@@ -457,11 +471,11 @@
                 height: 100%;
                 background-size: cover;
                 background-position: center right;
-                opacity: 0.32;
+                opacity: 0.42;
                 pointer-events: none;
                 z-index: 0;
-                mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 25%, rgba(0, 0, 0, 0.95) 60%, black 100%);
-                -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 25%, rgba(0, 0, 0, 0.95) 60%, black 100%);
+                mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.96) 65%, black 100%);
+                -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.96) 65%, black 100%);
             }
 
             /* Card Header: User & Client Strip */
@@ -717,7 +731,32 @@
 
             .tautulli-poster-wrapper:hover .tautulli-poster-img {
                 transform: scale(1.04);
-                filter: brightness(1.06);
+                filter: brightness(1.08);
+            }
+            /* Moonfin Holographic Shimmer Sweep on Poster Hover */
+            .tautulli-poster-wrapper::after {
+                content: '';
+                position: absolute;
+                top: 0; left: -75%;
+                width: 50%;
+                height: 100%;
+                background: linear-gradient(
+                    105deg,
+                    transparent 20%,
+                    rgba(255,255,255,0.08) 40%,
+                    rgba(255,255,255,0.22) 50%,
+                    rgba(255,255,255,0.08) 60%,
+                    transparent 80%
+                );
+                transform: skewX(-15deg);
+                pointer-events: none;
+                z-index: 4;
+                opacity: 0;
+                transition: left 0.55s cubic-bezier(0.16,1,0.3,1), opacity 0.25s ease;
+            }
+            .tautulli-poster-wrapper:hover::after {
+                left: 135%;
+                opacity: 1;
             }
 
             .tautulli-poster-fallback {
@@ -748,13 +787,12 @@
                 padding-right: 36px;
                 position: relative;
             }
-            /* Readable scrim behind spec text so it contrasts against vivid fanart */
+            /* Readable scrim — soft mask dissolve from left so text is readable yet fanart bleeds through */
             .tautulli-spec-table::before {
                 content: '';
                 position: absolute;
-                inset: -14px -14px -14px -10px;
-                background: linear-gradient(to right, rgba(6,8,16,0.82) 60%, rgba(6,8,16,0.55) 100%);
-                border-radius: 0 6px 6px 0;
+                inset: -14px -14px -14px -18px;
+                background: linear-gradient(to right, rgba(5,6,14,0.88) 0%, rgba(5,6,14,0.78) 45%, rgba(5,6,14,0.5) 75%, rgba(5,6,14,0.1) 100%);
                 pointer-events: none;
                 z-index: 0;
             }
@@ -774,7 +812,7 @@
             .tautulli-spec-label {
                 width: 82px;
                 flex-shrink: 0;
-                color: #64748b;
+                color: #7e8fa6;
                 font-size: 9.5px;
                 font-weight: 700;
                 letter-spacing: 0.06em;
@@ -899,14 +937,15 @@
                 text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
             }
 
-            /* Timeline Bar: Sleek Horizontal Line between Card Body and Meta Bar */
+            /* Timeline Bar: Pill Progress Bar between Card Body and Meta Bar */
             .tautulli-card-timeline {
                 position: relative;
                 z-index: 2;
                 width: 100%;
-                height: 3px;
-                background: rgba(255, 255, 255, 0.08);
+                height: 4px;
+                background: rgba(255, 255, 255, 0.07);
                 overflow: hidden;
+                box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
             }
 
             .tautulli-card-timeline .tautulli-progress-buffer {
@@ -967,9 +1006,11 @@
                 justify-content: space-between;
                 gap: 12px;
                 padding: 8px 14px;
-                background: rgba(9, 10, 16, 0.75);
-                backdrop-filter: blur(20px) saturate(160%);
-                -webkit-backdrop-filter: blur(20px) saturate(160%);
+                background: rgba(5, 6, 12, 0.55);
+                backdrop-filter: blur(24px) saturate(180%);
+                -webkit-backdrop-filter: blur(24px) saturate(180%);
+                border-top: 1px solid rgba(255, 255, 255, 0.07);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
             }
 
             .tautulli-meta-left {
@@ -1085,6 +1126,8 @@
                 width: 22px;
                 height: 22px;
                 font-size: 10px;
+                border: 1.5px solid rgba(255,255,255,0.18);
+                transition: box-shadow 0.3s ease;
             }
 
             .tautulli-titles-container {
@@ -1261,18 +1304,20 @@
             }
 
 
-            /* LAN/WAN/CELLULAR Connection Pill */
+            /* LAN/WAN/CELLULAR Connection Pill (Moonfin-style) */
             .tautulli-net-pill {
                 display: inline-block;
-                font-size: 8.5px;
+                font-size: 8px;
                 font-weight: 700;
-                letter-spacing: 0.07em;
+                letter-spacing: 0.08em;
                 text-transform: uppercase;
-                padding: 1px 5px;
-                border-radius: 3px;
+                padding: 2px 6px;
+                border-radius: 4px;
                 vertical-align: middle;
-                margin-left: 4px;
+                margin-left: 5px;
                 line-height: 1.5;
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
             }
             .tautulli-net-pill-lan {
                 background: rgba(34, 197, 94, 0.12);
@@ -3012,11 +3057,19 @@
         // User Avatar image or initials circle
         let avatarHtml = '';
         if (card.userAvatarUrl && !isPrivacyMode) {
-            avatarHtml = `<div class="tautulli-user-avatar"><img src="${escapeHtml(card.userAvatarUrl)}" alt="${escapeHtml(card.userName)}" /></div>`;
+            const streamRing = card.streamClass === 'directplay' ? '0 0 0 1.5px #22c55e, 0 0 8px rgba(34,197,94,0.45)' :
+                card.streamClass === 'directstream' ? '0 0 0 1.5px #38bdf8, 0 0 8px rgba(56,189,248,0.45)' :
+                card.streamClass === 'hw' ? '0 0 0 1.5px #a855f7, 0 0 8px rgba(168,85,247,0.45)' :
+                '0 0 0 1.5px #f97316, 0 0 8px rgba(249,115,22,0.45)';
+            avatarHtml = `<div class="tautulli-user-avatar" style="box-shadow: ${streamRing};"><img src="${escapeHtml(card.userAvatarUrl)}" alt="${escapeHtml(card.userName)}" /></div>`;
         } else {
             const initial = (card.userName ? card.userName.charAt(0).toUpperCase() : 'U');
             const bgColor = getAvatarColor(card.userName);
-            avatarHtml = `<div class="tautulli-user-avatar" style="background: ${bgColor};">${initial}</div>`;
+            const streamRingFallback = card.streamClass === 'directplay' ? '0 0 0 1.5px #22c55e, 0 0 8px rgba(34,197,94,0.45)' :
+                card.streamClass === 'directstream' ? '0 0 0 1.5px #38bdf8, 0 0 8px rgba(56,189,248,0.45)' :
+                card.streamClass === 'hw' ? '0 0 0 1.5px #a855f7, 0 0 8px rgba(168,85,247,0.45)' :
+                '0 0 0 1.5px #f97316, 0 0 8px rgba(249,115,22,0.45)';
+            avatarHtml = `<div class="tautulli-user-avatar" style="background: ${bgColor}; box-shadow: ${streamRingFallback};">${initial}</div>`;
         }
 
         // Media Type Icon
@@ -3034,12 +3087,29 @@
         const userHref = card.userId ? `#!/useredit.html?userId=${encodeURIComponent(card.userId)}` : '#';
 
         return `
-            <div class="tautulli-card" data-session-id="${escapeHtml(card.sessionId)}" style="border-left: 3px solid ${
-                card.streamClass === 'directplay' ? '#22c55e' :
-                card.streamClass === 'directstream' ? '#38bdf8' :
-                card.streamClass === 'hw' ? '#a855f7' :
-                '#f97316'
-            };">
+            <div class="tautulli-card" data-session-id="${escapeHtml(card.sessionId)}" style="
+                border-left: 3px solid ${
+                    card.streamClass === 'directplay' ? '#22c55e' :
+                    card.streamClass === 'directstream' ? '#38bdf8' :
+                    card.streamClass === 'hw' ? '#a855f7' :
+                    '#f97316'
+                };
+                --stream-glow: ${
+                    card.streamClass === 'directplay' ? 'rgba(34,197,94,0.18)' :
+                    card.streamClass === 'directstream' ? 'rgba(56,189,248,0.18)' :
+                    card.streamClass === 'hw' ? 'rgba(168,85,247,0.18)' :
+                    'rgba(249,115,22,0.18)'
+                };
+                box-shadow:
+                    inset 0 1px 0 0 rgba(255,255,255,0.22),
+                    inset 1px 0 0 0 rgba(255,255,255,0.08),
+                    inset -1px 0 0 0 rgba(244,114,182,0.06),
+                    inset 0 -1px 0 0 rgba(255,255,255,0.03),
+                    0 0 0 1px var(--stream-glow),
+                    0 0 32px 4px var(--stream-glow),
+                    0 24px 52px -8px rgba(0,0,0,0.88),
+                    0 8px 24px -4px rgba(0,0,0,0.6);
+            ">
                 ${card.posterUrl ? `<div class="tautulli-card-ambient-bg" style="background-image: url('${escapeHtml(card.posterUrl)}');"></div>` : ''}
                 ${card.backdropUrl ? `<div class="tautulli-card-fanart-backdrop" style="background-image: url('${escapeHtml(card.backdropUrl)}');"></div>` : ''}
 
@@ -3076,7 +3146,7 @@
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">CONTAINER</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.containerDisplay)}">${escapeHtml(card.containerDisplay)}</span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.containerDisplay)}">${escapeHtml(card.containerChip)}</span>
                         </div>
                         ${!card.isAudioItem ? `
                         <div class="tautulli-spec-row">
