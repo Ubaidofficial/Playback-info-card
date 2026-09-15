@@ -1156,6 +1156,8 @@
 
             /* Watch Statistics Drawer (Tautulli-Inspired Leaderboards) */
             .tautulli-stats-drawer {
+                container-type: inline-size;
+                container-name: statsDrawer;
                 margin-top: 16px;
                 padding: 16px 18px;
                 background: linear-gradient(155deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
@@ -1186,14 +1188,38 @@
                 color: #ffffff;
             }
 
+            .tautulli-stats-header .tautulli-modal-tool-btn {
+                font-size: 11px;
+                padding: 4px 10px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                color: #94a3b8;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+
+            .tautulli-stats-header .tautulli-modal-tool-btn:hover {
+                background: rgba(255, 255, 255, 0.12);
+                color: #ffffff;
+                border-color: rgba(255, 255, 255, 0.2);
+            }
+
             .tautulli-stats-grid,
             .tautulli-stats-top3-grid {
                 display: grid;
                 grid-template-columns: repeat(3, minmax(0, 1fr));
-                gap: 14px;
+                gap: 12px;
             }
 
-            @media (max-width: 860px) {
+            @container statsDrawer (max-width: 640px) {
+                .tautulli-stats-grid,
+                .tautulli-stats-top3-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            @media (max-width: 1050px) {
                 .tautulli-stats-grid,
                 .tautulli-stats-top3-grid {
                     grid-template-columns: 1fr;
@@ -1211,7 +1237,7 @@
                 gap: 12px;
                 padding: 10px 14px;
                 border-radius: 12px;
-                background: rgba(255, 255, 255, 0.03);
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%), #111420;
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 transition: all 0.22s var(--lg-ease);
                 text-decoration: none !important;
@@ -1221,19 +1247,19 @@
             }
 
             .tautulli-stats-top3-card:hover {
-                background: rgba(255, 255, 255, 0.07);
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.065) 0%, rgba(255, 255, 255, 0.025) 100%), #141828;
                 border-color: rgba(56, 189, 248, 0.4);
                 transform: translateY(-2px);
-                box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.55);
+                box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.6);
                 color: #ffffff !important;
             }
 
             .tautulli-stats-top3-rank {
                 font-size: 13px;
                 font-weight: 800;
-                width: 28px;
-                height: 28px;
-                border-radius: 8px;
+                width: 26px;
+                height: 26px;
+                border-radius: 7px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -1317,9 +1343,9 @@
                 height: 54px;
                 border-radius: 6px;
                 object-fit: cover;
-                background: #1e293b;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+                background: #1a202c;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
                 flex-shrink: 0;
             }
 
@@ -1328,7 +1354,8 @@
                 min-width: 0;
                 display: flex;
                 flex-direction: column;
-                gap: 2px;
+                gap: 3px;
+                justify-content: center;
             }
 
             .tautulli-stats-name {
@@ -1342,22 +1369,32 @@
                 line-height: 1.3;
             }
 
+            .tautulli-stats-subline {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 6px;
+            }
+
             .tautulli-stats-meta {
                 font-size: 11px;
                 font-weight: 500;
                 color: #94a3b8 !important;
                 text-decoration: none !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
                 line-height: 1.2;
             }
 
             .tautulli-stats-metric {
-                font-size: 11px;
+                font-size: 10.5px;
                 font-weight: 700;
                 color: #38bdf8 !important;
                 background: rgba(56, 189, 248, 0.12);
                 border: 1px solid rgba(56, 189, 248, 0.28);
-                padding: 3px 8px;
-                border-radius: 6px;
+                padding: 2px 7px;
+                border-radius: 5px;
                 font-family: monospace;
                 white-space: nowrap;
                 flex-shrink: 0;
@@ -4033,10 +4070,12 @@
                                 <div class="tautulli-stats-top3-rank ${rankClass}">${rankLabel}</div>
                                 ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.style.display='none'" />` : '<div class="tautulli-stats-thumb" style="display:flex;align-items:center;justify-content:center;color:#64748b;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></div>'}
                                 <div class="tautulli-stats-info">
-                                    <div class="tautulli-stats-name" style="text-decoration:none!important;color:#f8fafc!important;">${escapeHtml(item.name)}</div>
-                                    <div class="tautulli-stats-meta" style="text-decoration:none!important;color:#94a3b8!important;">${escapeHtml(metaStr)}</div>
+                                    <div class="tautulli-stats-name" style="text-decoration:none!important;color:#f8fafc!important;" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                                    <div class="tautulli-stats-subline">
+                                        <span class="tautulli-stats-meta" style="text-decoration:none!important;color:#94a3b8!important;">${escapeHtml(metaStr)}</span>
+                                        <span class="tautulli-stats-metric" style="text-decoration:none!important;">${item.playCount} play${item.playCount === 1 ? '' : 's'}</span>
+                                    </div>
                                 </div>
-                                <div class="tautulli-stats-metric" style="text-decoration:none!important;">${item.playCount} play${item.playCount === 1 ? '' : 's'}</div>
                             </a>
                         `;
                     }).join('')}
