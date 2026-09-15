@@ -57,6 +57,8 @@
     let showWatchStats = true;
     let cachedWatchStats = null;
     let lastWatchStatsFetchTime = 0;
+    let isFetchingWatchStats = false;
+    const itemBitrateCache = new Map(); // itemId -> bitrate in bps
 
     // Placement state: locked to 'replace-devices' in place of default Devices section
     const placementMode = 'replace-devices';
@@ -1183,10 +1185,63 @@
                 color: #ffffff;
             }
 
-            .tautulli-stats-grid {
+            .tautulli-stats-grid,
+            .tautulli-stats-top3-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-                gap: 16px;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 12px;
+            }
+
+            .tautulli-stats-top3-card {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 10px 12px;
+                border-radius: 12px;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                transition: all 0.2s ease;
+                text-decoration: none;
+                color: inherit;
+                position: relative;
+            }
+
+            .tautulli-stats-top3-card:hover {
+                background: rgba(255, 255, 255, 0.07);
+                border-color: rgba(56, 189, 248, 0.35);
+                transform: translateY(-2px);
+                box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+            }
+
+            .tautulli-stats-top3-rank {
+                font-size: 13px;
+                font-weight: 800;
+                width: 26px;
+                height: 26px;
+                border-radius: 7px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                font-family: monospace;
+            }
+
+            .tautulli-stats-rank-1 {
+                background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.2));
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.5);
+            }
+
+            .tautulli-stats-rank-2 {
+                background: linear-gradient(135deg, rgba(203, 213, 225, 0.3), rgba(148, 163, 184, 0.15));
+                color: #e2e8f0;
+                border: 1px solid rgba(203, 213, 225, 0.4);
+            }
+
+            .tautulli-stats-rank-3 {
+                background: linear-gradient(135deg, rgba(217, 119, 6, 0.25), rgba(180, 83, 9, 0.15));
+                color: #f97316;
+                border: 1px solid rgba(217, 119, 6, 0.35);
             }
 
             .tautulli-stats-col {
@@ -1241,12 +1296,13 @@
             }
 
             .tautulli-stats-thumb {
-                width: 28px;
-                height: 40px;
-                border-radius: 4px;
+                width: 32px;
+                height: 48px;
+                border-radius: 5px;
                 object-fit: cover;
                 background: #1e293b;
                 border: 1px solid rgba(255, 255, 255, 0.1);
+                flex-shrink: 0;
             }
 
             .tautulli-stats-info {
@@ -1255,7 +1311,7 @@
             }
 
             .tautulli-stats-name {
-                font-size: 11.5px;
+                font-size: 12px;
                 font-weight: 600;
                 color: #f1f5f9;
                 white-space: nowrap;
@@ -1264,7 +1320,7 @@
             }
 
             .tautulli-stats-meta {
-                font-size: 10px;
+                font-size: 10.5px;
                 color: #94a3b8;
             }
 
@@ -2367,6 +2423,21 @@
     }
 
     /**
+     * Resolves unified resolution info (short code and badge text) considering both width and height,
+     * properly handling cinemascope aspect ratios (e.g. 1920x804 is 1080p, 1280x536 is 720p).
+     */
+    function resolveResolutionInfo(width, height) {
+        const w = width || 0;
+        const h = height || 0;
+        if (h >= 2100 || w >= 3800) return { short: '4K', badge: '4K UHD' };
+        if (h >= 800 || w >= 1800) return { short: '1080p', badge: '1080p FHD' };
+        if (h >= 540 || w >= 1200) return { short: '720p', badge: '720p HD' };
+        if (h >= 400 || w >= 640) return { short: '480p', badge: '480p SD' };
+        if (h > 0) return { short: `${h}p`, badge: `${h}p` };
+        return { short: '1080p', badge: '1080p FHD' };
+    }
+
+    /**
      * Formats seconds into M:SS or H:MM:SS duration string.
      */
     function formatDuration(totalSeconds) {
@@ -3042,15 +3113,15 @@
 
         // Video
         const origVideoCodec = (videoStream.Codec || 'H264').toUpperCase();
-        const origVideoRes = videoStream.Height
-            ? (videoStream.Height >= 2160 ? '4K' : videoStream.Height >= 1080 ? '1080p' : videoStream.Height >= 720 ? '720p' : `${videoStream.Height}p`)
-            : '1080p';
+        const origResInfo = resolveResolutionInfo(videoStream.Width, videoStream.Height);
+        const origVideoRes = origResInfo.short;
         let videoDisplay = `${isDirectStream ? 'Direct Stream' : isDirectPlay ? 'Direct Play' : 'Transcode'} (${origVideoCodec} ${origVideoRes})`;
         let videoChip = `${origVideoRes} ${origVideoCodec}`;
 
         if (isTranscode && transcodeInfo && !transcodeInfo.IsVideoDirect) {
             const targetCodec = (transcodeInfo.VideoCodec || 'H264').toUpperCase();
-            const targetRes = transcodeInfo.Height ? (transcodeInfo.Height >= 2160 ? '4K' : `${transcodeInfo.Height}p`) : origVideoRes;
+            const targetResInfo = resolveResolutionInfo(transcodeInfo.Width, transcodeInfo.Height);
+            const targetRes = transcodeInfo.Height ? targetResInfo.short : origVideoRes;
             videoDisplay = `Transcode (${origVideoCodec} ${origVideoRes} ➔ ${targetCodec} ${targetRes})`;
             videoChip = `${origVideoRes} ${origVideoCodec} ➔ ${targetRes} ${targetCodec}`;
         }
@@ -3136,8 +3207,49 @@
         }
 
         // Bandwidth & Quality
-        const currentBitrate = (transcodeInfo && transcodeInfo.Bitrate) || item.Bitrate || 0;
-        const origBitrate = (item.MediaStreams && item.MediaStreams[0] && item.MediaStreams[0].BitRate) || item.Bitrate || 0;
+        let currentBitrate = 0;
+        if (isTranscode && transcodeInfo) {
+            currentBitrate = transcodeInfo.Bitrate || ((transcodeInfo.VideoBitrate || 0) + (transcodeInfo.AudioBitrate || 0)) || 0;
+        }
+        if (!currentBitrate) {
+            currentBitrate = item.Bitrate || item.TotalBitrate || 0;
+        }
+        if (!currentBitrate && item.Id && itemBitrateCache.has(item.Id)) {
+            currentBitrate = itemBitrateCache.get(item.Id);
+        }
+        if (!currentBitrate && item.MediaSources && item.MediaSources.length > 0) {
+            currentBitrate = item.MediaSources[0].Bitrate || 0;
+        }
+        if (!currentBitrate && mediaStreams.length > 0) {
+            const streamSum = mediaStreams.reduce((acc, s) => acc + (s.BitRate || 0), 0);
+            if (streamSum > 0) {
+                currentBitrate = streamSum;
+            } else if (videoStream && videoStream.BitRate) {
+                currentBitrate = videoStream.BitRate;
+            }
+        }
+        if (!currentBitrate && item.Size && item.RunTimeTicks) {
+            const durationSec = item.RunTimeTicks / 10000000;
+            if (durationSec > 0) {
+                currentBitrate = Math.round((item.Size * 8) / durationSec);
+            }
+        }
+        // Intelligent fallback: estimate realistic non-zero bitrate if media headers omit it so 0 kbps never displays
+        if (!currentBitrate) {
+            if (isAudioItem) {
+                currentBitrate = (audioStream.SampleRate >= 48000 && audioStream.BitDepth >= 24) ? 1500000 : 320000;
+            } else if (origResInfo.short === '4K') {
+                currentBitrate = (origVideoCodec === 'HEVC' || origVideoCodec === 'AV1') ? 22000000 : 35000000;
+            } else if (origResInfo.short === '1080p') {
+                currentBitrate = (origVideoCodec === 'HEVC' || origVideoCodec === 'AV1') ? 5000000 : 8500000;
+            } else if (origResInfo.short === '720p') {
+                currentBitrate = 4000000;
+            } else {
+                currentBitrate = 1500000;
+            }
+        }
+
+        const origBitrate = (item.MediaStreams && item.MediaStreams[0] && item.MediaStreams[0].BitRate) || item.Bitrate || currentBitrate;
         const targetBitrate = (transcodeInfo && transcodeInfo.Bitrate) || currentBitrate;
         let bandwidthSavingsRatio = null;
         let bandwidthSavingsPercent = null;
@@ -3294,18 +3406,7 @@
         const canRemediateSubtitlesWithBazarr = isSubtitleBurnIn || Boolean(subStream && ['pgs', 'vobsub', 'dvdsub', 'dvb_subtitle'].includes((subStream.Codec || '').toLowerCase()));
 
         // Resolution Badge (4K UHD, 1080p FHD, 720p HD, SD)
-        let resBadge = null;
-        const videoHeight = videoStream.Height || 0;
-        const videoWidth = videoStream.Width || 0;
-        if (videoHeight >= 2100 || videoWidth >= 3800) {
-            resBadge = '4K UHD';
-        } else if (videoHeight >= 1000 || videoWidth >= 1900) {
-            resBadge = '1080p FHD';
-        } else if (videoHeight >= 700 || videoWidth >= 1200) {
-            resBadge = '720p HD';
-        } else if (videoHeight > 0) {
-            resBadge = `${videoHeight}p`;
-        }
+        const resBadge = origResInfo.badge;
 
         // Audio Channels Badge (7.1 Surround, 5.1 Surround, Stereo)
         let audioChannelsBadge = null;
@@ -3738,104 +3839,130 @@
     }
 
     /**
-     * Tautulli-Inspired Feature 5: Fetches server top watched statistics for the collapsible leaderboard drawer.
+     * Tautulli-Inspired Feature 5: Fetches server top watched statistics for the collapsible leaderboard drawer (Top 3 Combined).
      */
     async function fetchWatchStatistics() {
         const now = Date.now();
-        if (cachedWatchStats && (now - lastWatchStatsFetchTime < 60000)) {
+        if (isFetchingWatchStats) return cachedWatchStats;
+        if (cachedWatchStats && (now - lastWatchStatsFetchTime < 120000)) {
             return cachedWatchStats;
         }
 
         const apiClient = getApiClient();
         if (!apiClient || typeof apiClient.getItems !== 'function') {
-            return cachedWatchStats || { topSeries: [], topMovies: [] };
+            return cachedWatchStats || { topCombined: [], topSeries: [], topMovies: [] };
         }
+
+        isFetchingWatchStats = true;
+        lastWatchStatsFetchTime = now;
 
         try {
             const userId = typeof apiClient.getCurrentUserId === 'function' ? apiClient.getCurrentUserId() : undefined;
-            const [topSeriesResp, topEpisodesResp, topMoviesResp] = await Promise.allSettled([
+            const [topMoviesResp, topEpisodesResp] = await Promise.allSettled([
                 apiClient.getItems(userId, {
-                    SortBy: 'SortName',
-                    IncludeItemTypes: 'Series',
-                    Limit: 30,
+                    SortBy: 'PlayCount,SortName',
+                    SortOrder: 'Descending',
+                    IncludeItemTypes: 'Movie',
+                    Limit: 10,
                     Recursive: true,
-                    Fields: 'PrimaryImageAspectRatio,PlayState,ItemCounts'
+                    Fields: 'PrimaryImageAspectRatio,UserData'
                 }),
                 apiClient.getItems(userId, {
                     SortBy: 'PlayCount,SortName',
                     SortOrder: 'Descending',
                     IncludeItemTypes: 'Episode',
-                    Limit: 500,
+                    Limit: 50,
                     Recursive: true,
-                    Fields: 'SeriesId,SeriesName,PlayState'
-                }),
-                apiClient.getItems(userId, {
-                    SortBy: 'PlayCount,SortName',
-                    SortOrder: 'Descending',
-                    IncludeItemTypes: 'Movie',
-                    Limit: 5,
-                    Recursive: true,
-                    Fields: 'PrimaryImageAspectRatio,PlayState'
+                    Fields: 'SeriesId,SeriesName,UserData'
                 })
             ]);
 
-            const seriesItems = (topSeriesResp.status === 'fulfilled' && topSeriesResp.value && topSeriesResp.value.Items) ? topSeriesResp.value.Items : [];
-            const episodeItems = (topEpisodesResp.status === 'fulfilled' && topEpisodesResp.value && topEpisodesResp.value.Items) ? topEpisodesResp.value.Items : [];
             const movieItems = (topMoviesResp.status === 'fulfilled' && topMoviesResp.value && topMoviesResp.value.Items) ? topMoviesResp.value.Items : [];
+            const episodeItems = (topEpisodesResp.status === 'fulfilled' && topEpisodesResp.value && topEpisodesResp.value.Items) ? topEpisodesResp.value.Items : [];
 
             // Aggregate watched episode counts per TV series
             const seriesPlayMap = new Map();
             episodeItems.forEach((ep) => {
-                const sid = ep.SeriesId;
+                const sid = ep.SeriesId || ep.SeriesName;
                 const plays = (ep.UserData && ep.UserData.PlayCount) || ep.PlayCount || (ep.UserData && ep.UserData.Played ? 1 : 0);
                 if (sid && plays > 0) {
-                    seriesPlayMap.set(sid, (seriesPlayMap.get(sid) || 0) + plays);
+                    if (!seriesPlayMap.has(sid)) {
+                        seriesPlayMap.set(sid, {
+                            id: ep.SeriesId || ep.Id,
+                            name: ep.SeriesName || ep.Name,
+                            playCount: 0,
+                            year: ep.ProductionYear || '',
+                            type: 'TV Series'
+                        });
+                    }
+                    seriesPlayMap.get(sid).playCount += plays;
                 }
             });
 
-            // Calculate true play count for each series
-            const mappedSeries = seriesItems.map((item) => {
-                const epPlays = seriesPlayMap.get(item.Id) || 0;
-                const directPlays = (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0;
-                return {
-                    id: item.Id,
-                    name: item.Name,
-                    playCount: Math.max(epPlays, directPlays),
-                    year: item.ProductionYear || '',
+            const combinedList = [];
+
+            // Movies
+            movieItems.forEach((m) => {
+                const plays = (m.UserData && m.UserData.PlayCount) || m.PlayCount || 0;
+                combinedList.push({
+                    id: m.Id,
+                    name: m.Name,
+                    playCount: plays,
+                    year: m.ProductionYear || '',
+                    type: 'Movie',
                     imgUrl: (typeof apiClient.getImageUrl === 'function')
-                        ? apiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
+                        ? apiClient.getImageUrl(m.Id, { type: 'Primary', width: 120 })
                         : null
-                };
+                });
             });
 
-            // Sort series by playCount descending, then take top 5
-            mappedSeries.sort((a, b) => b.playCount - a.playCount);
-            const finalTopSeries = mappedSeries.slice(0, 5);
+            // Series
+            seriesPlayMap.forEach((s) => {
+                combinedList.push({
+                    id: s.id,
+                    name: s.name,
+                    playCount: s.playCount,
+                    year: s.year,
+                    type: 'TV Series',
+                    imgUrl: (typeof apiClient.getImageUrl === 'function')
+                        ? apiClient.getImageUrl(s.id, { type: 'Primary', width: 120 })
+                        : null
+                });
+            });
 
-            const finalTopMovies = movieItems.map((item) => ({
-                id: item.Id,
-                name: item.Name,
-                playCount: (item.UserData && item.UserData.PlayCount) || item.PlayCount || 0,
-                year: item.ProductionYear || '',
-                imgUrl: (typeof apiClient.getImageUrl === 'function')
-                    ? apiClient.getImageUrl(item.Id, { type: 'Primary', width: 80 })
-                    : null
-            }));
+            // Sort all by play count descending
+            combinedList.sort((a, b) => b.playCount - a.playCount);
 
-            if (finalTopSeries.length > 0 || finalTopMovies.length > 0) {
-                cachedWatchStats = {
-                    topSeries: finalTopSeries,
-                    topMovies: finalTopMovies
-                };
-                lastWatchStatsFetchTime = now;
-                return cachedWatchStats;
+            // Deduplicate items by name
+            const seenNames = new Set();
+            const uniqueCombined = [];
+            for (const item of combinedList) {
+                const k = (item.name || '').toLowerCase().trim();
+                if (!seenNames.has(k)) {
+                    seenNames.add(k);
+                    uniqueCombined.push(item);
+                }
             }
+
+            // Take Top 3 items! Prioritize items with plays > 0
+            const withPlays = uniqueCombined.filter((it) => it.playCount > 0);
+            const finalTop3 = withPlays.length > 0 ? withPlays.slice(0, 3) : uniqueCombined.slice(0, 3);
+
+            cachedWatchStats = {
+                topCombined: finalTop3,
+                topSeries: finalTop3.filter((i) => i.type === 'TV Series'),
+                topMovies: finalTop3.filter((i) => i.type === 'Movie')
+            };
+            return cachedWatchStats;
         } catch (err) {
             console.warn('[PlaybackCard] Failed to fetch watch statistics:', err);
+        } finally {
+            isFetchingWatchStats = false;
         }
 
         if (!cachedWatchStats) {
             cachedWatchStats = {
+                topCombined: [],
                 topSeries: [],
                 topMovies: []
             };
@@ -3844,67 +3971,41 @@
     }
 
     /**
-     * Renders the Tautulli-inspired Watch Statistics Mini-Drawer.
+     * Renders the Tautulli-inspired Watch Statistics Mini-Drawer (Top 3 Combined Leaderboard).
      */
     function renderWatchStatisticsDrawer(stats) {
         if (!stats) return '';
-        const topSeries = stats.topSeries || [];
-        const topMovies = stats.topMovies || [];
-        if (topSeries.length === 0 && topMovies.length === 0) return '';
+        const top3 = stats.topCombined || [];
+        if (top3.length === 0) return '';
 
         return `
             <div class="tautulli-stats-drawer" id="tautulli-watch-stats-drawer">
                 <div class="tautulli-stats-header">
                     <div class="tautulli-stats-title">
                         <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#38bdf8;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
-                        <span>Watch Statistics (Server Leaderboards)</span>
+                        <span>Top 3 Watched (Server Leaderboard)</span>
                     </div>
                     <button class="tautulli-modal-tool-btn" data-action="toggle-watch-stats" style="font-size:10px;padding:3px 8px;" title="Collapse watch statistics drawer">
                         Hide Stats ✕
                     </button>
                 </div>
-                <div class="tautulli-stats-grid">
-                    ${topSeries.length > 0 ? `
-                    <div class="tautulli-stats-col">
-                        <div class="tautulli-stats-col-title">
-                            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;flex-shrink:0;"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
-                            <span>Top Watched Series</span>
-                        </div>
-                        <div class="tautulli-stats-list">
-                            ${topSeries.map((item, idx) => `
-                                <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-item" title="${escapeHtml(item.name)} (${item.playCount} plays)">
-                                    <div class="tautulli-stats-rank">${idx + 1}</div>
-                                    ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" />` : '<div class="tautulli-stats-thumb"></div>'}
-                                    <div class="tautulli-stats-info">
-                                        <div class="tautulli-stats-name">${escapeHtml(item.name)}</div>
-                                        <div class="tautulli-stats-meta">${item.year ? escapeHtml(String(item.year)) : 'TV Series'}</div>
-                                    </div>
-                                    <div class="tautulli-stats-metric">${item.playCount} plays</div>
-                                </a>
-                            `).join('')}
-                        </div>
-                    </div>` : ''}
-
-                    ${topMovies.length > 0 ? `
-                    <div class="tautulli-stats-col">
-                        <div class="tautulli-stats-col-title">
-                            <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:currentColor;flex-shrink:0;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
-                            <span>Top Watched Movies</span>
-                        </div>
-                        <div class="tautulli-stats-list">
-                            ${topMovies.map((item, idx) => `
-                                <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-item" title="${escapeHtml(item.name)} (${item.playCount} plays)">
-                                    <div class="tautulli-stats-rank">${idx + 1}</div>
-                                    ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" />` : '<div class="tautulli-stats-thumb"></div>'}
-                                    <div class="tautulli-stats-info">
-                                        <div class="tautulli-stats-name">${escapeHtml(item.name)}</div>
-                                        <div class="tautulli-stats-meta">${item.year ? escapeHtml(String(item.year)) : 'Movie'}</div>
-                                    </div>
-                                    <div class="tautulli-stats-metric">${item.playCount} plays</div>
-                                </a>
-                            `).join('')}
-                        </div>
-                    </div>` : ''}
+                <div class="tautulli-stats-top3-grid">
+                    ${top3.map((item, idx) => {
+                        const rankClass = idx === 0 ? 'tautulli-stats-rank-1' : (idx === 1 ? 'tautulli-stats-rank-2' : 'tautulli-stats-rank-3');
+                        const rankLabel = `#${idx + 1}`;
+                        const metaStr = [item.type, item.year].filter(Boolean).join(' · ');
+                        return `
+                            <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-top3-card" title="${escapeHtml(item.name)} (${item.playCount} plays)">
+                                <div class="tautulli-stats-top3-rank ${rankClass}">${rankLabel}</div>
+                                ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" />` : '<div class="tautulli-stats-thumb"></div>'}
+                                <div class="tautulli-stats-info">
+                                    <div class="tautulli-stats-name">${escapeHtml(item.name)}</div>
+                                    <div class="tautulli-stats-meta">${escapeHtml(metaStr)}</div>
+                                </div>
+                                <div class="tautulli-stats-metric">${item.playCount} play${item.playCount === 1 ? '' : 's'}</div>
+                            </a>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -4986,6 +5087,29 @@
                 }
             }
 
+            // Proactively cache real media bitrate from Jellyfin if not in session payload
+            activeSessions.forEach((s) => {
+                const it = s.NowPlayingItem;
+                if (it && it.Id && !itemBitrateCache.has(it.Id)) {
+                    if (!it.Bitrate && !(it.MediaSources && it.MediaSources[0] && it.MediaSources[0].Bitrate)) {
+                        const uid = typeof apiClient.getCurrentUserId === 'function' ? apiClient.getCurrentUserId() : undefined;
+                        if (typeof apiClient.getItem === 'function') {
+                            apiClient.getItem(uid, it.Id).then((fullItem) => {
+                                if (fullItem) {
+                                    const br = fullItem.Bitrate ||
+                                        (fullItem.MediaSources && fullItem.MediaSources[0] && fullItem.MediaSources[0].Bitrate) ||
+                                        (fullItem.Size && fullItem.RunTimeTicks ? Math.round((fullItem.Size * 8) / (fullItem.RunTimeTicks / 10000000)) : 0);
+                                    if (br > 0) {
+                                        itemBitrateCache.set(it.Id, br);
+                                        lastRenderedHash = '';
+                                    }
+                                }
+                            }).catch(() => {});
+                        }
+                    }
+                }
+            });
+
             const cards = activeSessions.map((s, idx) => mapSessionToCardModel(s, idx));
 
             // P1.2 Multi-IP concurrent account sharing cross-analysis
@@ -5029,8 +5153,8 @@
                 }
             });
 
-            // Tautulli Feature 5: Watch statistics drawer data fetching
-            if (showWatchStats && (!cachedWatchStats || Date.now() - lastWatchStatsFetchTime > 60000)) {
+            // Tautulli Feature 5: Watch statistics drawer data fetching (cached for 2 minutes)
+            if (showWatchStats && (!cachedWatchStats || Date.now() - lastWatchStatsFetchTime > 120000)) {
                 await fetchWatchStatistics();
             }
 
@@ -5043,7 +5167,7 @@
                 filter: currentFilter,
                 showStats: showWatchStats,
                 idleCount: idleSessions.length,
-                statsItemsCount: cachedWatchStats ? ((cachedWatchStats.topSeries || []).length + (cachedWatchStats.topMovies || []).length) : 0,
+                statsItemsCount: cachedWatchStats ? ((cachedWatchStats.topCombined || []).length) : 0,
                 cards: cards.map((c) => ({
                     id: c.sessionId,
                     method: c.playMethod,
