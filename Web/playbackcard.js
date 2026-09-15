@@ -50,6 +50,10 @@
     let isPrivacyMode = false;
     let currentFilter = 'all'; // 'all', 'transcode', 'wan', 'paused'
     let currentCardModels = [];
+    let etaDisplayMode = 'clock'; // 'clock' | 'remaining'
+    try {
+        etaDisplayMode = localStorage.getItem('jellyfin_playbackcard_eta_mode') || 'clock';
+    } catch (e) {}
     const sessionPausedTimestamps = new Map(); // sessionId -> timestamp when pause was first detected
 
     // Rolling Telemetry History
@@ -796,6 +800,25 @@
                 font-weight: 600;
             }
 
+            .tautulli-spec-row-clickable {
+                cursor: pointer;
+                transition: color 0.15s ease;
+            }
+
+            .tautulli-spec-row-clickable:hover .tautulli-spec-value {
+                text-decoration: underline;
+                color: #38bdf8 !important;
+            }
+
+            .tautulli-time-stack {
+                cursor: pointer;
+                transition: opacity 0.15s ease;
+            }
+
+            .tautulli-time-stack:hover .tautulli-time-eta {
+                opacity: 0.82;
+            }
+
             /* Platform Corner Badge (Top-Right of Spec Area) */
             .tautulli-platform-corner-badge {
                 position: absolute;
@@ -879,9 +902,29 @@
                 transition: width 1s linear;
             }
 
+            .tautulli-card-timeline .tautulli-progress-fill.directplay {
+                background: #22c55e;
+                box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.directstream {
+                background: #38bdf8;
+                box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.hw {
+                background: #a855f7;
+                box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.transcode {
+                background: #f97316;
+                box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+            }
+
             .tautulli-card-timeline .tautulli-progress-fill.paused {
-                background: #f59e0b;
-                box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+                background: #94a3b8;
+                box-shadow: 0 0 8px rgba(148, 163, 184, 0.4);
                 transition: none;
             }
 
@@ -2075,22 +2118,21 @@
         if (!remainingSeconds || remainingSeconds <= 0) {
             return 'ETA: --:--';
         }
+        if (etaDisplayMode === 'remaining') {
+            if (remainingSeconds < 3600) {
+                const mins = Math.max(1, Math.round(remainingSeconds / 60));
+                return `-${mins}m left`;
+            }
+            const hrs = Math.floor(remainingSeconds / 3600);
+            const mins = Math.round((remainingSeconds % 3600) / 60);
+            return `-${hrs}h ${mins}m left`;
+        }
+        // Clock mode (default)
         const etaDate = new Date(Date.now() + remainingSeconds * 1000);
         const hours = etaDate.getHours();
         const minutes = etaDate.getMinutes();
         const pad = (n) => (n < 10 ? '0' + n : n);
-
-        let leftStr = '';
-        if (remainingSeconds < 3600) {
-            const mins = Math.max(1, Math.round(remainingSeconds / 60));
-            leftStr = `(${mins}m left)`;
-        } else {
-            const hrs = Math.floor(remainingSeconds / 3600);
-            const mins = Math.round((remainingSeconds % 3600) / 60);
-            leftStr = `(${hrs}h ${mins}m left)`;
-        }
-
-        return `ETA: ${pad(hours)}:${pad(minutes)} ${leftStr}`;
+        return `ETA: ${pad(hours)}:${pad(minutes)}`;
     }
 
     /**
@@ -2113,12 +2155,31 @@
     }
 
     /**
-     * Human-formats transcode reason codes into readable badge labels.
+     * Plain-English mapping for Jellyfin transcode reasons.
      */
+    const TRANSCODE_REASONS_MAP = {
+        ContainerNotSupported: 'Container not supported by client',
+        VideoCodecNotSupported: 'Video codec not supported by client',
+        AudioCodecNotSupported: 'Audio codec not supported by client',
+        SubtitleCodecNotSupported: 'Subtitle codec requires burn-in',
+        AudioIsExternal: 'External audio track not supported',
+        SecondaryAudioNotSupported: 'Secondary audio not supported',
+        VideoProfileNotSupported: 'Video profile level not supported',
+        VideoBitDepthNotSupported: 'Bit depth (10-bit) not supported',
+        VideoResolutionNotSupported: 'Resolution exceeds client display limit',
+        VideoBitrateNotSupported: 'Bitrate exceeds quality setting',
+        AudioBitrateNotSupported: 'Audio bitrate exceeds client limit',
+        AudioChannelsNotSupported: 'Audio channels not supported',
+        AnamorphicVideoNotSupported: 'Anamorphic video not supported',
+        InterlacedVideoNotSupported: 'Interlaced video not supported',
+        DirectPlayError: 'Direct play error',
+        RefFramesNotSupported: 'Reference frames exceed hardware limits'
+    };
+
     function formatTranscodeReason(reason) {
         if (!reason) return 'Transcoding';
-        if (TRANSCODE_EXPLANATIONS[reason] && TRANSCODE_EXPLANATIONS[reason].short) {
-            return TRANSCODE_EXPLANATIONS[reason].short;
+        if (TRANSCODE_REASONS_MAP[reason]) {
+            return TRANSCODE_REASONS_MAP[reason];
         }
         return reason
             .replace(/([A-Z])/g, ' $1')
@@ -2626,54 +2687,9 @@
         }
         const containerChip = (isTranscode && transcodeInfo && (!transcodeInfo.IsVideoDirect || !transcodeInfo.IsAudioDirect)) ? `${origContainer} ➔ ${targetContainer}` : origContainer;
 
-        // Video
-        const origVideoCodec = (videoStream.Codec || 'H264').toUpperCase();
-        const origResInfo = resolveResolutionInfo(videoStream.Width, videoStream.Height);
-        const origVideoRes = origResInfo.short;
-        let videoMethod = 'Direct Play';
-        if (isDirectStream || (transcodeInfo && transcodeInfo.IsVideoDirect === true)) {
-            videoMethod = isDirectPlay ? 'Direct Play' : 'Direct Stream';
-        } else if (isTranscode && transcodeInfo && transcodeInfo.IsVideoDirect === false) {
-            videoMethod = 'Transcode';
-        } else if (isTranscode) {
-            videoMethod = 'Transcode';
-        }
-
-        let videoDisplay = `${videoMethod} (${origVideoRes} ${origVideoCodec})`;
-        let videoChip = `${origVideoRes} ${origVideoCodec}`;
-        if (videoMethod === 'Transcode' && transcodeInfo) {
-            const targetCodec = (transcodeInfo.VideoCodec || 'H264').toUpperCase();
-            const targetResInfo = resolveResolutionInfo(transcodeInfo.Width, transcodeInfo.Height);
-            const targetRes = transcodeInfo.Height ? targetResInfo.short : origVideoRes;
-            videoDisplay = `Transcode (${origVideoRes} ${origVideoCodec} ➔ ${targetRes} ${targetCodec})`;
-            videoChip = `${origVideoRes} ${origVideoCodec} ➔ ${targetRes} ${targetCodec}`;
-        }
-
-        // Audio
-        const origAudioLang = audioStream.Language ? audioStream.Language.toUpperCase() : '';
-        const origAudioCodec = (audioStream.Codec || 'AAC').toUpperCase();
-        const origChannels = audioStream.Channels === 6 ? '5.1' : audioStream.Channels === 8 ? '7.1' : audioStream.Channels === 2 ? 'Stereo' : (audioStream.Channels ? `${audioStream.Channels} Ch` : 'Stereo');
-        const origAudioDesc = [origAudioLang, origAudioCodec, origChannels].filter(Boolean).join(' ');
-        let audioMethod = 'Direct Play';
-        if (isDirectStream || (transcodeInfo && transcodeInfo.IsAudioDirect === true)) {
-            audioMethod = isDirectPlay ? 'Direct Play' : 'Direct Stream';
-        } else if (isTranscode && transcodeInfo && transcodeInfo.IsAudioDirect === false) {
-            audioMethod = 'Transcode';
-        } else if (isTranscode) {
-            audioMethod = 'Transcode';
-        }
-
-        let audioDisplay = `${audioMethod} (${origAudioDesc})`;
-        let audioChip = origAudioDesc || `${origAudioCodec} ${origChannels}`;
-        if (audioMethod === 'Transcode' && transcodeInfo) {
-            const targetAudioCodec = (transcodeInfo.AudioCodec || 'AAC').toUpperCase();
-            const targetChannels = transcodeInfo.AudioChannels === 2 ? 'Stereo' : (transcodeInfo.AudioChannels ? `${transcodeInfo.AudioChannels} Ch` : 'Stereo');
-            audioDisplay = `Transcode (${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels})`;
-            audioChip = `${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}`;
-        }
-
-        // HDR Detection & P1.4 Enhanced Tone Mapping Details (HDR10, HDR10+, Dolby Vision, HLG, BT2020)
+        // HDR Detection & Enhanced Tone Mapping Details (HDR10, HDR10+, Dolby Vision, HLG, BT2020)
         let hdrBadge = null;
+        let hdrName = null;
         const videoRange = (videoStream.VideoRange || videoStream.VideoRangeType || '').toUpperCase();
         const colorSpace = (videoStream.ColorSpace || '').toUpperCase();
         const colorTransfer = (videoStream.ColorTransfer || '').toLowerCase();
@@ -2684,7 +2700,6 @@
         let toneMappingDetail = null;
 
         if (isHdr) {
-            let hdrName = 'HDR';
             if (videoRange.includes('DOVI') || (videoStream.Title && videoStream.Title.toUpperCase().includes('DV'))) {
                 hdrName = 'Dolby Vision';
                 hdrStandardDesc = 'Dolby Vision (Dynamic Metadata)';
@@ -2698,6 +2713,7 @@
                 hdrName = 'HLG';
                 hdrStandardDesc = 'ARIB STD-B67 (HLG)';
             } else {
+                hdrName = 'HDR';
                 hdrStandardDesc = 'HDR Wide Color Gamut';
             }
 
@@ -2711,13 +2727,88 @@
             }
         }
 
-        // Audio Spatial / Atmos / Lossless detection
-        let audioBadge = null;
+        // Video: Codec, Resolution, Bit Depth (10-bit), and HDR Format
+        const origVideoCodec = (videoStream.Codec || 'H264').toUpperCase();
+        const origResInfo = resolveResolutionInfo(videoStream.Width, videoStream.Height);
+        const origVideoRes = origResInfo.short;
+        const videoBitDepth = videoStream.BitDepth ? `${videoStream.BitDepth}-bit` : '';
+
+        const sourceVideoParts = [origVideoRes, origVideoCodec];
+        if (videoBitDepth) sourceVideoParts.push(videoBitDepth);
+        if (hdrName) sourceVideoParts.push(hdrName);
+        const sourceVideoDesc = sourceVideoParts.join(' ');
+
+        let videoMethod = 'Direct Play';
+        if (isDirectStream || (transcodeInfo && transcodeInfo.IsVideoDirect === true)) {
+            videoMethod = isDirectPlay ? 'Direct Play' : 'Direct Stream';
+        } else if (isTranscode) {
+            videoMethod = 'Transcode';
+        }
+
+        let videoDisplay = `${videoMethod} (${sourceVideoDesc})`;
+        let videoChip = sourceVideoDesc;
+        if (videoMethod === 'Transcode' && transcodeInfo && transcodeInfo.IsVideoDirect === false) {
+            const targetCodec = (transcodeInfo.VideoCodec || 'H264').toUpperCase();
+            const targetResInfo = resolveResolutionInfo(transcodeInfo.Width, transcodeInfo.Height);
+            const targetRes = transcodeInfo.Height ? targetResInfo.short : origVideoRes;
+            const targetVideoParts = [targetRes, targetCodec, '8-bit'];
+            if (isToneMapped) targetVideoParts.push('SDR');
+            const toneMapTag = isToneMapped ? ' · Tone Mapped' : '';
+            videoDisplay = `Transcode (${sourceVideoDesc} ➔ ${targetVideoParts.join(' ')}${toneMapTag})`;
+            videoChip = `${sourceVideoDesc} ➔ ${targetVideoParts.join(' ')}`;
+        } else if (transcodeInfo && transcodeInfo.IsVideoDirect === true && isTranscode) {
+            videoDisplay = `Direct Stream (${sourceVideoDesc})`;
+        }
+
+        // Audio: Codec, Channels, Spatial Atmos, Bit Depth, Sample Rate, and Bitrate
+        const origAudioLang = audioStream.Language ? audioStream.Language.toUpperCase() : '';
+        const origAudioCodec = (audioStream.Codec || 'AAC').toUpperCase();
+        const origChannels = audioStream.Channels === 6 ? '5.1' : audioStream.Channels === 8 ? '7.1' : audioStream.Channels === 2 ? 'Stereo' : (audioStream.Channels ? `${audioStream.Channels} Ch` : 'Stereo');
         const audioTitleUpper = (audioStream.Title || audioStream.DisplayTitle || '').toUpperCase();
-        if (audioTitleUpper.includes('ATMOS') || audioTitleUpper.includes('JOC')) {
+        const isAtmos = audioTitleUpper.includes('ATMOS') || audioTitleUpper.includes('JOC');
+        const isLossless = origAudioCodec.includes('TRUEHD') || origAudioCodec.includes('DTS-HD') || origAudioCodec.includes('FLAC') || origAudioCodec.includes('ALAC');
+
+        let audioBadge = null;
+        if (isAtmos) {
             audioBadge = 'Dolby Atmos';
-        } else if (origAudioCodec.includes('TRUEHD') || origAudioCodec.includes('DTS-HD') || origAudioCodec.includes('FLAC') || origAudioCodec.includes('ALAC')) {
+        } else if (isLossless) {
             audioBadge = 'Lossless';
+        }
+
+        const sourceAudioParts = [];
+        if (origAudioLang) sourceAudioParts.push(origAudioLang);
+        sourceAudioParts.push(origAudioCodec);
+        sourceAudioParts.push(origChannels);
+        if (isAtmos) sourceAudioParts.push('Atmos');
+        if (audioStream.BitDepth && (isLossless || audioStream.BitDepth >= 24)) {
+            sourceAudioParts.push(`${audioStream.BitDepth}-bit`);
+        }
+        if (audioStream.SampleRate && (audioStream.SampleRate >= 48000 || isLossless)) {
+            const khz = (audioStream.SampleRate / 1000).toFixed(1).replace('.0', '');
+            sourceAudioParts.push(`${khz}kHz`);
+        }
+        if (audioStream.BitRate) {
+            sourceAudioParts.push(`· ${formatBitrate(audioStream.BitRate)}`);
+        }
+
+        const origAudioDesc = sourceAudioParts.join(' ');
+        let audioMethod = 'Direct Play';
+        if (isDirectStream || (transcodeInfo && transcodeInfo.IsAudioDirect === true)) {
+            audioMethod = isDirectPlay ? 'Direct Play' : 'Direct Stream';
+        } else if (isTranscode) {
+            audioMethod = 'Transcode';
+        }
+
+        let audioDisplay = `${audioMethod} (${origAudioDesc})`;
+        let audioChip = origAudioDesc || `${origAudioCodec} ${origChannels}`;
+        if (audioMethod === 'Transcode' && transcodeInfo && transcodeInfo.IsAudioDirect === false) {
+            const targetAudioCodec = (transcodeInfo.AudioCodec || 'AAC').toUpperCase();
+            const targetChannels = transcodeInfo.AudioChannels === 6 ? '5.1' : transcodeInfo.AudioChannels === 2 ? 'Stereo' : (transcodeInfo.AudioChannels ? `${transcodeInfo.AudioChannels} Ch` : 'Stereo');
+            const targetAudioBitrate = transcodeInfo.AudioBitrate ? ` · ${formatBitrate(transcodeInfo.AudioBitrate)}` : '';
+            audioDisplay = `Transcode (${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}${targetAudioBitrate})`;
+            audioChip = `${origAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}`;
+        } else if (transcodeInfo && transcodeInfo.IsAudioDirect === true && isTranscode) {
+            audioDisplay = `Direct Stream (${origAudioDesc})`;
         }
 
         // Subtitles (Explicit 'None' if unselected, exactly matching Tautulli)
@@ -2796,19 +2887,26 @@
             qualityDisplay = `${targetRes} (${formatBitrate(currentBitrate)})`;
         }
 
-        // Tautulli Stream String & CSS Class
+        // Tautulli Stream String, Tooltip & CSS Class
         let streamDisplay = 'Direct Play';
         let streamClass = 'directplay';
+        let streamTooltip = 'Direct Play: Native hardware playback without server conversion';
         if (isDirectStream) {
             streamDisplay = `Direct Stream${transcodeInfo && transcodeInfo.IsThrottled ? ' (Throttled)' : ''}`;
             streamClass = 'directstream';
+            streamTooltip = `Direct Stream: Container conversion (${origContainer} ➔ ${targetContainer})`;
         } else if (isTranscode) {
             streamClass = hwAccelBadge ? 'hw' : 'transcode';
             const streamParts = [];
             if (hwAccelBadge) streamParts.push(hwAccelBadge);
+            if (transcodeFps) streamParts.push(`${transcodeFps} fps`);
             if (transcodeSpeedMultiplier) streamParts.push(`${transcodeSpeedMultiplier}x`);
             if (transcodeInfo && transcodeInfo.IsThrottled) streamParts.push('Throttled');
             streamDisplay = `Transcode${streamParts.length > 0 ? ' (' + streamParts.join(' · ') + ')' : ''}`;
+
+            const reasonList = (transcodeInfo && transcodeInfo.TranscodeReasons) || [];
+            const reasonStr = reasonList.length > 0 ? reasonList.map(formatTranscodeReason).join(', ') : 'Server conversion active';
+            streamTooltip = `Transcode: ${reasonStr}${hwAccelBadge ? ' · ' + hwAccelBadge : ''}${transcodeSpeedMultiplier ? ' · Speed ' + transcodeSpeedMultiplier + 'x' : ''}`;
         }
 
         // Tautulli Product & Player Display
@@ -2935,7 +3033,6 @@
 
         // Detailed media specs
         const videoProfile = videoStream.Profile || null;
-        const videoBitDepth = videoStream.BitDepth ? `${videoStream.BitDepth}-bit` : null;
         const videoFrameRate = videoStream.AverageFrameRate ? `${Math.round(videoStream.AverageFrameRate)} fps` : (videoStream.RealFrameRate ? `${Math.round(videoStream.RealFrameRate)} fps` : null);
         const audioSampleRate = audioStream.SampleRate ? `${(audioStream.SampleRate / 1000).toFixed(1)} kHz` : null;
         const audioBitRate = audioStream.BitRate ? formatBitrate(audioStream.BitRate) : null;
@@ -2983,6 +3080,7 @@
             playerDisplay,
             qualityDisplay,
             streamDisplay,
+            streamTooltip,
             streamClass,
             fileDisplay,
             fileSizeDisplay,
@@ -3164,7 +3262,7 @@
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">STREAM</span>
-                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamDisplay)}">${escapeHtml(card.streamDisplay)}</span>
+                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}">${escapeHtml(card.streamDisplay)}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">CONTAINER</span>
@@ -3192,14 +3290,14 @@
                             <span class="tautulli-spec-label">BANDWIDTH</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.bandwidthDisplay)}"><strong>${escapeHtml(card.bandwidthDisplay)}</strong></span>
                         </div>
-                        <div class="tautulli-spec-row">
+                        <div class="tautulli-spec-row tautulli-spec-row-clickable" data-action="copy-filepath" data-filepath="${escapeHtml(card.filePath || card.fileDisplay)}" title="Click to copy file path: ${escapeHtml(card.filePath || card.fileDisplay)}">
                             <span class="tautulli-spec-label">FILE</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.filePath || card.fileDisplay)}">${escapeHtml(card.fileDisplay)}</span>
                         </div>
                     </div>
 
                     <!-- Bottom-Right Floating Time Stack -->
-                    <div class="tautulli-time-stack">
+                    <div class="tautulli-time-stack" data-action="toggle-eta-mode" title="Click to toggle between Clock Time and Time Remaining">
                         <span class="tautulli-time-eta ${card.isPaused ? 'tautulli-time-paused' : ''}">${escapeHtml(card.etaStr)}</span>
                         <span class="tautulli-time-progress">${escapeHtml(card.timeProgressStr)}</span>
                     </div>
@@ -3208,7 +3306,7 @@
                 <!-- Timeline Bar (Sleek Horizontal Line) -->
                 <div class="tautulli-card-timeline">
                     ${card.transcodeCompletionPercentage != null ? `<div class="tautulli-progress-buffer" style="width: ${card.transcodeCompletionPercentage}%;"></div>` : ''}
-                    <div class="tautulli-progress-fill ${card.isLiveStream ? 'live' : ''} ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
+                    <div class="tautulli-progress-fill ${escapeHtml(card.streamClass)} ${card.isLiveStream ? 'live' : ''} ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
                 </div>
 
                 <!-- Bottom Meta Bar: Title, Subline, Rating, User & Stream Actions -->
@@ -3773,6 +3871,25 @@
     }
 
     /**
+     * Fallback clipboard copy for non-HTTPS (local IP) environments.
+     */
+    function copyToClipboardFallback(text) {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            const success = document.execCommand('copy');
+            ta.remove();
+            return success;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
      * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Mute, Privacy, Filter, Stats).
      */
     function attachContainerEvents(container) {
@@ -3809,6 +3926,46 @@
             if (action === 'set-stats-tab') {
                 e.preventDefault();
                 activeStatsTab = target.getAttribute('data-tab') || 'combined';
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
+            if (action === 'copy-filepath') {
+                e.preventDefault();
+                e.stopPropagation();
+                const path = target.getAttribute('data-filepath');
+                if (path) {
+                    const markCopied = () => {
+                        const valEl = target.querySelector('.tautulli-spec-value');
+                        if (valEl) {
+                            const origText = valEl.textContent;
+                            valEl.textContent = '✓ Copied!';
+                            valEl.style.color = '#34d399';
+                            setTimeout(() => {
+                                valEl.textContent = origText;
+                                valEl.style.color = '';
+                            }, 2000);
+                        }
+                    };
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(path).then(markCopied).catch(() => {
+                            if (copyToClipboardFallback(path)) markCopied();
+                        });
+                    } else if (copyToClipboardFallback(path)) {
+                        markCopied();
+                    }
+                }
+                return;
+            }
+
+            if (action === 'toggle-eta-mode') {
+                e.preventDefault();
+                e.stopPropagation();
+                etaDisplayMode = (etaDisplayMode === 'clock') ? 'remaining' : 'clock';
+                try {
+                    localStorage.setItem('jellyfin_playbackcard_eta_mode', etaDisplayMode);
+                } catch (err) {}
                 lastRenderedHash = '';
                 fetchAndRenderSessions();
                 return;
@@ -3921,6 +4078,7 @@
                 filter: currentFilter,
                 showStats: showWatchStats,
                 statsTab: activeStatsTab,
+                etaMode: etaDisplayMode,
                 idleCount: idleSessions.length,
                 statsHash: cachedWatchStats ? `${(cachedWatchStats.topCombined || []).length}-${(cachedWatchStats.topMovies || []).length}-${(cachedWatchStats.topSeries || []).length}-${(cachedWatchStats.topUsers || []).length}` : '',
                 cards: cards.map((c) => ({
