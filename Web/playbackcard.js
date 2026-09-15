@@ -95,6 +95,42 @@
 
     let streamGuardRules = loadStreamGuardRules();
 
+    // P1.5 Transcode Watchdog: Stall & Zombie Tracking
+    const sessionLastTicks = new Map(); // sessionId -> last known PositionTicks
+    const sessionTranscodeStallCycles = new Map(); // sessionId -> consecutive stalled cycles while transcoding
+
+    // P1.6 Servarr Remediation Configuration (Bazarr, Radarr, Sonarr)
+    const DEFAULT_SERVARR_CONFIG = {
+        bazarrUrl: '',
+        bazarrApiKey: '',
+        radarrUrl: '',
+        radarrApiKey: '',
+        sonarrUrl: '',
+        sonarrApiKey: ''
+    };
+
+    function loadServarrConfig() {
+        try {
+            const saved = localStorage.getItem('playbackcard_servarr_config');
+            if (saved) {
+                return Object.assign({}, DEFAULT_SERVARR_CONFIG, JSON.parse(saved));
+            }
+        } catch (e) {
+            console.warn('[PlaybackCard] Could not load Servarr config from localStorage', e);
+        }
+        return Object.assign({}, DEFAULT_SERVARR_CONFIG);
+    }
+
+    function saveServarrConfig(cfg) {
+        try {
+            localStorage.setItem('playbackcard_servarr_config', JSON.stringify(cfg));
+        } catch (e) {
+            console.warn('[PlaybackCard] Could not save Servarr config to localStorage', e);
+        }
+    }
+
+    let servarrConfig = loadServarrConfig();
+
     // Stream Doctor: Transcode Reasons & Client Fix Recommendations
     const TRANSCODE_EXPLANATIONS = {
         'ContainerNotSupported': {
@@ -2203,6 +2239,105 @@
                 width: 60px;
                 text-align: center;
             }
+
+            /* Zombie Transcode Pipeline Watchdog */
+            .tautulli-badge-zombie {
+                animation: tautulli-stutter-pulse 1.8s infinite ease-in-out !important;
+                background: rgba(245, 158, 11, 0.25) !important;
+                border-color: rgba(245, 158, 11, 0.6) !important;
+                color: #fcd34d !important;
+            }
+
+            .tautulli-btn-flush {
+                background: rgba(239, 68, 68, 0.2) !important;
+                border: 1px solid rgba(239, 68, 68, 0.5) !important;
+                color: #fca5a5 !important;
+            }
+
+            .tautulli-btn-flush:hover {
+                background: rgba(239, 68, 68, 0.4) !important;
+                border-color: rgba(239, 68, 68, 0.8) !important;
+                color: #ffffff !important;
+                transform: scale(1.04);
+            }
+
+            /* Servarr Subtitle Remediation (Bazarr) */
+            .tautulli-servarr-btn {
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%);
+                border: 1px solid rgba(16, 185, 129, 0.5);
+                color: #6ee7b7;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 3px 8px;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all var(--lg-duration) ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .tautulli-servarr-btn:hover {
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.45) 0%, rgba(6, 182, 212, 0.45) 100%);
+                border-color: rgba(16, 185, 129, 0.85);
+                color: #ffffff;
+                transform: scale(1.02);
+            }
+
+            .tautulli-servarr-btn:active {
+                transform: scale(0.96);
+            }
+
+            .tautulli-pipeline-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 2px 7px;
+                border-radius: 999px;
+                font-size: 10px;
+                font-weight: 600;
+                background: rgba(0, 164, 220, 0.15);
+                color: #38bdf8;
+                border: 1px solid rgba(0, 164, 220, 0.3);
+            }
+
+            .tautulli-pipeline-zombie {
+                background: rgba(245, 158, 11, 0.2) !important;
+                color: #fcd34d !important;
+                border-color: rgba(245, 158, 11, 0.5) !important;
+                animation: tautulli-stutter-pulse 2s infinite ease-in-out;
+            }
+
+            .tautulli-form-row {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                margin-bottom: 12px;
+            }
+
+            .tautulli-form-row label {
+                font-size: 11.5px;
+                font-weight: 600;
+                color: #cbd5e1;
+            }
+
+            .tautulli-input {
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                border-radius: 6px;
+                color: #ffffff;
+                font-size: 12px;
+                padding: 6px 10px;
+                width: 100%;
+                box-sizing: border-box;
+                font-family: inherit;
+            }
+
+            .tautulli-input:focus {
+                outline: none;
+                border-color: #00a4dc;
+                box-shadow: 0 0 0 2px rgba(0, 164, 220, 0.3);
+            }
         `;
         document.head.appendChild(styleElement);
     }
@@ -2781,6 +2916,72 @@
     }
 
     /**
+     * P1.5 Interactive Action: Force Flush Zombie Transcode Pipeline
+     * Halts runaway/orphaned FFmpeg processes and clears stalled session tracking.
+     */
+    async function handleFlushPipeline(sessionId, userName, mediaTitle) {
+        if (!window.ApiClient || !sessionId) return;
+        const confirmMsg = `Force Flush Zombie Pipeline for ${userName} (${mediaTitle})?\nThis terminates stalled FFmpeg transcode processes and frees server resources.`;
+        if (!window.confirm(confirmMsg)) {
+            return;
+        }
+
+        try {
+            sessionTranscodeStallCycles.delete(sessionId);
+            sessionLastTicks.delete(sessionId);
+            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
+                await window.ApiClient.sendPlaystateCommand(sessionId, 'Stop');
+            } else if (typeof window.ApiClient.ajax === 'function') {
+                await window.ApiClient.ajax({
+                    type: 'POST',
+                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/Stop`)
+                });
+            }
+            lastRenderedHash = '';
+            fetchAndRenderSessions();
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to flush pipeline:', err);
+            alert('Could not terminate stalled pipeline. Please check server permissions.');
+        }
+    }
+
+    /**
+     * P1.6 Interactive Action: Trigger Bazarr Subtitle Remediation
+     * Searches and downloads text-based SRT subtitles to eliminate CPU transcode burn-in.
+     */
+    async function handleFetchSrtBazarr(sessionId, title) {
+        if (!servarrConfig.bazarrUrl) {
+            if (window.confirm('Bazarr is not configured yet. Would you like to configure your Bazarr URL & API key now?')) {
+                openServarrModal();
+            }
+            return;
+        }
+
+        const baseUrl = servarrConfig.bazarrUrl.replace(/\/$/, '');
+        const apiKey = servarrConfig.bazarrApiKey || '';
+
+        try {
+            const res = await fetch(`${baseUrl}/api/command`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': apiKey
+                },
+                body: JSON.stringify({ name: 'WantedSubtitlesSearch' }),
+                mode: 'cors'
+            });
+            if (res.ok) {
+                alert(`✓ Bazarr Subtitle Search triggered successfully for "${title || 'playing media'}". SRT subtitles will be synced in background.`);
+            } else {
+                window.open(`${baseUrl}/series`, '_blank');
+            }
+        } catch (err) {
+            // Browser CORS or network isolation: gracefully open Bazarr UI directly
+            window.open(`${baseUrl}/series`, '_blank');
+        }
+    }
+
+    /**
      * Maps raw Jellyfin session data into Tautulli/Jellywatch card view model.
      */
     function mapSessionToCardModel(session, index) {
@@ -3066,6 +3267,32 @@
         }
         const isSevereStutter = slowCycleCount >= 2; // Buffering alarm after 2+ consecutive checks
 
+        // P1.5 Zombie Transcode Tracking: stalled playback position during active transcoding
+        let isZombieTranscode = false;
+        let zombieStallDurationSec = 0;
+        if (isTranscode && !playState.IsPaused) {
+            const lastTicks = sessionLastTicks.get(session.Id);
+            if (lastTicks !== undefined && lastTicks === positionTicks) {
+                const stalledCycles = (sessionTranscodeStallCycles.get(session.Id) || 0) + 1;
+                sessionTranscodeStallCycles.set(session.Id, stalledCycles);
+                if (stalledCycles >= 5) {
+                    isZombieTranscode = true;
+                    zombieStallDurationSec = stalledCycles * 3;
+                }
+            } else {
+                sessionTranscodeStallCycles.set(session.Id, 0);
+            }
+            sessionLastTicks.set(session.Id, positionTicks);
+        } else {
+            sessionTranscodeStallCycles.set(session.Id, 0);
+            if (playState.PositionTicks != null) {
+                sessionLastTicks.set(session.Id, playState.PositionTicks);
+            }
+        }
+
+        // P1.6 Subtitle Burn-In & Bazarr Remediation readiness
+        const canRemediateSubtitlesWithBazarr = isSubtitleBurnIn || Boolean(subStream && ['pgs', 'vobsub', 'dvdsub', 'dvb_subtitle'].includes((subStream.Codec || '').toLowerCase()));
+
         // Resolution Badge (4K UHD, 1080p FHD, 720p HD, SD)
         let resBadge = null;
         const videoHeight = videoStream.Height || 0;
@@ -3161,6 +3388,18 @@
             volumeLevel,
             isSlowTranscode,
             isSevereStutter,
+            isZombieTranscode,
+            zombieStallDurationSec,
+            zombieBadge: isZombieTranscode ? `ZOMBIE PIPELINE (${zombieStallDurationSec}s)` : null,
+            canRemediateSubtitlesWithBazarr,
+            mediaItemName: item.Name || primaryTitle,
+            mediaItemYear: item.ProductionYear || '',
+            mediaItemType: item.Type || 'Movie',
+            seriesName: item.SeriesName || '',
+            seasonIndex: item.ParentIndexNumber != null ? item.ParentIndexNumber : 1,
+            episodeIndex: item.IndexNumber != null ? item.IndexNumber : 1,
+            providerIds: item.ProviderIds || {},
+            mediaPath: item.Path || '',
             is4k: origVideoRes === '4K',
             isSubtitleBurnIn,
             transcodeReasons,
@@ -3274,6 +3513,12 @@
                         <button class="tautulli-send-tip-btn" data-action="send-fix-tip" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-tip="${escapeHtml(doctorAdvice)}" title="Send this fix recommendation as on-screen alert to player">
                             Send Tip to Player
                         </button>
+                        ${card.canRemediateSubtitlesWithBazarr ? `
+                        <button class="tautulli-servarr-btn" data-action="fetch-srt-bazarr" data-session-id="${escapeHtml(card.sessionId)}" data-title="${escapeHtml(card.mediaItemName || card.primaryTitle)}" title="Trigger Bazarr to search and download text-based SRT subtitles">
+                            <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;flex-shrink:0;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
+                            <span>Fetch SRT (Bazarr)</span>
+                        </button>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -3367,11 +3612,21 @@
                             <svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                             MULTI-IP (${card.distinctWanIpCount} WAN)
                         </span>` : ''}
+                        ${card.isZombieTranscode ? `
+                        <span class="tautulli-badge tautulli-badge-zombie" title="Zombie Transcode Pipeline: 0 playback progress detected for ${card.zombieStallDurationSec}s while transcoding.">
+                            <svg viewBox="0 0 24 24" style="width:9px;height:9px;fill:currentColor;flex-shrink:0;"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                            ZOMBIE (${card.zombieStallDurationSec}s)
+                        </span>` : ''}
                         ${card.platformBadge ? `
                         <div class="tautulli-platform-badge" style="background: ${card.platformBadge.bg}; color: ${card.platformBadge.color};" title="${escapeHtml(card.platformBadge.title)}">
                             ${card.platformBadge.svg}
                         </div>` : ''}
                         <div class="tautulli-action-cluster">
+                            ${card.isZombieTranscode ? `
+                            <button class="tautulli-action-btn tautulli-btn-flush" data-action="force-flush-pipeline" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" title="Force flush zombie transcode pipeline & terminate orphaned session">
+                                <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                            </button>
+                            ` : ''}
                             <button class="tautulli-action-btn tautulli-action-btn-info" data-action="inspect-stream" data-session-id="${escapeHtml(card.sessionId)}" title="Stream Telemetry & Diagnostics">
                                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                             </button>
@@ -3380,7 +3635,6 @@
                             </button>
                             <button class="tautulli-action-btn tautulli-action-btn-kill" data-action="kill-stream" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" title="Terminate stream">
                                 <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -3688,6 +3942,11 @@
                             <span>Stream Guard</span>
                             <span class="tautulli-guard-badge" title="Active guard policies">${(streamGuardRules.killPausedEnabled ? 1 : 0) + (streamGuardRules.kill4kSwEnabled ? 1 : 0) + (streamGuardRules.maxConcurrentStreams > 0 ? 1 : 0)}</span>
                         </button>
+                        <button class="tautulli-tool-btn" data-action="open-servarr-modal" title="Servarr Remediations: Connect Bazarr, Radarr &amp; Sonarr for automated media &amp; subtitle fixes">
+                            <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
+                            <span>Servarr</span>
+                            ${(servarrConfig.bazarrUrl && servarrConfig.bazarrApiKey) ? '<span class="tautulli-guard-badge" title="Servarr Connected">✓</span>' : ''}
+                        </button>
                         <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
                             <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
                             <span>${isPrivacyMode ? 'Privacy On' : 'Privacy'}</span>
@@ -3735,6 +3994,7 @@
         const directPlayCount = cards.filter((c) => c.isDirectPlay).length;
         const directStreamCount = cards.filter((c) => c.isDirectStream).length;
         const transcodeCount = cards.filter((c) => c.isTranscode).length;
+        const zombieCount = cards.filter((c) => c.isZombieTranscode).length;
         const wanCount = cards.filter((c) => !c.isLan).length;
         const pausedCount = cards.filter((c) => c.isPaused).length;
 
@@ -3773,6 +4033,23 @@
                 </div>
             `
             : '';
+
+        // P1.5 Zombie Pipeline & Transcode Watchdog Banner Pill
+        const pipelineStatusHtml = zombieCount > 0
+            ? `
+                <div class="tautulli-pipeline-pill tautulli-pipeline-zombie" title="Zombie FFmpeg Warning: Stalled transcode pipeline(s) detected with no playback progress for >=15 seconds.">
+                    <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    <span>Zombie FFmpeg: ${zombieCount} Stalled</span>
+                </div>
+            `
+            : (transcodeCount > 0
+                ? `
+                    <div class="tautulli-pipeline-pill" title="Active Transcode Pipelines: Real-time FFmpeg worker processes">
+                        <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+                        <span>${transcodeCount} Active Pipeline${transcodeCount > 1 ? 's' : ''}</span>
+                    </div>
+                `
+                : '');
 
         const breakdownParts = [];
         if (directPlayCount > 0) breakdownParts.push(`${directPlayCount} direct play${directPlayCount > 1 ? 's' : ''}`);
@@ -3830,6 +4107,7 @@
                         <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span>${bandwidthVisualHtml}${sparklineHtml}</span>
                     </div>
                     ${multiIpAlertBannerHtml}
+                    ${pipelineStatusHtml}
                     ${totalStreams > 1 ? `
                     <div class="tautulli-filter-group">
                         <button class="tautulli-filter-pill ${currentFilter === 'all' ? 'active' : ''}" data-action="set-filter" data-filter="all">All (${totalStreams})</button>
@@ -3848,6 +4126,11 @@
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
                         <span>Stream Guard</span>
                         <span class="tautulli-guard-badge" title="Active guard policies">${(streamGuardRules.killPausedEnabled ? 1 : 0) + (streamGuardRules.kill4kSwEnabled ? 1 : 0) + (streamGuardRules.maxConcurrentStreams > 0 ? 1 : 0)}</span>
+                    </button>
+                    <button class="tautulli-tool-btn" data-action="open-servarr-modal" title="Servarr Remediations: Connect Bazarr, Radarr &amp; Sonarr for automated media &amp; subtitle fixes">
+                        <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
+                        <span>Servarr</span>
+                        ${(servarrConfig.bazarrUrl && servarrConfig.bazarrApiKey) ? '<span class="tautulli-guard-badge" title="Servarr Connected">✓</span>' : ''}
                     </button>
                     <button class="${privacyBtnClass}" data-action="toggle-privacy" title="Mask IP addresses and usernames for streaming/screenshots">
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
@@ -3984,6 +4267,16 @@
                     ${card.audioBadge ? `<tr><td>Audio Fidelity</td><td><span style="color:#a5b4fc;font-weight:700;">${escapeHtml(card.audioBadge)}</span></td></tr>` : ''}
                     <tr><td>Subtitle Stream</td><td>${escapeHtml(card.subtitleDisplay)}</td></tr>
                     ${card.isSubtitleBurnIn ? `<tr><td>Subtitle Burn-In</td><td><span style="color:#fbbf24;font-weight:700;">Active (Subtitles Forcing Transcode)</span></td></tr>` : ''}
+                    ${card.canRemediateSubtitlesWithBazarr ? `
+                    <tr><td>Subtitle Remediation</td><td>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="color:#fbbf24;font-size:11px;">Image subtitles forcing transcode</span>
+                            <button class="tautulli-servarr-btn" data-action="fetch-srt-bazarr" data-session-id="${escapeHtml(card.sessionId)}" data-title="${escapeHtml(card.mediaItemName || card.primaryTitle)}" style="padding:2px 8px;font-size:10.5px;">
+                                <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
+                                <span>Fetch SRT (Bazarr)</span>
+                            </button>
+                        </div>
+                    </td></tr>` : ''}
                 </table>
             </div>
 
@@ -4000,8 +4293,45 @@
                     ${card.transcodeCompletionPercentage != null ? `<tr><td>Transcode Buffer Ahead</td><td>${card.transcodeCompletionPercentage}% completed</td></tr>` : ''}
                     <tr><td>Throttled State</td><td>${card.isThrottled ? '<span style="color:#34d399;">Active (Throttled / Power Saving)</span>' : 'Unthrottled'}</td></tr>
                     ${card.transcodeReasons.length > 0 ? `<tr><td>Transcode Triggers</td><td>${escapeHtml(card.transcodeReasons.map(formatTranscodeReason).join(', '))}</td></tr>` : ''}
+                    ${card.isZombieTranscode ? `
+                    <tr><td>Pipeline Watchdog</td><td><span style="color:#ef4444;font-weight:700;"><svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;vertical-align:text-bottom;margin-right:4px;"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>Zombie Stalled (${card.zombieStallDurationSec}s no progress)</span></td></tr>
+                    <tr><td>Pipeline Action</td><td>
+                        <button class="tautulli-btn-flush" data-action="force-flush-pipeline" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" style="display:inline-flex;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">
+                            Force Flush Pipeline
+                        </button>
+                    </td></tr>
+                    ` : '<tr><td>Pipeline Watchdog</td><td><span style="color:#34d399;font-weight:600;">Normal Active Flow</span></td></tr>'}
                 </table>
             </div>` : ''}
+
+            <!-- Servarr Media Deep Links -->
+            <div class="tautulli-modal-section">
+                <div class="tautulli-modal-section-title">
+                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                    <span>Servarr Automation Deep Links</span>
+                </div>
+                <table class="tautulli-modal-table">
+                    <tr><td>Media Identity</td><td>${escapeHtml(card.mediaItemName || card.primaryTitle)} ${card.mediaItemYear ? `(${card.mediaItemYear})` : ''} [${escapeHtml(card.mediaItemType || 'Media')}]</td></tr>
+                    <tr><td>Remediation Links</td><td>
+                        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+                            ${servarrConfig.bazarrUrl ? `
+                            <a href="${servarrConfig.bazarrUrl.replace(/\/$/, '')}/series" target="_blank" rel="noopener noreferrer" class="tautulli-servarr-btn" style="text-decoration:none;">
+                                <span>Open in Bazarr ➔</span>
+                            </a>` : ''}
+                            ${(card.mediaItemType === 'Episode' || card.seriesName) ? (servarrConfig.sonarrUrl ? `
+                            <a href="${servarrConfig.sonarrUrl.replace(/\/$/, '')}/series" target="_blank" rel="noopener noreferrer" class="tautulli-servarr-btn" style="text-decoration:none;">
+                                <span>Open in Sonarr ➔</span>
+                            </a>` : '') : (servarrConfig.radarrUrl ? `
+                            <a href="${servarrConfig.radarrUrl.replace(/\/$/, '')}/movies" target="_blank" rel="noopener noreferrer" class="tautulli-servarr-btn" style="text-decoration:none;">
+                                <span>Open in Radarr ➔</span>
+                            </a>` : '')}
+                            <button class="tautulli-tool-btn" data-action="open-servarr-modal" style="font-size:10px;padding:3px 8px;">
+                                <span>Configure Servarr URLs</span>
+                            </button>
+                        </div>
+                    </td></tr>
+                </table>
+            </div>
 
             <!-- Client & Player -->
             <div class="tautulli-modal-section">
@@ -4065,7 +4395,23 @@
             };
         }
 
-        modal.querySelector('[data-action="close-modal"]').onclick = closeStreamInspectorModal;
+        modal.onclick = function (e) {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+            const action = target.getAttribute('data-action');
+            if (action === 'close-modal') {
+                closeStreamInspectorModal();
+            } else if (action === 'force-flush-pipeline') {
+                closeStreamInspectorModal();
+                handleFlushPipeline(card.sessionId, card.userName, card.primaryTitle);
+            } else if (action === 'fetch-srt-bazarr') {
+                handleFetchSrtBazarr(card.sessionId, card.mediaItemName || card.primaryTitle);
+            } else if (action === 'open-servarr-modal') {
+                closeStreamInspectorModal();
+                openServarrModal();
+            }
+        };
+
         backdrop.appendChild(modal);
         document.body.appendChild(backdrop);
         document.addEventListener('keydown', handleModalEscape);
@@ -4235,6 +4581,148 @@
     function closeStreamGuardModal() {
         document.removeEventListener('keydown', handleGuardModalEscape);
         const existing = document.getElementById('tautulli-guard-modal-backdrop');
+        if (existing) {
+            existing.remove();
+        }
+    }
+
+    /**
+     * Keydown handler to dismiss the Servarr Remediation modal via Escape key.
+     */
+    function handleServarrModalEscape(e) {
+        if (e.key === 'Escape') {
+            closeServarrModal();
+        }
+    }
+
+    /**
+     * Renders and displays the Servarr Remediation Suite configuration modal.
+     */
+    function openServarrModal() {
+        closeServarrModal();
+
+        const backdrop = document.createElement('div');
+        backdrop.id = 'tautulli-servarr-modal-backdrop';
+        backdrop.className = 'tautulli-modal-backdrop';
+        backdrop.onclick = function (e) {
+            if (e.target === backdrop) {
+                closeServarrModal();
+            }
+        };
+
+        const modal = document.createElement('div');
+        modal.className = 'tautulli-modal';
+        modal.innerHTML = `
+            <div class="tautulli-modal-header">
+                <div class="tautulli-modal-title">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
+                    <span>Servarr Remediation Suite (Bazarr · Radarr · Sonarr)</span>
+                </div>
+                <div class="tautulli-modal-header-actions">
+                    <button class="tautulli-modal-close" data-action="close-servarr-modal" title="Close">
+                        <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bazarr Configuration -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Bazarr (Subtitle Automation)</div>
+                        <div class="tautulli-rule-desc">Automatically trigger searches for text SRT subtitles when PGS/VOBSUB subtitles force CPU transcode burn-in.</div>
+                    </div>
+                </div>
+                <div class="tautulli-form-row">
+                    <label class="tautulli-form-label">Bazarr Base URL</label>
+                    <input type="text" id="servarr-bazarr-url" class="tautulli-input" placeholder="http://192.168.1.50:6767" value="${escapeHtml(servarrConfig.bazarrUrl || '')}">
+                </div>
+                <div class="tautulli-form-row" style="margin-top:6px;">
+                    <label class="tautulli-form-label">Bazarr API Key</label>
+                    <input type="password" id="servarr-bazarr-api-key" class="tautulli-input" placeholder="Enter API Key from Bazarr Settings &gt; General" value="${escapeHtml(servarrConfig.bazarrApiKey || '')}">
+                </div>
+            </div>
+
+            <!-- Radarr Configuration -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Radarr (Movie Management)</div>
+                        <div class="tautulli-rule-desc">Quickly inspect movie quality profiles, storage file paths, and trigger automatic media upgrades.</div>
+                    </div>
+                </div>
+                <div class="tautulli-form-row">
+                    <label class="tautulli-form-label">Radarr Base URL</label>
+                    <input type="text" id="servarr-radarr-url" class="tautulli-input" placeholder="http://192.168.1.50:7878" value="${escapeHtml(servarrConfig.radarrUrl || '')}">
+                </div>
+                <div class="tautulli-form-row" style="margin-top:6px;">
+                    <label class="tautulli-form-label">Radarr API Key</label>
+                    <input type="password" id="servarr-radarr-api-key" class="tautulli-input" placeholder="Enter API Key from Radarr Settings &gt; General" value="${escapeHtml(servarrConfig.radarrApiKey || '')}">
+                </div>
+            </div>
+
+            <!-- Sonarr Configuration -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Sonarr (TV Show Management)</div>
+                        <div class="tautulli-rule-desc">Quickly inspect series quality profiles, episode paths, and trigger automatic episode upgrades.</div>
+                    </div>
+                </div>
+                <div class="tautulli-form-row">
+                    <label class="tautulli-form-label">Sonarr Base URL</label>
+                    <input type="text" id="servarr-sonarr-url" class="tautulli-input" placeholder="http://192.168.1.50:8989" value="${escapeHtml(servarrConfig.sonarrUrl || '')}">
+                </div>
+                <div class="tautulli-form-row" style="margin-top:6px;">
+                    <label class="tautulli-form-label">Sonarr API Key</label>
+                    <input type="password" id="servarr-sonarr-api-key" class="tautulli-input" placeholder="Enter API Key from Sonarr Settings &gt; General" value="${escapeHtml(servarrConfig.sonarrApiKey || '')}">
+                </div>
+            </div>
+
+            <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px;">
+                <button class="tautulli-modal-tool-btn" id="servarr-save-btn" style="background:rgba(0,164,220,0.3);border-color:#38bdf8;color:#ffffff;font-size:12px;padding:6px 16px;">
+                    Save Servarr Configuration
+                </button>
+            </div>
+        `;
+
+        modal.querySelector('[data-action="close-servarr-modal"]').onclick = closeServarrModal;
+
+        const saveBtn = modal.querySelector('#servarr-save-btn');
+        if (saveBtn) {
+            saveBtn.onclick = function () {
+                const bUrl = modal.querySelector('#servarr-bazarr-url');
+                const bKey = modal.querySelector('#servarr-bazarr-api-key');
+                const rUrl = modal.querySelector('#servarr-radarr-url');
+                const rKey = modal.querySelector('#servarr-radarr-api-key');
+                const sUrl = modal.querySelector('#servarr-sonarr-url');
+                const sKey = modal.querySelector('#servarr-sonarr-api-key');
+
+                servarrConfig.bazarrUrl = bUrl ? bUrl.value.trim() : '';
+                servarrConfig.bazarrApiKey = bKey ? bKey.value.trim() : '';
+                servarrConfig.radarrUrl = rUrl ? rUrl.value.trim() : '';
+                servarrConfig.radarrApiKey = rKey ? rKey.value.trim() : '';
+                servarrConfig.sonarrUrl = sUrl ? sUrl.value.trim() : '';
+                servarrConfig.sonarrApiKey = sKey ? sKey.value.trim() : '';
+
+                saveServarrConfig(servarrConfig);
+                closeServarrModal();
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+            };
+        }
+
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        document.addEventListener('keydown', handleServarrModalEscape);
+    }
+
+    /**
+     * Closes the active Servarr Remediation modal if open.
+     */
+    function closeServarrModal() {
+        document.removeEventListener('keydown', handleServarrModalEscape);
+        const existing = document.getElementById('tautulli-servarr-modal-backdrop');
         if (existing) {
             existing.remove();
         }
@@ -4412,6 +4900,25 @@
                 return;
             }
 
+            if (action === 'open-servarr-modal') {
+                e.preventDefault();
+                openServarrModal();
+                return;
+            }
+
+            if (action === 'force-flush-pipeline') {
+                e.preventDefault();
+                handleFlushPipeline(sessionId, userName, mediaTitle);
+                return;
+            }
+
+            if (action === 'fetch-srt-bazarr') {
+                e.preventDefault();
+                const title = target.getAttribute('data-title') || mediaTitle;
+                handleFetchSrtBazarr(sessionId, title);
+                return;
+            }
+
             if (action === 'toggle-doctor') {
                 e.preventDefault();
                 const docPanel = container.querySelector(`#tautulli-doctor-${sessionId}`);
@@ -4553,7 +5060,9 @@
                     savings: c.bandwidthSavingsBadge || '',
                     conn: c.connectionType || '',
                     sync: c.syncPlayBadge || '',
-                    hires: c.isHiResAudio || false
+                    hires: c.isHiResAudio || false,
+                    zombie: c.isZombieTranscode || false,
+                    bazarr: c.canRemediateSubtitlesWithBazarr || false
                 }))
             });
 
