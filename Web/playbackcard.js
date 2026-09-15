@@ -746,7 +746,19 @@
                 gap: 3.5px;
                 min-width: 0;
                 padding-right: 36px;
+                position: relative;
             }
+            /* Readable scrim behind spec text so it contrasts against vivid fanart */
+            .tautulli-spec-table::before {
+                content: '';
+                position: absolute;
+                inset: -14px -14px -14px -10px;
+                background: linear-gradient(to right, rgba(6,8,16,0.82) 60%, rgba(6,8,16,0.55) 100%);
+                border-radius: 0 6px 6px 0;
+                pointer-events: none;
+                z-index: 0;
+            }
+            /* .tautulli-spec-row z-index set in its own rule below */
 
             .tautulli-spec-row {
                 display: flex;
@@ -754,6 +766,8 @@
                 font-size: 11px;
                 line-height: 1.35;
                 min-width: 0;
+                position: relative;
+                z-index: 1;
                 gap: 8px;
             }
 
@@ -811,6 +825,8 @@
             .tautulli-spec-row-clickable {
                 cursor: pointer;
                 transition: color 0.15s ease;
+                max-width: 100%;
+                overflow: hidden;
             }
 
             .tautulli-spec-row-clickable:hover .tautulli-spec-value {
@@ -2787,7 +2803,7 @@
 
         // Titles & Navigation
         let primaryTitle = item.Name || 'Unknown Title';
-        let secondaryTitle = item.ProductionYear ? String(item.ProductionYear) : '';
+        let secondaryTitle = ''; // will be set per-type below
         const isAudioItem = item.Type === 'Audio';
 
         if (item.Type === 'Episode') {
@@ -2805,9 +2821,9 @@
             const prgTime = totalSeconds > 0 ? formatDuration(totalSeconds) : '';
             secondaryTitle = [chName, prgTime, 'Live Broadcast'].filter(Boolean).join(' · ');
         } else {
+            // Year is shown separately as tautulli-year-badge — only show duration here
             const durationStr = totalSeconds > 0 ? formatDuration(totalSeconds) : '';
-            const yearStr = item.ProductionYear ? String(item.ProductionYear) : '';
-            secondaryTitle = [yearStr, durationStr].filter(Boolean).join(' · ');
+            secondaryTitle = durationStr;
         }
 
         let displayName = session.UserName || 'User';
@@ -3125,7 +3141,7 @@
                         <div class="tautulli-meta-line-2">
                             <span class="tautulli-meta-type-icon">${typeIconSvg}</span>
                             <span class="tautulli-meta-sub">${escapeHtml(card.secondaryTitle || '')}</span>
-                            ${card.mediaItemYear ? `<span class="tautulli-year-badge">${escapeHtml(String(card.mediaItemYear))}</span>` : ''}
+                            ${(card.mediaItemYear && !card.isAudioItem && !card.isLiveStream) ? `<span class="tautulli-year-badge">${escapeHtml(String(card.mediaItemYear))}</span>` : ''}
                         </div>
                     </div>
                     <div class="tautulli-meta-right">
