@@ -971,9 +971,9 @@
 
             .tautulli-title-line {
                 display: flex;
-                align-items: baseline;
-                justify-content: space-between;
+                align-items: center;
                 gap: 8px;
+                flex-wrap: wrap;
             }
 
             .tautulli-title-primary {
@@ -993,13 +993,13 @@
             }
 
             .tautulli-title-secondary {
-                font-size: 11px;
+                font-size: 11.5px;
                 color: #94a3b8;
                 font-weight: 500;
-                flex-shrink: 0;
-                display: flex;
+                display: inline-flex;
                 align-items: center;
-                gap: 5px;
+                gap: 6px;
+                flex-wrap: wrap;
             }
 
             .tautulli-rating-badge {
@@ -1424,18 +1424,11 @@
             .tautulli-stats-grid,
             .tautulli-stats-top3-grid {
                 display: grid;
-                grid-template-columns: repeat(3, minmax(0, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
                 gap: 12px;
             }
 
-            @container statsDrawer (max-width: 640px) {
-                .tautulli-stats-grid,
-                .tautulli-stats-top3-grid {
-                    grid-template-columns: 1fr;
-                }
-            }
-
-            @media (max-width: 1050px) {
+            @container statsDrawer (max-width: 520px) {
                 .tautulli-stats-grid,
                 .tautulli-stats-top3-grid {
                     grid-template-columns: 1fr;
@@ -1450,8 +1443,8 @@
             a.tautulli-stats-top3-card:active {
                 display: flex;
                 align-items: center;
-                gap: 12px;
-                padding: 10px 14px;
+                gap: 10px;
+                padding: 10px 12px;
                 border-radius: 12px;
                 background: linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%), #111420;
                 border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1460,6 +1453,7 @@
                 color: #f1f5f9 !important;
                 position: relative;
                 overflow: hidden;
+                min-width: 0;
             }
 
             .tautulli-stats-top3-card:hover {
@@ -1501,6 +1495,12 @@
                 background: linear-gradient(135deg, rgba(217, 119, 6, 0.3), rgba(180, 83, 9, 0.1));
                 color: #f97316 !important;
                 border: 1px solid rgba(217, 119, 6, 0.5);
+            }
+
+            .tautulli-stats-rank-other {
+                background: rgba(255, 255, 255, 0.05);
+                color: #94a3b8 !important;
+                border: 1px solid rgba(255, 255, 255, 0.1);
             }
 
             .tautulli-stats-col {
@@ -1579,17 +1579,19 @@
                 font-weight: 700;
                 color: #f8fafc !important;
                 text-decoration: none !important;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
                 line-height: 1.3;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                word-break: break-word;
             }
 
             .tautulli-stats-subline {
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
                 gap: 6px;
+                margin-top: 2px;
             }
 
             .tautulli-stats-meta {
@@ -1601,6 +1603,8 @@
                 overflow: hidden;
                 text-overflow: ellipsis;
                 line-height: 1.2;
+                flex: 1 1 auto;
+                min-width: 0;
             }
 
             .tautulli-stats-metric {
@@ -1615,6 +1619,7 @@
                 white-space: nowrap;
                 flex-shrink: 0;
                 text-decoration: none !important;
+                margin-left: auto;
             }
 
             .tautulli-stats-user-thumb {
@@ -4505,7 +4510,7 @@
                 ` : `
                 <div class="tautulli-stats-top3-grid">
                     ${items.map((item, idx) => {
-                        const rankClass = idx === 0 ? 'tautulli-stats-rank-1' : (idx === 1 ? 'tautulli-stats-rank-2' : 'tautulli-stats-rank-3');
+                        const rankClass = idx === 0 ? 'tautulli-stats-rank-1' : (idx === 1 ? 'tautulli-stats-rank-2' : (idx === 2 ? 'tautulli-stats-rank-3' : 'tautulli-stats-rank-other'));
                         const rankLabel = `#${idx + 1}`;
 
                         if (isUserView) {
@@ -4531,11 +4536,11 @@
                             `;
                         }
 
-                        // Compact meta line: e.g. "2019 · 1080p · 4.8 GB"
+                        // Compact meta line: e.g. "2019 · 1080p"
                         const metaParts = [];
                         if (item.year) metaParts.push(item.year);
                         if (item.resolution) metaParts.push(item.resolution);
-                        if (item.size) metaParts.push(item.size);
+                        else if (item.size) metaParts.push(item.size);
                         else if (item.codec) metaParts.push(item.codec);
                         else if (item.type) metaParts.push(item.type);
                         const metaStr = metaParts.join(' · ') || item.type || 'Movie';
