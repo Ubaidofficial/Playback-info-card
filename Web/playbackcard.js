@@ -58,6 +58,16 @@
     let cachedWatchStats = null;
     let lastWatchStatsFetchTime = 0;
 
+    // Placement state: 'replace-devices' (default) vs 'top-banner'
+    let placementMode = 'replace-devices';
+    try {
+        const savedPlacement = localStorage.getItem('jellyfin_playbackcard_placement');
+        if (savedPlacement === 'top-banner' || savedPlacement === 'replace-devices') {
+            placementMode = savedPlacement;
+        }
+    } catch (e) {}
+    let defaultDevicesElement = null;
+
     // Smart Stream Guard Rules state (persisted in localStorage)
     const DEFAULT_STREAM_GUARD_RULES = {
         killPausedEnabled: false,
@@ -1439,6 +1449,99 @@
                 font-weight: 500;
                 color: #777777;
                 letter-spacing: 0.02em;
+            }
+
+            /* Connected Devices in Empty / Idle State */
+            .tautulli-connected-devices-container {
+                width: 100%;
+                margin-top: 14px;
+                padding: 14px 16px;
+                background: linear-gradient(155deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.008) 100%), #0d0f17;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                box-shadow: var(--lg-specular-top), 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+                box-sizing: border-box;
+                text-align: left;
+            }
+
+            .tautulli-connected-devices-title {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #94a3b8;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .tautulli-connected-devices-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 10px;
+            }
+
+            .tautulli-connected-device-chip {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 14px;
+                background: rgba(255, 255, 255, 0.035);
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 10px;
+                transition: background 0.2s, border-color 0.2s, transform 0.2s;
+            }
+
+            .tautulli-connected-device-chip:hover {
+                background: rgba(255, 255, 255, 0.06);
+                border-color: rgba(255, 255, 255, 0.14);
+                transform: translateY(-1px);
+            }
+
+            .tautulli-connected-device-icon {
+                color: #38bdf8;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .tautulli-connected-device-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .tautulli-connected-device-name {
+                font-size: 13px;
+                font-weight: 600;
+                color: #f1f5f9;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-connected-device-meta {
+                font-size: 11px;
+                color: #94a3b8;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-connected-device-status {
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #34d399;
+                background: rgba(16, 185, 129, 0.12);
+                border: 1px solid rgba(16, 185, 129, 0.25);
+                border-radius: 100px;
+                padding: 2px 7px;
+                flex-shrink: 0;
             }
 
             /* Stream Details Inspector Modal */
@@ -3477,7 +3580,7 @@
     /**
      * Renders the overall activity container including summary header and cards.
      */
-    function renderContainer(cards) {
+    function renderContainer(cards, idleSessions) {
         const statsDrawerHtml = (showWatchStats && cachedWatchStats) ? renderWatchStatisticsDrawer(cachedWatchStats) : '';
         const privacyBtnClass = isPrivacyMode ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
         const statsBtnClass = showWatchStats ? 'tautulli-tool-btn active' : 'tautulli-tool-btn';
@@ -3497,6 +3600,10 @@
                         </div>
                     </div>
                     <div class="tautulli-activity-tools">
+                        <button class="tautulli-tool-btn" data-action="toggle-placement" title="Switch Placement: Replace Devices vs Top Banner">
+                            <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+                            <span>${placementMode === 'replace-devices' ? 'In Devices' : 'Top Banner'}</span>
+                        </button>
                         <button class="${statsBtnClass}" data-action="toggle-watch-stats" title="Toggle Watch Statistics Leaderboards">
                             <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                             <span>${showWatchStats ? 'Stats On' : 'Stats'}</span>
@@ -3517,6 +3624,32 @@
                         <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
                     </svg>
                     <div class="tautulli-empty-text">No active streams</div>
+                    ${(idleSessions && idleSessions.length > 0) ? `
+                    <div class="tautulli-connected-devices-container">
+                        <div class="tautulli-connected-devices-title">
+                            <svg style="width:12px;height:12px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v10H4z m-2 12h20v2H2z"/></svg>
+                            <span>Connected Devices (${idleSessions.length})</span>
+                        </div>
+                        <div class="tautulli-connected-devices-grid">
+                            ${idleSessions.map(s => {
+                                const devName = escapeHtml(s.DeviceName || s.Client || 'Unknown Device');
+                                const client = escapeHtml(s.Client || '');
+                                const user = escapeHtml(s.UserName || 'User');
+                                return `
+                                    <div class="tautulli-connected-device-chip">
+                                        <div class="tautulli-connected-device-icon">
+                                            <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                                        </div>
+                                        <div class="tautulli-connected-device-info">
+                                            <div class="tautulli-connected-device-name">${devName}</div>
+                                            <div class="tautulli-connected-device-meta">${user} · ${client}</div>
+                                        </div>
+                                        <div class="tautulli-connected-device-status" title="Active Jellyfin Session">Online</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>` : ''}
                 </div>
                 ${statsDrawerHtml}
             `;
@@ -3632,6 +3765,10 @@
                 </div>
 
                 <div class="tautulli-activity-tools">
+                    <button class="tautulli-tool-btn" data-action="toggle-placement" title="Switch Placement: Replace Devices vs Top Banner">
+                        <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+                        <span>${placementMode === 'replace-devices' ? 'In Devices' : 'Top Banner'}</span>
+                    </button>
                     <button class="${statsBtnClass}" data-action="toggle-watch-stats" title="Toggle Watch Statistics Leaderboards">
                         <svg style="width:13px;height:13px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                         <span>${showWatchStats ? 'Stats On' : 'Stats'}</span>
@@ -4156,6 +4293,18 @@
             if (!target) return;
 
             const action = target.getAttribute('data-action');
+            if (action === 'toggle-placement') {
+                e.preventDefault();
+                placementMode = (placementMode === 'replace-devices') ? 'top-banner' : 'replace-devices';
+                try {
+                    localStorage.setItem('jellyfin_playbackcard_placement', placementMode);
+                } catch (err) {}
+                lastRenderedHash = '';
+                setupDashboardContainer(document.body);
+                fetchAndRenderSessions();
+                return;
+            }
+
             if (action === 'toggle-privacy') {
                 e.preventDefault();
                 isPrivacyMode = !isPrivacyMode;
@@ -4230,7 +4379,8 @@
      * Polls ApiClient.getSessions() and updates the DOM cleanly.
      */
     async function fetchAndRenderSessions() {
-        if (!isDashboardActive || isFetching || !window.ApiClient) {
+        const apiClient = getApiClient();
+        if (!isDashboardActive || isFetching || !apiClient) {
             return;
         }
 
@@ -4241,11 +4391,12 @@
 
         isFetching = true;
         try {
-            const rawSessions = await window.ApiClient.getSessions();
+            const rawSessions = await apiClient.getSessions();
             if (!isDashboardActive) return; // View changed while awaiting promise
 
             // Filter for active playback sessions with active media item
             const activeSessions = (rawSessions || []).filter((s) => s && s.NowPlayingItem != null);
+            const idleSessions = (rawSessions || []).filter((s) => s && s.NowPlayingItem == null);
 
             // Clean up pause timestamps for terminated sessions to prevent memory leaks
             const activeSessionIds = new Set(activeSessions.map((s) => s.Id));
@@ -4307,9 +4458,11 @@
 
             // Compute hash of content to avoid redundant DOM mutations
             const contentHash = JSON.stringify({
+                placement: placementMode,
                 privacy: isPrivacyMode,
                 filter: currentFilter,
                 showStats: showWatchStats,
+                idleCount: idleSessions.length,
                 statsItemsCount: cachedWatchStats ? ((cachedWatchStats.topSeries || []).length + (cachedWatchStats.topMovies || []).length) : 0,
                 cards: cards.map((c) => ({
                     id: c.sessionId,
@@ -4333,7 +4486,7 @@
 
             if (contentHash !== lastRenderedHash) {
                 lastRenderedHash = contentHash;
-                container.innerHTML = renderContainer(cards);
+                container.innerHTML = renderContainer(cards, idleSessions);
                 attachContainerEvents(container);
             }
 
@@ -4430,6 +4583,50 @@
     }
 
     /**
+     * Finds the Devices section in the dashboard to enable seamless in-place replacement.
+     */
+    function findDevicesSection(viewElement) {
+        const root = (viewElement && typeof viewElement.querySelector === 'function') ? viewElement : document;
+
+        // 1. Direct active devices class or ID across Jellyfin versions
+        const directSelectors = [
+            '.activeDevices',
+            '#activeDevices',
+            '.active-devices',
+            '[data-section="devices"]',
+            '.devicesSection',
+            '.dashboardDevices'
+        ];
+        for (const sel of directSelectors) {
+            try {
+                const el = root.querySelector(sel);
+                if (el) {
+                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, [data-role="section"]');
+                    return parentSection || el;
+                }
+            } catch (e) {}
+        }
+
+        // 2. Headings or link tags matching "Devices"
+        try {
+            const candidates = Array.from(root.querySelectorAll('a, h2, h3, h4, .sectionTitle, .sectionTitleContainer'));
+            for (const el of candidates) {
+                const href = (el.getAttribute('href') || '').toLowerCase();
+                const text = (el.textContent || '').trim().toLowerCase();
+                if (href.includes('devices') || text === 'devices' || text.startsWith('devices')) {
+                    const section = el.closest('.dashboardSection, .dashboardColumnSection, section, [data-role="section"]');
+                    if (section && section !== document.body && section !== root) {
+                        return section;
+                    }
+                    return el.parentElement || el;
+                }
+            }
+        } catch (e) {}
+
+        return null;
+    }
+
+    /**
      * Searches for the optimal insertion point across Jellyfin 10.8, 10.9, and 10.10 dashboard layouts.
      */
     function findDashboardTarget(viewElement) {
@@ -4482,11 +4679,6 @@
             existing.remove();
         }
 
-        const target = findDashboardTarget(viewElement);
-        if (!target) {
-            return false;
-        }
-
         const container = document.createElement('div');
         container.id = CONFIG.CONTAINER_ID;
         container.innerHTML = `
@@ -4494,6 +4686,27 @@
                 <div class="tautulli-empty-text">Loading live playback sessions...</div>
             </div>
         `;
+
+        if (placementMode === 'replace-devices') {
+            const devicesTarget = findDevicesSection(viewElement);
+            if (devicesTarget && devicesTarget.parentNode) {
+                defaultDevicesElement = devicesTarget;
+                devicesTarget.style.display = 'none';
+                devicesTarget.setAttribute('data-playbackcard-replaced', 'true');
+                devicesTarget.parentNode.insertBefore(container, devicesTarget);
+                attachContainerEvents(container);
+                return true;
+            }
+        }
+
+        if (defaultDevicesElement && defaultDevicesElement.style) {
+            defaultDevicesElement.style.display = '';
+        }
+
+        const target = findDashboardTarget(viewElement);
+        if (!target) {
+            return false;
+        }
 
         // If target is an existing dashboard section (e.g. .activeDevices or .dashboardServerActivity), insert directly before it
         const isExistingSection = (target.classList && (target.classList.contains('activeDevices') || target.classList.contains('dashboardServerActivity'))) || target.id === 'activeDevices';
@@ -4552,6 +4765,9 @@
         if (isDashboardView(view)) {
             stopPolling();
             closeStreamInspectorModal();
+            if (defaultDevicesElement && defaultDevicesElement.style) {
+                defaultDevicesElement.style.display = '';
+            }
             const container = document.getElementById(CONFIG.CONTAINER_ID);
             if (container) {
                 container.remove();
@@ -4566,6 +4782,15 @@
         if (isDashboardView(document.body)) {
             const existing = document.getElementById(CONFIG.CONTAINER_ID);
             const isAttached = existing && document.body && (typeof document.body.contains === 'function' ? document.body.contains(existing) : true);
+
+            // In replace-devices mode, ensure default devices section stays hidden
+            if (placementMode === 'replace-devices') {
+                const devicesTarget = findDevicesSection(document.body);
+                if (devicesTarget && devicesTarget.style && devicesTarget.style.display !== 'none') {
+                    devicesTarget.style.display = 'none';
+                }
+            }
+
             if (!existing || !isAttached) {
                 if (setupDashboardContainer(document.body)) {
                     startPolling();
@@ -4576,6 +4801,9 @@
         } else {
             if (isDashboardActive) {
                 stopPolling();
+                if (defaultDevicesElement && defaultDevicesElement.style) {
+                    defaultDevicesElement.style.display = '';
+                }
                 const existing = document.getElementById(CONFIG.CONTAINER_ID);
                 if (existing) {
                     existing.remove();
