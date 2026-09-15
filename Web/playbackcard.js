@@ -785,7 +785,7 @@
                 flex-direction: column;
                 gap: 4px;
                 min-width: 0;
-                padding-right: 86px;
+                padding-right: 42px;
                 position: relative;
             }
             /* Readable scrim — soft mask dissolve from left so text is readable yet fanart bleeds through */
@@ -865,7 +865,7 @@
             .tautulli-spec-row-clickable {
                 cursor: pointer;
                 transition: color 0.15s ease;
-                max-width: 100%;
+                max-width: calc(100% - 112px);
                 overflow: hidden;
             }
 
@@ -904,24 +904,40 @@
                 height: 16px;
             }
 
-            /* Bottom-Right Floating Time Stack (in Card Body) */
+            /* Bottom-Right Floating Time Stack (in Card Body) — Frosted Glass HUD Capsule */
             .tautulli-time-stack {
                 position: absolute;
-                bottom: 12px;
-                right: 14px;
+                bottom: 10px;
+                right: 12px;
                 display: flex;
                 flex-direction: column;
                 align-items: flex-end;
                 gap: 2px;
+                padding: 4px 8px;
+                background: rgba(10, 12, 20, 0.65);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 7px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
                 z-index: 3;
                 pointer-events: auto;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .tautulli-time-stack:hover {
+                background: rgba(15, 18, 30, 0.88);
+                border-color: rgba(229, 160, 13, 0.45);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 10px rgba(229, 160, 13, 0.25);
             }
 
             .tautulli-time-progress {
                 color: #94a3b8;
                 font-family: monospace;
-                font-size: 11px;
+                font-size: 10.5px;
                 font-variant-numeric: tabular-nums;
+                line-height: 1.2;
             }
 
             .tautulli-time-eta {
@@ -931,6 +947,7 @@
                 letter-spacing: 0.02em;
                 font-family: monospace;
                 font-variant-numeric: tabular-nums;
+                line-height: 1.2;
             }
 
             .tautulli-time-paused {
