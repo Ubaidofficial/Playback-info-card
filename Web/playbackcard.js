@@ -699,10 +699,10 @@
                 position: relative;
                 z-index: 1;
                 display: flex;
-                gap: 14px;
-                padding: 14px;
-                background: rgba(0, 0, 0, 0.04);
-                min-height: 155px;
+                gap: 12px;
+                padding: 12px 14px;
+                background: transparent;
+                min-height: 158px;
             }
 
             .tautulli-poster-wrapper {
@@ -711,11 +711,11 @@
                 min-width: 120px;
                 max-width: 120px;
                 aspect-ratio: 2 / 3;
-                border-radius: 8px;
+                border-radius: 10px;
                 overflow: hidden;
                 background: rgba(10, 10, 15, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.08);
                 flex-shrink: 0;
                 cursor: pointer;
                 text-decoration: none;
@@ -782,7 +782,7 @@
                 flex: 1;
                 display: flex;
                 flex-direction: column;
-                gap: 3.5px;
+                gap: 4px;
                 min-width: 0;
                 padding-right: 36px;
                 position: relative;
@@ -821,13 +821,14 @@
             }
 
             .tautulli-spec-value {
-                color: #cbd5e1;
+                color: #d4d8e0;
                 font-weight: 500;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
                 min-width: 0;
                 flex: 1;
+                font-variant-numeric: tabular-nums;
             }
 
             .tautulli-spec-value a {
@@ -1046,6 +1047,7 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                transition: transform 0.15s cubic-bezier(0.16,1,0.3,1), opacity 0.15s ease;
                 color: #e5a00d;
                 flex-shrink: 0;
                 transition: transform 0.15s ease, color 0.15s ease;
@@ -1054,6 +1056,8 @@
             .tautulli-meta-play-btn:hover {
                 transform: scale(1.18);
                 color: #fbbf24;
+            
+                transform: scale(1.15);
             }
 
             .tautulli-meta-play-btn:active {
@@ -1347,6 +1351,22 @@
                 font-style: italic;
             }
 
+
+            /* Paused Card — Cool Shift: entire card feels "cold" and inactive */
+            .tautulli-card-paused {
+                filter: saturate(0.7) brightness(0.88);
+                transition: filter 0.45s ease;
+            }
+            .tautulli-card-paused .tautulli-spec-value {
+                color: #9aa5b4 !important;
+            }
+            .tautulli-card-paused .tautulli-stream-directplay,
+            .tautulli-card-paused .tautulli-stream-directstream,
+            .tautulli-card-paused .tautulli-stream-hw,
+            .tautulli-card-paused .tautulli-stream-transcode {
+                color: #9aa5b4 !important;
+            }
+
             /* Paused Poster Dimming */
             .tautulli-poster-paused .tautulli-poster-img {
                 filter: brightness(0.5) saturate(0.35);
@@ -1563,6 +1583,101 @@
                 font-weight: 500;
                 color: #777777;
                 letter-spacing: 0.02em;
+            }
+
+
+            /* Spec Group Separator (8px breathing room between semantic groups) */
+            .tautulli-spec-group-sep {
+                height: 0;
+                margin-top: 5px;
+                border-top: 1px solid rgba(255, 255, 255, 0.045);
+                margin-bottom: 1px;
+                position: relative;
+                z-index: 1;
+            }
+
+            /* Stream Decision Live Dot (recording-style indicator) */
+            .tautulli-stream-dot {
+                display: inline-block;
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                margin-right: 5px;
+                vertical-align: middle;
+                flex-shrink: 0;
+                animation: tautulli-stream-dot-pulse 2.4s ease-in-out infinite;
+            }
+            .tautulli-stream-dot-directplay  { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.7); }
+            .tautulli-stream-dot-directstream { background: #38bdf8; box-shadow: 0 0 4px rgba(56,189,248,0.7); }
+            .tautulli-stream-dot-hw          { background: #a855f7; box-shadow: 0 0 4px rgba(168,85,247,0.7); }
+            .tautulli-stream-dot-transcode   { background: #f97316; box-shadow: 0 0 4px rgba(249,115,22,0.7); }
+            @keyframes tautulli-stream-dot-pulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50%       { opacity: 0.5; transform: scale(0.72); }
+            }
+
+            /* Skeleton Loading Shimmer */
+            .tautulli-skeleton-wrap {
+                padding: 0;
+            }
+            .tautulli-skeleton-card {
+                display: flex;
+                gap: 14px;
+                padding: 14px;
+                background: linear-gradient(155deg, rgba(255,255,255,0.03) 0%, rgba(9,10,16,0.85) 100%);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 18px;
+                min-height: 158px;
+                overflow: hidden;
+            }
+            .tautulli-skeleton-poster {
+                width: 105px;
+                min-width: 105px;
+                aspect-ratio: 2/3;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.06);
+                overflow: hidden;
+                position: relative;
+            }
+            .tautulli-skeleton-body {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                justify-content: center;
+            }
+            .tautulli-skeleton-line {
+                height: 9px;
+                border-radius: 4px;
+                background: rgba(255,255,255,0.06);
+                overflow: hidden;
+                position: relative;
+            }
+            .tautulli-skeleton-line.w-40 { width: 40%; }
+            .tautulli-skeleton-line.w-50 { width: 50%; }
+            .tautulli-skeleton-line.w-60 { width: 60%; }
+            .tautulli-skeleton-line.w-70 { width: 70%; }
+            .tautulli-skeleton-line.w-80 { width: 80%; }
+
+            .tautulli-skeleton-poster::after,
+            .tautulli-skeleton-line::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(
+                    90deg,
+                    transparent 0%,
+                    rgba(255,255,255,0.09) 40%,
+                    rgba(255,255,255,0.16) 50%,
+                    rgba(255,255,255,0.09) 60%,
+                    transparent 100%
+                );
+                animation: tautulli-skeleton-shimmer 1.6s ease-in-out infinite;
+                transform: translateX(-100%);
+            }
+            @keyframes tautulli-skeleton-shimmer {
+                0%   { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
             }
 
             /* Connected Devices in Empty / Idle State */
@@ -1946,28 +2061,28 @@
     function formatETA(remainingSeconds, isPaused, pausedSeconds) {
         if (isPaused) {
             if (pausedSeconds > 0) {
-                return `Paused (${formatDuration(pausedSeconds)})`;
+                return `\u23f8 ${formatDuration(pausedSeconds)}`;
             }
-            return 'ETA: Paused';
+            return '\u23f8 Paused';
         }
         if (!remainingSeconds || remainingSeconds <= 0) {
-            return 'ETA: --:--';
+            return '--:--';
         }
         if (etaDisplayMode === 'remaining') {
             if (remainingSeconds < 3600) {
                 const mins = Math.max(1, Math.round(remainingSeconds / 60));
-                return `-${mins}m left`;
+                return `-${mins}m`;
             }
             const hrs = Math.floor(remainingSeconds / 3600);
             const mins = Math.round((remainingSeconds % 3600) / 60);
-            return `-${hrs}h ${mins}m left`;
+            return `-${hrs}h ${mins}m`;
         }
-        // Clock mode (default)
+        // Clock time mode (default) — clean HH:MM, no "ETA:" prefix
         const etaDate = new Date(Date.now() + remainingSeconds * 1000);
         const hours = etaDate.getHours();
         const minutes = etaDate.getMinutes();
         const pad = (n) => (n < 10 ? '0' + n : n);
-        return `ETA: ${pad(hours)}:${pad(minutes)}`;
+        return `${pad(hours)}:${pad(minutes)}`;
     }
 
     /**
@@ -3087,26 +3202,26 @@
         const userHref = card.userId ? `#!/useredit.html?userId=${encodeURIComponent(card.userId)}` : '#';
 
         return `
-            <div class="tautulli-card" data-session-id="${escapeHtml(card.sessionId)}" style="
-                border-left: 3px solid ${
+            <div class="tautulli-card${card.isPaused ? ' tautulli-card-paused' : ''}" data-session-id="${escapeHtml(card.sessionId)}" style="
+                --stream-accent: ${
                     card.streamClass === 'directplay' ? '#22c55e' :
                     card.streamClass === 'directstream' ? '#38bdf8' :
                     card.streamClass === 'hw' ? '#a855f7' :
                     '#f97316'
                 };
                 --stream-glow: ${
-                    card.streamClass === 'directplay' ? 'rgba(34,197,94,0.18)' :
-                    card.streamClass === 'directstream' ? 'rgba(56,189,248,0.18)' :
-                    card.streamClass === 'hw' ? 'rgba(168,85,247,0.18)' :
-                    'rgba(249,115,22,0.18)'
+                    card.streamClass === 'directplay' ? 'rgba(34,197,94,0.10)' :
+                    card.streamClass === 'directstream' ? 'rgba(56,189,248,0.10)' :
+                    card.streamClass === 'hw' ? 'rgba(168,85,247,0.10)' :
+                    'rgba(249,115,22,0.10)'
                 };
                 box-shadow:
+                    inset 3px 0 0 0 var(--stream-accent),
                     inset 0 1px 0 0 rgba(255,255,255,0.22),
-                    inset 1px 0 0 0 rgba(255,255,255,0.08),
-                    inset -1px 0 0 0 rgba(244,114,182,0.06),
+                    inset 0 0 0 1px rgba(255,255,255,0.10),
+                    inset -1px 0 0 0 rgba(244,114,182,0.05),
                     inset 0 -1px 0 0 rgba(255,255,255,0.03),
-                    0 0 0 1px var(--stream-glow),
-                    0 0 32px 4px var(--stream-glow),
+                    0 0 28px 2px var(--stream-glow),
                     0 24px 52px -8px rgba(0,0,0,0.88),
                     0 8px 24px -4px rgba(0,0,0,0.6);
             ">
@@ -3140,9 +3255,10 @@
                             <span class="tautulli-spec-label">QUALITY</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.qualityDisplay)}">${escapeHtml(card.qualityDisplay)}</span>
                         </div>
+                        <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">STREAM</span>
-                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}">${escapeHtml(card.streamDisplay)}</span>
+                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${escapeHtml(card.streamDisplay)}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">CONTAINER</span>
@@ -3162,6 +3278,7 @@
                             <span class="tautulli-spec-label">SUBTITLE</span>
                             <span class="tautulli-spec-value${card.subtitleDisplay === 'None' ? ' tautulli-spec-value-muted' : ''}" title="${escapeHtml(card.subtitleDisplay)}">${escapeHtml(card.subtitleDisplay)}</span>
                         </div>` : ''}
+                        <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">LOCATION</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.locationDisplay)}">${escapeHtml(card.locationDisplay)} <span class="tautulli-net-pill tautulli-net-pill-${card.connectionType ? card.connectionType.toLowerCase() : 'lan'}">${escapeHtml(card.connectionType || 'LAN')}</span></span>
@@ -3395,7 +3512,7 @@
                         <span>Activity</span>
                     </div>
                     <div class="tautulli-activity-stats">
-                        <span>Sessions: <span class="tautulli-activity-stat-highlight">${totalStreams} stream${totalStreams > 1 ? 's' : ''}</span> ${breakdownStr}</span>
+                        <span><span class="tautulli-activity-stat-highlight">${totalStreams}</span> stream${totalStreams !== 1 ? 's' : ''} ${breakdownStr}</span>
                         <span>|</span>
                         <span>Bandwidth: <span class="tautulli-activity-stat-highlight">${bandwidthDetail}</span>${bandwidthVisualHtml}${sparklineHtml}</span>
                         ${(idleSessions && idleSessions.length > 0) ? `<span>|</span><span>Connected: <span class="tautulli-activity-stat-highlight">${idleSessions.length} device${idleSessions.length > 1 ? 's' : ''}</span></span>` : ''}
@@ -3937,8 +4054,17 @@
         const container = document.createElement('div');
         container.id = CONFIG.CONTAINER_ID;
         container.innerHTML = `
-            <div class="tautulli-empty-container">
-                <div class="tautulli-empty-text">Loading live playback sessions...</div>
+            <div class="tautulli-skeleton-wrap">
+                <div class="tautulli-skeleton-card">
+                    <div class="tautulli-skeleton-poster"></div>
+                    <div class="tautulli-skeleton-body">
+                        <div class="tautulli-skeleton-line w-60"></div>
+                        <div class="tautulli-skeleton-line w-40"></div>
+                        <div class="tautulli-skeleton-line w-80"></div>
+                        <div class="tautulli-skeleton-line w-50"></div>
+                        <div class="tautulli-skeleton-line w-70"></div>
+                    </div>
+                </div>
             </div>
         `;
 
