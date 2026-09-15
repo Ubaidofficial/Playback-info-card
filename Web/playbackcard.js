@@ -232,12 +232,13 @@
      * Injects custom CSS styling for the Liquid Glass theme and Tautulli/Jellywatch card anatomy.
      */
     function injectStyles() {
-        if (document.getElementById(CONFIG.STYLES_ID)) {
-            return;
+        let styleElement = document.getElementById(CONFIG.STYLES_ID);
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = CONFIG.STYLES_ID;
+            document.head.appendChild(styleElement);
         }
 
-        const styleElement = document.createElement('style');
-        styleElement.id = CONFIG.STYLES_ID;
         styleElement.textContent = `
             :root {
                 /* Liquid Glass Physics & Elevation Tokens (LiquidGlass-UI, GlinUI, OpenGlass) */
@@ -1155,8 +1156,8 @@
 
             /* Watch Statistics Drawer (Tautulli-Inspired Leaderboards) */
             .tautulli-stats-drawer {
-                margin-top: 24px;
-                padding: 16px;
+                margin-top: 16px;
+                padding: 16px 18px;
                 background: linear-gradient(155deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
                 backdrop-filter: blur(28px) saturate(180%);
                 -webkit-backdrop-filter: blur(28px) saturate(180%);
@@ -1188,60 +1189,76 @@
             .tautulli-stats-grid,
             .tautulli-stats-top3-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 12px;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
             }
 
-            .tautulli-stats-top3-card {
+            @media (max-width: 860px) {
+                .tautulli-stats-grid,
+                .tautulli-stats-top3-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .tautulli-stats-top3-card,
+            a.tautulli-stats-top3-card,
+            a.tautulli-stats-top3-card:link,
+            a.tautulli-stats-top3-card:visited,
+            a.tautulli-stats-top3-card:hover,
+            a.tautulli-stats-top3-card:active {
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                padding: 10px 12px;
+                padding: 10px 14px;
                 border-radius: 12px;
                 background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                transition: all 0.2s ease;
-                text-decoration: none;
-                color: inherit;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                transition: all 0.22s var(--lg-ease);
+                text-decoration: none !important;
+                color: #f1f5f9 !important;
                 position: relative;
+                overflow: hidden;
             }
 
             .tautulli-stats-top3-card:hover {
                 background: rgba(255, 255, 255, 0.07);
-                border-color: rgba(56, 189, 248, 0.35);
+                border-color: rgba(56, 189, 248, 0.4);
                 transform: translateY(-2px);
-                box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.55);
+                color: #ffffff !important;
             }
 
             .tautulli-stats-top3-rank {
                 font-size: 13px;
                 font-weight: 800;
-                width: 26px;
-                height: 26px;
-                border-radius: 7px;
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;
                 font-family: monospace;
+                letter-spacing: -0.5px;
             }
 
             .tautulli-stats-rank-1 {
-                background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.2));
-                color: #fbbf24;
-                border: 1px solid rgba(245, 158, 11, 0.5);
+                background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.15));
+                color: #fbbf24 !important;
+                border: 1px solid rgba(245, 158, 11, 0.6);
+                box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
             }
 
             .tautulli-stats-rank-2 {
-                background: linear-gradient(135deg, rgba(203, 213, 225, 0.3), rgba(148, 163, 184, 0.15));
-                color: #e2e8f0;
-                border: 1px solid rgba(203, 213, 225, 0.4);
+                background: linear-gradient(135deg, rgba(203, 213, 225, 0.3), rgba(148, 163, 184, 0.1));
+                color: #e2e8f0 !important;
+                border: 1px solid rgba(203, 213, 225, 0.5);
             }
 
             .tautulli-stats-rank-3 {
-                background: linear-gradient(135deg, rgba(217, 119, 6, 0.25), rgba(180, 83, 9, 0.15));
-                color: #f97316;
-                border: 1px solid rgba(217, 119, 6, 0.35);
+                background: linear-gradient(135deg, rgba(217, 119, 6, 0.3), rgba(180, 83, 9, 0.1));
+                color: #f97316 !important;
+                border: 1px solid rgba(217, 119, 6, 0.5);
             }
 
             .tautulli-stats-col {
@@ -1278,7 +1295,7 @@
                 background: rgba(255, 255, 255, 0.02);
                 border: 1px solid rgba(255, 255, 255, 0.04);
                 transition: background 0.2s ease, transform 0.2s ease;
-                text-decoration: none;
+                text-decoration: none !important;
                 color: inherit;
             }
 
@@ -1296,39 +1313,55 @@
             }
 
             .tautulli-stats-thumb {
-                width: 32px;
-                height: 48px;
-                border-radius: 5px;
+                width: 38px;
+                height: 54px;
+                border-radius: 6px;
                 object-fit: cover;
                 background: #1e293b;
                 border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
                 flex-shrink: 0;
             }
 
             .tautulli-stats-info {
                 flex: 1;
                 min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
             }
 
             .tautulli-stats-name {
-                font-size: 12px;
-                font-weight: 600;
-                color: #f1f5f9;
+                font-size: 13px;
+                font-weight: 700;
+                color: #f8fafc !important;
+                text-decoration: none !important;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                line-height: 1.3;
             }
 
             .tautulli-stats-meta {
-                font-size: 10.5px;
-                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 500;
+                color: #94a3b8 !important;
+                text-decoration: none !important;
+                line-height: 1.2;
             }
 
             .tautulli-stats-metric {
                 font-size: 11px;
                 font-weight: 700;
-                color: #fcd34d;
+                color: #38bdf8 !important;
+                background: rgba(56, 189, 248, 0.12);
+                border: 1px solid rgba(56, 189, 248, 0.28);
+                padding: 3px 8px;
+                border-radius: 6px;
                 font-family: monospace;
+                white-space: nowrap;
+                flex-shrink: 0;
+                text-decoration: none !important;
             }
 
             /* Stream Pipeline Chips (Diskovarr dashboard precision with vector glyphs) */
@@ -2395,7 +2428,6 @@
                 box-shadow: 0 0 0 2px rgba(0, 164, 220, 0.3);
             }
         `;
-        document.head.appendChild(styleElement);
     }
 
     /**
@@ -3865,7 +3897,7 @@
                     IncludeItemTypes: 'Movie',
                     Limit: 10,
                     Recursive: true,
-                    Fields: 'PrimaryImageAspectRatio,UserData'
+                    Fields: 'PrimaryImageAspectRatio,UserData,ImageTags'
                 }),
                 apiClient.getItems(userId, {
                     SortBy: 'PlayCount,SortName',
@@ -3873,7 +3905,7 @@
                     IncludeItemTypes: 'Episode',
                     Limit: 50,
                     Recursive: true,
-                    Fields: 'SeriesId,SeriesName,UserData'
+                    Fields: 'SeriesId,SeriesName,SeriesPrimaryImageTag,UserData,ImageTags'
                 })
             ]);
 
@@ -3892,7 +3924,8 @@
                             name: ep.SeriesName || ep.Name,
                             playCount: 0,
                             year: ep.ProductionYear || '',
-                            type: 'TV Series'
+                            type: 'TV Series',
+                            imageTag: ep.SeriesPrimaryImageTag || (ep.ImageTags && ep.ImageTags.Primary) || null
                         });
                     }
                     seriesPlayMap.get(sid).playCount += plays;
@@ -3904,6 +3937,7 @@
             // Movies
             movieItems.forEach((m) => {
                 const plays = (m.UserData && m.UserData.PlayCount) || m.PlayCount || 0;
+                const imgTag = (m.ImageTags && m.ImageTags.Primary) || m.PrimaryImageTag || undefined;
                 combinedList.push({
                     id: m.Id,
                     name: m.Name,
@@ -3911,7 +3945,7 @@
                     year: m.ProductionYear || '',
                     type: 'Movie',
                     imgUrl: (typeof apiClient.getImageUrl === 'function')
-                        ? apiClient.getImageUrl(m.Id, { type: 'Primary', width: 120 })
+                        ? apiClient.getImageUrl(m.Id, { type: 'Primary', maxHeight: 200, tag: imgTag })
                         : null
                 });
             });
@@ -3925,7 +3959,7 @@
                     year: s.year,
                     type: 'TV Series',
                     imgUrl: (typeof apiClient.getImageUrl === 'function')
-                        ? apiClient.getImageUrl(s.id, { type: 'Primary', width: 120 })
+                        ? apiClient.getImageUrl(s.id, { type: 'Primary', maxHeight: 200, tag: s.imageTag || undefined })
                         : null
                 });
             });
@@ -3982,7 +4016,7 @@
             <div class="tautulli-stats-drawer" id="tautulli-watch-stats-drawer">
                 <div class="tautulli-stats-header">
                     <div class="tautulli-stats-title">
-                        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#38bdf8;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                        <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:#38bdf8;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                         <span>Top 3 Watched (Server Leaderboard)</span>
                     </div>
                     <button class="tautulli-modal-tool-btn" data-action="toggle-watch-stats" style="font-size:10px;padding:3px 8px;" title="Collapse watch statistics drawer">
@@ -3995,14 +4029,14 @@
                         const rankLabel = `#${idx + 1}`;
                         const metaStr = [item.type, item.year].filter(Boolean).join(' · ');
                         return `
-                            <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-top3-card" title="${escapeHtml(item.name)} (${item.playCount} plays)">
+                            <a href="#!/details?id=${encodeURIComponent(item.id)}" class="tautulli-stats-top3-card" style="text-decoration:none!important;color:#f1f5f9!important;" title="${escapeHtml(item.name)} (${item.playCount} plays)">
                                 <div class="tautulli-stats-top3-rank ${rankClass}">${rankLabel}</div>
-                                ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" />` : '<div class="tautulli-stats-thumb"></div>'}
+                                ${item.imgUrl ? `<img class="tautulli-stats-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.style.display='none'" />` : '<div class="tautulli-stats-thumb" style="display:flex;align-items:center;justify-content:center;color:#64748b;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></div>'}
                                 <div class="tautulli-stats-info">
-                                    <div class="tautulli-stats-name">${escapeHtml(item.name)}</div>
-                                    <div class="tautulli-stats-meta">${escapeHtml(metaStr)}</div>
+                                    <div class="tautulli-stats-name" style="text-decoration:none!important;color:#f8fafc!important;">${escapeHtml(item.name)}</div>
+                                    <div class="tautulli-stats-meta" style="text-decoration:none!important;color:#94a3b8!important;">${escapeHtml(metaStr)}</div>
                                 </div>
-                                <div class="tautulli-stats-metric">${item.playCount} play${item.playCount === 1 ? '' : 's'}</div>
+                                <div class="tautulli-stats-metric" style="text-decoration:none!important;">${item.playCount} play${item.playCount === 1 ? '' : 's'}</div>
                             </a>
                         `;
                     }).join('')}
