@@ -886,25 +886,30 @@
                 opacity: 0.82;
             }
 
-            /* Platform Corner Badge (Top-Right of Spec Area) */
+            /* Platform Corner Badge (Top-Right of Spec Area) — Frosted Glass Tile with Official Brand Logo */
             .tautulli-platform-corner-badge {
                 position: absolute;
-                top: 12px;
-                right: 14px;
+                top: 10px;
+                right: 12px;
                 width: 28px;
                 height: 28px;
                 border-radius: 7px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+                background: rgba(15, 18, 28, 0.72);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
                 z-index: 3;
-                border: 1px solid rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                overflow: hidden;
             }
 
             .tautulli-platform-corner-badge svg {
-                width: 16px;
-                height: 16px;
+                width: 18px;
+                height: 18px;
+                display: block;
             }
 
             /* Bottom-Right Floating Time Stack (in Card Body) — Frosted Glass HUD Capsule */
@@ -2241,155 +2246,141 @@
     function getPlatformBadge(client, deviceName) {
         const combined = `${client || ''} ${deviceName || ''}`.toLowerCase();
 
-        if (combined.includes('apple tv') || combined.includes('appletv')) {
-            return {
-                bg: '#1c1c1e',
-                color: '#ffffff',
-                title: 'Apple TV',
-                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
-            };
-        }
-        if (combined.includes('webos') || combined.includes('lg')) {
-            return {
-                bg: '#a50034',
-                color: '#ffffff',
-                title: 'LG webOS TV',
-                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
-            };
-        }
-        if (combined.includes('tizen') || combined.includes('samsung')) {
-            return {
-                bg: '#0f79af',
-                color: '#ffffff',
-                title: 'Samsung Tizen TV',
-                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
-            };
-        }
-        if (combined.includes('playstation') || combined.includes('ps4') || combined.includes('ps5')) {
-            return {
-                bg: '#003791',
-                color: '#ffffff',
-                title: 'PlayStation',
-                svg: `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H9v2H7v-2H5v-2h2V9h2v2h2v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`
-            };
-        }
-        if (combined.includes('xbox')) {
-            return {
-                bg: '#107c10',
-                color: '#ffffff',
-                title: 'Xbox Console',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.88 15.53c-1.04.52-2.39.84-3.88.84s-2.84-.32-3.88-.84c-.45-.23-.84-.5-1.19-.8 1.13-1.01 2.99-2.36 5.07-2.36s3.94 1.35 5.07 2.36c-.35.3-.74.57-1.19.8zm2.4-2.28c-.89-.92-2.28-1.99-4.28-2.58 1.62-.97 3.39-1.28 4.14-1.34.46 1.19.64 2.52.14 3.92zm-12.56 0c-.5-1.4-.32-2.73.14-3.92.75.06 2.52.37 4.14 1.34-2 .59-3.39 1.66-4.28 2.58z"/></svg>`
-            };
-        }
-        if (combined.includes('swiftfin')) {
-            return {
-                bg: '#00a4dc',
-                color: '#ffffff',
-                title: 'Swiftfin Client',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>`
-            };
-        }
-        if (combined.includes('infuse')) {
-            return {
-                bg: '#ff4b3a',
-                color: '#ffffff',
-                title: 'Infuse Player',
-                svg: `<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`
-            };
-        }
-        if (combined.includes('kodi')) {
-            return {
-                bg: '#17b2e7',
-                color: '#ffffff',
-                title: 'Kodi Media Center',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 3.83L18.17 12 12 18.17 5.83 12 12 5.83z"/></svg>`
-            };
-        }
-        if (combined.includes('android') || combined.includes('pixel') || combined.includes('shield')) {
-            return {
-                bg: '#34a853',
-                color: '#ffffff',
-                title: 'Android / Google TV',
-                svg: `<svg viewBox="0 0 24 24"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`
-            };
-        }
+        // 1. Apple Safari (Official multi-color compass with blue gradient dial & red/white needle)
         if (combined.includes('safari')) {
             return {
-                bg: '#0071e3',
-                color: '#ffffff',
                 title: 'Apple Safari',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-3.5l2.79-6.29 6.29-2.79-2.79 6.29-6.29 2.79zm4.25-4.25c-.41.41-.41 1.09 0 1.5s1.09.41 1.5 0 .41-1.09 0-1.5-1.09-.41-1.5 0z"/></svg>`
+                svg: `<svg viewBox="0 0 24 24"><defs><linearGradient id="safari-dial" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00a3ff"/><stop offset="100%" stop-color="#0066eb"/></linearGradient></defs><circle cx="12" cy="12" r="11" fill="url(#safari-dial)" stroke="#2ea6ff" stroke-width="0.5"/><path d="M12 2.5v1.5M12 20v1.5M2.5 12H4M20 12h1.5M5.28 5.28l1.06 1.06M17.66 17.66l1.06 1.06M5.28 18.72l1.06-1.06M17.66 6.34l1.06-1.06" stroke="rgba(255,255,255,0.7)" stroke-width="0.8" stroke-linecap="round"/><polygon points="16.5,7.5 13,11 11,13" fill="#ff3b30"/><polygon points="7.5,16.5 11,13 13,11" fill="#ffffff"/><circle cx="12" cy="12" r="1.3" fill="#ff3b30"/></svg>`
             };
         }
-        if (combined.includes('apple') || combined.includes('ios') || combined.includes('macos') || combined.includes('iphone') || combined.includes('ipad')) {
-            return {
-                bg: '#1c1c1e',
-                color: '#ffffff',
-                title: 'Apple / iOS / macOS',
-                svg: `<svg viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.87c.66-.82 1.11-1.96.99-3.1-.96.04-2.12.65-2.8 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.13-.47 2.79-1.29z"/></svg>`
-            };
-        }
-        if (combined.includes('fire') || combined.includes('amazon')) {
-            return {
-                bg: '#ff9900',
-                color: '#ffffff',
-                title: 'Amazon Fire TV',
-                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
-            };
-        }
+
+        // 2. Google Chrome (Official 4-color emblem: red, yellow, green, blue center)
         if (combined.includes('chrome')) {
             return {
-                bg: '#ea4335',
-                color: '#ffffff',
                 title: 'Google Chrome',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`
+                svg: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ffffff"/><path fill="#EA4335" d="M12 2a10 10 0 0 0-8.66 5l4.33 7.5A5 5 0 0 1 12 7h8.66A10 10 0 0 0 12 2z"/><path fill="#FBBC05" d="M20.66 7H12a5 5 0 0 1 4.33 7.5l-4.33 7.5A10 10 0 0 0 22 12a10 10 0 0 0-1.34-5z"/><path fill="#34A853" d="M12 22a10 10 0 0 0 8.66-5l-4.33-7.5A5 5 0 0 1 7.67 14.5L3.34 7A10 10 0 0 0 12 22z"/><circle cx="12" cy="12" r="5" fill="#ffffff"/><circle cx="12" cy="12" r="4" fill="#4285F4"/></svg>`
             };
         }
+
+        // 3. Mozilla Firefox (Official multi-color flame fox & blue globe)
         if (combined.includes('firefox')) {
             return {
-                bg: '#ff7139',
-                color: '#ffffff',
                 title: 'Mozilla Firefox',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
+                svg: `<svg viewBox="0 0 24 24"><defs><linearGradient id="ff-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2b3a8c"/><stop offset="100%" stop-color="#0080ff"/></linearGradient><linearGradient id="ff-f" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ffe600"/><stop offset="50%" stop-color="#ff6600"/><stop offset="100%" stop-color="#cc0044"/></linearGradient></defs><circle cx="12" cy="12" r="8.5" fill="url(#ff-g)"/><path fill="url(#ff-f)" d="M21.7 8.3c-.3-.9-.8-1.7-1.4-2.4-.4-.4-.8.1-.6.6.5 1.1.7 2.3.6 3.5 0 3-1.6 5.6-4 7-1.8 1-4 1.2-6 .5-1.5-.5-2.8-1.5-3.6-2.9-.6-1-.8-2.2-.6-3.3.2-1 .7-2 1.4-2.8.3-.4 0-.9-.5-.8-1.2.3-2.3 1-3.1 2-.9 1.2-1.4 2.6-1.5 4.1 0 5 4.1 9 9.1 9 4.8 0 8.8-3.7 9.1-8.5.1-2.1-.5-4.2-1.6-6z"/></svg>`
             };
         }
+
+        // 4. Microsoft Edge (Official multi-color wave logo)
         if (combined.includes('edg')) {
             return {
-                bg: '#0078d7',
-                color: '#ffffff',
                 title: 'Microsoft Edge',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>`
+                svg: `<svg viewBox="0 0 24 24"><defs><linearGradient id="edge-t" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0078d7"/><stop offset="100%" stop-color="#00c853"/></linearGradient><linearGradient id="edge-w" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00b0ff"/><stop offset="100%" stop-color="#00e5ff"/></linearGradient></defs><path fill="url(#edge-t)" d="M12 2C6.5 2 2 6.5 2 12c0 3.2 1.5 6 3.8 7.8-.3-1.2-.2-2.5.3-3.6 1-2.2 3.3-3.7 5.9-3.7h4V10c0-4.4-3.6-8-8-8z"/><path fill="url(#edge-w)" d="M16 12.5c0 2.5-2 4.5-4.5 4.5-2 0-3.7-1.3-4.3-3.1-.2.4-.3.9-.3 1.4 0 3.7 3 6.7 6.7 6.7 4.2 0 7.6-3.4 7.6-7.6 0-.6-.1-1.3-.3-1.9H16z"/></svg>`
             };
         }
-        if (combined.includes('roku')) {
+
+        // 5. Android / Google TV (Official Android #3DDC84 bugdroid)
+        if (combined.includes('android') || combined.includes('pixel') || combined.includes('shield')) {
             return {
-                bg: '#662d91',
-                color: '#ffffff',
-                title: 'Roku',
-                svg: `<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>`
+                title: 'Android / Google TV',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#3DDC84" d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 1.23 12.95 1 12 1c-.96 0-1.86.23-2.66.63L7.85.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 3.26 6 5.01 6 7h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>`
             };
         }
-        // Jellyfin Web (explicit — shows Jellyfin's characteristic ◈ logo shape)
+
+        // 6. Apple TV / Apple / iOS / macOS (Official Apple logo in silver)
+        if (combined.includes('apple tv') || combined.includes('appletv') || combined.includes('apple') || combined.includes('ios') || combined.includes('macos') || combined.includes('iphone') || combined.includes('ipad')) {
+            return {
+                title: combined.includes('tv') ? 'Apple TV' : 'Apple / iOS',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#f8fafc" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.87c.66-.82 1.11-1.96.99-3.1-.96.04-2.12.65-2.8 1.45-.59.69-1.12 1.83-.98 2.94 1.07.08 2.13-.47 2.79-1.29z"/></svg>`
+            };
+        }
+
+        // 7. Jellyfin Web / Client (Official Jellyfin faceted gradient logo)
         if (combined.includes('jellyfin') || combined.includes('jelly fin')) {
             return {
-                bg: '#00a4dc',
-                color: '#ffffff',
                 title: 'Jellyfin Web',
-                svg: `<svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2zm0 4.5l6.5 6.5-6.5 6.5-6.5-6.5L12 6.5zm0 3.5l-3 3 3 3 3-3-3-3z"/></svg>`
+                svg: `<svg viewBox="0 0 24 24"><defs><linearGradient id="jf-crystal" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#aa5cc3"/><stop offset="100%" stop-color="#00a4dc"/></linearGradient></defs><path fill="url(#jf-crystal)" d="M12 2L2 12l10 10 10-10L12 2zm0 4.5l6.5 6.5-6.5 6.5-6.5-6.5L12 6.5zm0 3.5l-3 3 3 3 3-3-3-3z"/></svg>`
             };
         }
-        // Generic web player fallback (monitor icon)
+
+        // 8. Kodi Media Center (Official Kodi blue diamond)
+        if (combined.includes('kodi')) {
+            return {
+                title: 'Kodi Media Center',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#17B2E7" d="M12 2L2 12l10 10 10-10L12 2zm0 3.83L18.17 12 12 18.17 5.83 12 12 5.83z"/><path fill="#ffffff" d="M12 7.5L7.5 12l4.5 4.5 4.5-4.5L12 7.5z"/></svg>`
+            };
+        }
+
+        // 9. Infuse Player (Official Infuse red/orange flame)
+        if (combined.includes('infuse')) {
+            return {
+                title: 'Infuse Player',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#FF4B3A"/><path fill="#ffffff" d="M9 7l8 5-8 5V7z"/></svg>`
+            };
+        }
+
+        // 10. Swiftfin (Official Swiftfin cyan logo)
+        if (combined.includes('swiftfin')) {
+            return {
+                title: 'Swiftfin Client',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#00A4DC"/><path fill="#ffffff" d="M12 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm1 13h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`
+            };
+        }
+
+        // 11. Sony PlayStation (Official multi-color PS logo)
+        if (combined.includes('playstation') || combined.includes('ps4') || combined.includes('ps5')) {
+            return {
+                title: 'PlayStation',
+                svg: `<svg viewBox="0 0 24 24"><path fill="#003791" d="M9.5 3v13.5l3.5-1.2V7.8c0-.9.4-1.4 1.2-1.4.7 0 1.1.4 1.1 1.2v3.7l2.7-.9V6.6c0-2-1.4-3.1-3.6-3.1-2.1 0-4.9.5-4.9-.5z"/><path fill="#0070d1" d="M14.2 16.3l-4.7 1.6V20l4.7-1.6c1.3-.4 2.2-.1 2.2.7 0 1-1.2 1.4-2.5 1.8l-7.4 2.5v1.2l9-3.1c2.4-.8 4.2-2.1 4.2-4.1 0-2.3-2.1-2.7-5.5-2.1z"/><path fill="#2997ff" d="M2.5 21.4l5.3-1.8v-1.6l-5.3 1.8c-1.3.4-2.2.1-2.2-.7 0-1 1.2-1.4 2.5-1.8l7.4-2.5v-1.2l-9 3.1C-1.2 17.5.6 18.8.6 20.8c0 2.3 2.1 2.7 5.5 2.1z"/></svg>`
+            };
+        }
+
+        // 12. Microsoft Xbox (Official Xbox green sphere)
+        if (combined.includes('xbox')) {
+            return {
+                title: 'Xbox Console',
+                svg: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#107C10"/><path fill="#ffffff" d="M15.88 17.53c-1.04.52-2.39.84-3.88.84s-2.84-.32-3.88-.84c-.45-.23-.84-.5-1.19-.8 1.13-1.01 2.99-2.36 5.07-2.36s3.94 1.35 5.07 2.36c-.35.3-.74.57-1.19.8zm2.4-2.28c-.89-.92-2.28-1.99-4.28-2.58 1.62-.97 3.39-1.28 4.14-1.34.46 1.19.64 2.52.14 3.92zm-12.56 0c-.5-1.4-.32-2.73.14-3.92.75.06 2.52.37 4.14 1.34-2 .59-3.39 1.66-4.28 2.58z"/></svg>`
+            };
+        }
+
+        // 13. Roku (Official Roku purple logo)
+        if (combined.includes('roku')) {
+            return {
+                title: 'Roku',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#662D91"/><path fill="#ffffff" d="M6 6h4.5c2.5 0 4 1.3 4 3.2 0 1.5-.9 2.6-2.2 3l2.8 5.8h-2.6l-2.4-5.2H8.3V18H6V6zm2.3 4.8h2c1.2 0 1.9-.6 1.9-1.5s-.7-1.5-1.9-1.5h-2v3z"/></svg>`
+            };
+        }
+
+        // 14. Amazon Fire TV (Official Fire TV orange)
+        if (combined.includes('fire') || combined.includes('amazon')) {
+            return {
+                title: 'Amazon Fire TV',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#FF9900"/><path fill="#ffffff" d="M12 4a8 8 0 1 0 8 8 8 8 0 0 0-8-8zm-2 11.5v-7l6 3.5z"/></svg>`
+            };
+        }
+
+        // 15. LG webOS TV (Official LG logo)
+        if (combined.includes('webos') || combined.includes('lg')) {
+            return {
+                title: 'LG webOS TV',
+                svg: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#A50034"/><path fill="#ffffff" d="M11 6.5v11h6.5v-1.8H13V6.5zm-2.2 4.2a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zm3.2-3.2A7.5 7.5 0 1 0 19.5 15h-1.8a5.7 5.7 0 1 1-5.7-5.7v-1.8z"/></svg>`
+            };
+        }
+
+        // 16. Samsung Tizen TV (Official Samsung blue logo)
+        if (combined.includes('tizen') || combined.includes('samsung')) {
+            return {
+                title: 'Samsung Tizen TV',
+                svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#0F79AF"/><path fill="#ffffff" d="M6 7.5h12v2.2h-4.8v6.8h-2.4V9.7H6V7.5z"/></svg>`
+            };
+        }
+
+        // Generic Web Player fallback (frosted monitor icon)
         return {
-            bg: '#334155',
-            color: '#ffffff',
             title: client || 'Web Player',
-            svg: `<svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`
+            svg: `<svg viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#334155"/><path fill="#f8fafc" d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>`
         };
     }
 
-    /**
-     * Resolves the active Jellyfin ApiClient across various web client versions and architectures.
-     */
     function getApiClient() {
         if (window.ApiClient) return window.ApiClient;
         if (window.connectionManager && typeof window.connectionManager.currentApiClient === 'function') {
@@ -3256,9 +3247,9 @@
                         ${artworkHtml}
                     </a>
 
-                    <!-- Platform Corner Badge -->
+                    <!-- Platform Corner Badge (Official Brand Logo) -->
                     ${card.platformBadge ? `
-                    <div class="tautulli-platform-corner-badge" style="background: ${card.platformBadge.bg}; color: ${card.platformBadge.color};" title="${escapeHtml(card.platformBadge.title)}">
+                    <div class="tautulli-platform-corner-badge" title="${escapeHtml(card.platformBadge.title)}">
                         ${card.platformBadge.svg}
                     </div>` : ''}
 
