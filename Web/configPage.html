@@ -12,28 +12,115 @@
                     <div class="sectionTitleContainer flex align-items-center">
                         <h2 class="sectionTitle">Playback Info Card Settings</h2>
                     </div>
-                    <p style="color: #94a3b8; font-size: 0.9em; margin-bottom: 1.5em;">
-                        Configure real-time monitoring, fluid progress interpolation, and visual dashboard preferences for the Playback Info Card.
+                    <p style="color: #94a3b8; font-size: 0.9em; margin-bottom: 1.8em;">
+                        Configure real-time monitoring, visual preferences, automated Stream Guard policies, and Servarr remediation integrations.
                     </p>
 
-                    <div class="inputContainer">
-                        <label class="inputLabel" for="txtPollingInterval">Client Polling Interval (Seconds)</label>
-                        <input is="emby-input" type="number" id="txtPollingInterval" min="1" max="30" step="1" required />
-                        <div class="fieldDescription">How often the admin dashboard queries the Jellyfin server for new playback sessions (Default: 3 seconds).</div>
+                    <!-- SECTION 1: General Preferences -->
+                    <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 1.5em; margin-bottom: 1.5em;">
+                        <h3 style="margin-bottom: 0.8em; color: #38bdf8;">General Preferences</h3>
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtPollingInterval">Client Polling Interval (Seconds)</label>
+                            <input is="emby-input" type="number" id="txtPollingInterval" min="1" max="30" step="1" required />
+                            <div class="fieldDescription">How often the admin dashboard queries the Jellyfin server for new playback sessions (Default: 3 seconds).</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkShowIdleSessions" />
+                                <span>Show Idle Connected Devices</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Display online devices and clients connected to the server even when they are not actively streaming media.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtAccentColor">Theme Accent Color</label>
+                            <input is="emby-input" type="text" id="txtAccentColor" placeholder="#00a4dc" />
+                            <div class="fieldDescription">Hex color code for active progress bars and highlight metrics (Default: #00a4dc).</div>
+                        </div>
                     </div>
 
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="chkShowIdleSessions" />
-                            <span>Show Idle Connected Devices</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription">Display online devices and clients connected to the server even when they are not actively streaming media.</div>
+                    <!-- SECTION 2: Smart Stream Guard Policies -->
+                    <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 1.5em; margin-bottom: 1.5em;">
+                        <h3 style="margin-bottom: 0.8em; color: #f59e0b;">Smart Stream Guard Policies</h3>
+                        <p style="color: #94a3b8; font-size: 0.85em; margin-bottom: 1em;">
+                            Automated resource protection rules that safeguard server CPU, GPU, and bandwidth.
+                        </p>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkKillPausedEnabled" />
+                                <span>Kill Paused Streams</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Automatically terminate playback sessions left paused longer than the configured timeout to release locked transcode slots.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtKillPausedMinutes">Paused Timeout (Minutes)</label>
+                            <input is="emby-input" type="number" id="txtKillPausedMinutes" min="1" max="180" step="1" value="15" />
+                            <div class="fieldDescription">Number of minutes a stream may remain paused before auto-termination (Default: 15 minutes).</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkKill4kSwEnabled" />
+                                <span>Block 4K Software (CPU) Transcodes</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Immediately terminate unaccelerated 4K transcodes running entirely on CPU to prevent server freezing.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtMaxConcurrentStreams">Max Concurrent Streams Per User</label>
+                            <input is="emby-input" type="number" id="txtMaxConcurrentStreams" min="0" max="20" step="1" value="0" />
+                            <div class="fieldDescription">Maximum allowed simultaneous active streams per individual user account. Set to 0 for unlimited.</div>
+                        </div>
+
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="chkExemptAdmins" />
+                                <span>Exempt Administrators from Auto-Kill</span>
+                            </label>
+                            <div class="fieldDescription checkboxFieldDescription">Always exempt server administrator sessions from automated termination rules (Recommended).</div>
+                        </div>
                     </div>
 
-                    <div class="inputContainer">
-                        <label class="inputLabel" for="txtAccentColor">Theme Accent Color</label>
-                        <input is="emby-input" type="text" id="txtAccentColor" placeholder="#00a4dc" />
-                        <div class="fieldDescription">Hex color code for active progress bars and highlight metrics (Default: #00a4dc).</div>
+                    <!-- SECTION 3: Servarr Remediation Integrations -->
+                    <div style="padding-bottom: 1.5em; margin-bottom: 1.5em;">
+                        <h3 style="margin-bottom: 0.8em; color: #a855f7;">Servarr Remediation Integrations</h3>
+                        <p style="color: #94a3b8; font-size: 0.85em; margin-bottom: 1em;">
+                            Connect Bazarr, Radarr, and Sonarr to automatically trigger subtitle sync or media upgrades directly from the stream card.
+                        </p>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtBazarrUrl">Bazarr URL</label>
+                            <input is="emby-input" type="text" id="txtBazarrUrl" placeholder="http://localhost:6767" />
+                            <div class="fieldDescription">Base URL for Bazarr (used to auto-fetch text SRT subtitles when image PGS/VOBSUB triggers burn-in).</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtBazarrApiKey">Bazarr API Key</label>
+                            <input is="emby-input" type="password" id="txtBazarrApiKey" placeholder="Bazarr API Key" />
+                        </div>
+
+                        <div class="inputContainer" style="margin-top: 1em;">
+                            <label class="inputLabel" for="txtRadarrUrl">Radarr URL</label>
+                            <input is="emby-input" type="text" id="txtRadarrUrl" placeholder="http://localhost:7878" />
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtRadarrApiKey">Radarr API Key</label>
+                            <input is="emby-input" type="password" id="txtRadarrApiKey" placeholder="Radarr API Key" />
+                        </div>
+
+                        <div class="inputContainer" style="margin-top: 1em;">
+                            <label class="inputLabel" for="txtSonarrUrl">Sonarr URL</label>
+                            <input is="emby-input" type="text" id="txtSonarrUrl" placeholder="http://localhost:8989" />
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel" for="txtSonarrApiKey">Sonarr API Key</label>
+                            <input is="emby-input" type="password" id="txtSonarrApiKey" placeholder="Sonarr API Key" />
+                        </div>
                     </div>
 
                     <div>
@@ -52,9 +139,26 @@
                 function loadConfig(page) {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        // General
                         page.querySelector('#txtPollingInterval').value = config.PollingIntervalSeconds || 3;
-                        page.querySelector('#chkShowIdleSessions').checked = config.ShowIdleSessions || false;
+                        page.querySelector('#chkShowIdleSessions').checked = Boolean(config.ShowIdleSessions);
                         page.querySelector('#txtAccentColor').value = config.AccentColor || '#00a4dc';
+
+                        // Stream Guard
+                        page.querySelector('#chkKillPausedEnabled').checked = Boolean(config.KillPausedEnabled);
+                        page.querySelector('#txtKillPausedMinutes').value = config.KillPausedMinutes || 15;
+                        page.querySelector('#chkKill4kSwEnabled').checked = Boolean(config.Kill4kSwEnabled);
+                        page.querySelector('#txtMaxConcurrentStreams').value = config.MaxConcurrentStreams || 0;
+                        page.querySelector('#chkExemptAdmins').checked = config.ExemptAdmins !== false;
+
+                        // Servarr
+                        page.querySelector('#txtBazarrUrl').value = config.BazarrUrl || '';
+                        page.querySelector('#txtBazarrApiKey').value = config.BazarrApiKey || '';
+                        page.querySelector('#txtRadarrUrl').value = config.RadarrUrl || '';
+                        page.querySelector('#txtRadarrApiKey').value = config.RadarrApiKey || '';
+                        page.querySelector('#txtSonarrUrl').value = config.SonarrUrl || '';
+                        page.querySelector('#txtSonarrApiKey').value = config.SonarrApiKey || '';
+
                         Dashboard.hideLoadingMsg();
                     }).catch(function (err) {
                         Dashboard.hideLoadingMsg();
@@ -67,9 +171,25 @@
                     Dashboard.showLoadingMsg();
 
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        // General
                         config.PollingIntervalSeconds = parseInt(page.querySelector('#txtPollingInterval').value, 10) || 3;
                         config.ShowIdleSessions = page.querySelector('#chkShowIdleSessions').checked;
                         config.AccentColor = page.querySelector('#txtAccentColor').value.trim() || '#00a4dc';
+
+                        // Stream Guard
+                        config.KillPausedEnabled = page.querySelector('#chkKillPausedEnabled').checked;
+                        config.KillPausedMinutes = parseInt(page.querySelector('#txtKillPausedMinutes').value, 10) || 15;
+                        config.Kill4kSwEnabled = page.querySelector('#chkKill4kSwEnabled').checked;
+                        config.MaxConcurrentStreams = parseInt(page.querySelector('#txtMaxConcurrentStreams').value, 10) || 0;
+                        config.ExemptAdmins = page.querySelector('#chkExemptAdmins').checked;
+
+                        // Servarr
+                        config.BazarrUrl = page.querySelector('#txtBazarrUrl').value.trim();
+                        config.BazarrApiKey = page.querySelector('#txtBazarrApiKey').value.trim();
+                        config.RadarrUrl = page.querySelector('#txtRadarrUrl').value.trim();
+                        config.RadarrApiKey = page.querySelector('#txtRadarrApiKey').value.trim();
+                        config.SonarrUrl = page.querySelector('#txtSonarrUrl').value.trim();
+                        config.SonarrApiKey = page.querySelector('#txtSonarrApiKey').value.trim();
 
                         ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
