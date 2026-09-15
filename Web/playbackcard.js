@@ -51,10 +51,8 @@
     let currentFilter = 'all'; // 'all', 'transcode', 'wan', 'paused'
     let currentCardModels = [];
     const sessionPausedTimestamps = new Map(); // sessionId -> timestamp when pause was first detected
-    const sessionSlowCycles = new Map(); // sessionId -> consecutive slow (<1.0x) poll cycles
-    const autoKillEventsLog = []; // { id, time, userName, title, reason }
 
-    // P1 Rolling Telemetry History
+    // Rolling Telemetry History
     const MAX_BANDWIDTH_HISTORY = 16;
     const bandwidthHistory = []; // { time, total, wan, lan }
 
@@ -66,10 +64,6 @@
     let isFetchingWatchStats = false;
     const itemBitrateCache = new Map(); // itemId -> bitrate in bps
 
-    // Cached Admin Users for Safeguard Policies
-    let adminUserIds = new Set();
-    let adminUserNames = new Set();
-
     // Placement state: locked to 'replace-devices' in place of default Devices section
     const placementMode = 'replace-devices';
     try {
@@ -77,107 +71,9 @@
     } catch (e) {}
     let defaultDevicesElement = null;
 
-    // Smart Stream Guard Rules state (persisted in localStorage)
-    const DEFAULT_STREAM_GUARD_RULES = {
-        killPausedEnabled: false,
-        killPausedMinutes: 15,
-        kill4kSwEnabled: false,
-        maxConcurrentStreams: 0, // 0 = disabled
-        exemptAdmins: true // Never auto-terminate admin playback sessions
-    };
-
-    function loadStreamGuardRules() {
-        try {
-            const saved = localStorage.getItem('playbackcard_stream_guard_rules');
-            if (saved) {
-                return Object.assign({}, DEFAULT_STREAM_GUARD_RULES, JSON.parse(saved));
-            }
-        } catch (e) {
-            console.warn('[PlaybackCard] Could not load stream guard rules from localStorage', e);
-        }
-        return Object.assign({}, DEFAULT_STREAM_GUARD_RULES);
-    }
-
-    function saveStreamGuardRules(rules, syncToServer = true) {
-        try {
-            localStorage.setItem('playbackcard_stream_guard_rules', JSON.stringify(rules));
-        } catch (e) {
-            console.warn('[PlaybackCard] Could not save stream guard rules to localStorage', e);
-        }
-        if (syncToServer) {
-            const apiClient = getApiClient();
-            if (apiClient && typeof apiClient.getPluginConfiguration === 'function' && typeof apiClient.updatePluginConfiguration === 'function') {
-                apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID).then((serverConfig) => {
-                    if (serverConfig) {
-                        serverConfig.KillPausedEnabled = rules.killPausedEnabled;
-                        serverConfig.KillPausedMinutes = rules.killPausedMinutes;
-                        serverConfig.Kill4kSwEnabled = rules.kill4kSwEnabled;
-                        serverConfig.MaxConcurrentStreams = rules.maxConcurrentStreams;
-                        serverConfig.ExemptAdmins = rules.exemptAdmins;
-                        return apiClient.updatePluginConfiguration(CONFIG.PLUGIN_ID, serverConfig);
-                    }
-                }).catch((e) => console.warn('[PlaybackCard] Could not sync Stream Guard rules to server', e));
-            }
-        }
-    }
-
-    let streamGuardRules = loadStreamGuardRules();
-
-    // P1.5 Transcode Watchdog: Stall & Zombie Tracking
-    const sessionLastTicks = new Map(); // sessionId -> last known PositionTicks
-    const sessionTranscodeStallCycles = new Map(); // sessionId -> consecutive stalled cycles while transcoding
-
-    // P1.6 Servarr Remediation Configuration (Bazarr, Radarr, Sonarr)
-    const DEFAULT_SERVARR_CONFIG = {
-        bazarrUrl: '',
-        bazarrApiKey: '',
-        radarrUrl: '',
-        radarrApiKey: '',
-        sonarrUrl: '',
-        sonarrApiKey: ''
-    };
-
-    function loadServarrConfig() {
-        try {
-            const saved = localStorage.getItem('playbackcard_servarr_config');
-            if (saved) {
-                return Object.assign({}, DEFAULT_SERVARR_CONFIG, JSON.parse(saved));
-            }
-        } catch (e) {
-            console.warn('[PlaybackCard] Could not load Servarr config from localStorage', e);
-        }
-        return Object.assign({}, DEFAULT_SERVARR_CONFIG);
-    }
-
-    function saveServarrConfig(cfg, syncToServer = true) {
-        try {
-            localStorage.setItem('playbackcard_servarr_config', JSON.stringify(cfg));
-        } catch (e) {
-            console.warn('[PlaybackCard] Could not save Servarr config to localStorage', e);
-        }
-        if (syncToServer) {
-            const apiClient = getApiClient();
-            if (apiClient && typeof apiClient.getPluginConfiguration === 'function' && typeof apiClient.updatePluginConfiguration === 'function') {
-                apiClient.getPluginConfiguration(CONFIG.PLUGIN_ID).then((serverConfig) => {
-                    if (serverConfig) {
-                        serverConfig.BazarrUrl = cfg.bazarrUrl || '';
-                        serverConfig.BazarrApiKey = cfg.bazarrApiKey || '';
-                        serverConfig.RadarrUrl = cfg.radarrUrl || '';
-                        serverConfig.RadarrApiKey = cfg.radarrApiKey || '';
-                        serverConfig.SonarrUrl = cfg.sonarrUrl || '';
-                        serverConfig.SonarrApiKey = cfg.sonarrApiKey || '';
-                        return apiClient.updatePluginConfiguration(CONFIG.PLUGIN_ID, serverConfig);
-                    }
-                }).catch((e) => console.warn('[PlaybackCard] Could not sync Servarr config to server', e));
-            }
-        }
-    }
-
-    let servarrConfig = loadServarrConfig();
-
     /**
      * Loads plugin configuration from the Jellyfin server.
-     * Updates polling interval, accent color, show idle sessions, Stream Guard rules, and Servarr integrations.
+     * Updates polling interval, accent color, and show idle sessions.
      */
     let isConfigLoaded = false;
     async function loadServerConfiguration() {
@@ -207,51 +103,10 @@
                 if (typeof config.ShowIdleSessions === 'boolean') {
                     CONFIG.SHOW_IDLE_SESSIONS = config.ShowIdleSessions;
                 }
-                // Server Stream Guard rules sync
-                if (typeof config.KillPausedEnabled === 'boolean') {
-                    streamGuardRules.killPausedEnabled = config.KillPausedEnabled;
-                }
-                if (config.KillPausedMinutes) {
-                    streamGuardRules.killPausedMinutes = config.KillPausedMinutes;
-                }
-                if (typeof config.Kill4kSwEnabled === 'boolean') {
-                    streamGuardRules.kill4kSwEnabled = config.Kill4kSwEnabled;
-                }
-                if (typeof config.MaxConcurrentStreams === 'number') {
-                    streamGuardRules.maxConcurrentStreams = config.MaxConcurrentStreams;
-                }
-                if (typeof config.ExemptAdmins === 'boolean') {
-                    streamGuardRules.exemptAdmins = config.ExemptAdmins;
-                }
-                saveStreamGuardRules(streamGuardRules, false);
-
-                // Server Servarr config sync
-                if (config.BazarrUrl || config.BazarrApiKey || config.RadarrUrl || config.RadarrApiKey || config.SonarrUrl || config.SonarrApiKey) {
-                    servarrConfig.bazarrUrl = config.BazarrUrl || servarrConfig.bazarrUrl;
-                    servarrConfig.bazarrApiKey = config.BazarrApiKey || servarrConfig.bazarrApiKey;
-                    servarrConfig.radarrUrl = config.RadarrUrl || servarrConfig.radarrUrl;
-                    servarrConfig.radarrApiKey = config.RadarrApiKey || servarrConfig.radarrApiKey;
-                    servarrConfig.sonarrUrl = config.SonarrUrl || servarrConfig.sonarrUrl;
-                    servarrConfig.sonarrApiKey = config.SonarrApiKey || servarrConfig.sonarrApiKey;
-                    saveServarrConfig(servarrConfig, false);
-                }
             }
         } catch (err) {
             // Configuration might not be present or server running older version
         }
-    }
-
-    /**
-     * Checks whether a session belongs to an administrator.
-     */
-    function isSessionAdmin(card) {
-        if (!card) return false;
-        const apiClient = getApiClient();
-        const currentUserId = (apiClient && typeof apiClient.getCurrentUserId === 'function') ? apiClient.getCurrentUserId() : null;
-        if (currentUserId && card.userId === currentUserId) return true;
-        if (card.userId && adminUserIds.has(card.userId)) return true;
-        if (card.userName && adminUserNames.has(card.userName.toLowerCase())) return true;
-        return false;
     }
 
     /**
@@ -271,78 +126,6 @@
         }
     }
 
-    // Stream Doctor: Transcode Reasons & Client Fix Recommendations
-    const TRANSCODE_EXPLANATIONS = {
-        'ContainerNotSupported': {
-            short: 'Container Not Supported',
-            detail: 'The file container (e.g. MKV) is not natively supported by this client. Jellyfin is remuxing it to MP4/HLS.',
-            advice: 'Use Jellyfin Media Player instead of a web browser for direct container support.'
-        },
-        'VideoCodecNotSupported': {
-            short: 'Video Codec Unsupported',
-            detail: 'The video codec (e.g. HEVC/H.265 or AV1) cannot be decoded by this client hardware.',
-            advice: 'Use a client app with hardware decoding (Android TV, Apple TV, or Jellyfin Media Player).'
-        },
-        'AudioCodecNotSupported': {
-            short: 'Audio Codec Unsupported',
-            detail: 'The audio stream (e.g. TrueHD 7.1 or DTS-HD) is incompatible with client speakers/passthrough.',
-            advice: 'Select a secondary stereo or AC3 5.1 audio track in playback settings.'
-        },
-        'SubtitleCodecNotSupported': {
-            short: 'Subtitle Burn-In',
-            detail: 'Bitmap subtitles (PGS/VOBSUB) must be burned directly into the video stream by the server GPU/CPU.',
-            advice: 'Switch subtitles to a text-based format (SRT) in playback options to allow Direct Play.'
-        },
-        'VideoBitrateNotSupported': {
-            short: 'Bitrate Limit Exceeded',
-            detail: 'The stream bitrate exceeds the quality setting chosen by the client or server bandwidth cap.',
-            advice: 'Set client playback quality to "Original" or "Maximum" in settings.'
-        },
-        'VideoResolutionNotSupported': {
-            short: 'Resolution Too High',
-            detail: 'The display or client player cannot output video at this native resolution.',
-            advice: 'Ensure the client device and TV HDMI port support 4K 60Hz.'
-        },
-        'VideoProfileNotSupported': {
-            short: 'Video Profile Unsupported',
-            detail: 'The encoding profile (e.g. High 10 or Main 10) is not supported by client decoder.',
-            advice: 'Use Jellyfin Media Player or a dedicated streaming device.'
-        },
-        'SecondaryAudioNotSupported': {
-            short: 'Secondary Audio Incompatible',
-            detail: 'The selected secondary audio track requires real-time transcoding for this client.',
-            advice: 'Switch to the default primary audio track if available.'
-        },
-        'DirectPlayError': {
-            short: 'Direct Play Failed',
-            detail: 'The client player threw an error while attempting Direct Play, falling back to server transcode.',
-            advice: 'Update the client app to the latest version or restart playback.'
-        }
-    };
-
-    /**
-     * Device Nicknames / Model Aliases (e.g. "iPhone 16 Pro Max", "Living Room Apple TV 4K").
-     */
-    function getDeviceAliases() {
-        try {
-            const saved = localStorage.getItem('playbackcard_device_aliases');
-            if (saved) return JSON.parse(saved);
-        } catch (e) {}
-        return {};
-    }
-
-    function saveDeviceAlias(key, alias) {
-        try {
-            const aliases = getDeviceAliases();
-            if (alias && alias.trim()) {
-                aliases[key] = alias.trim();
-            } else {
-                delete aliases[key];
-            }
-            localStorage.setItem('playbackcard_device_aliases', JSON.stringify(aliases));
-        } catch (e) {}
-    }
-
     function cleanDeviceName(rawName) {
         if (!rawName) return 'Device';
         let name = rawName.trim();
@@ -353,17 +136,7 @@
 
     function resolveDeviceModel(session) {
         if (!session) return 'Device';
-        const key = session.DeviceId || session.DeviceName || session.Id;
-        const aliases = getDeviceAliases();
-        if (aliases[key]) {
-            return aliases[key];
-        }
-        if (session.DeviceName && aliases[session.DeviceName]) {
-            return aliases[session.DeviceName];
-        }
-
-        // Clean up duplicated names like "iPhone iPhone"
-        return cleanDeviceName(session.DeviceName || 'Browser');
+        return cleanDeviceName(session.DeviceName || session.Client || 'Browser');
     }
 
     /**
@@ -1044,7 +817,81 @@
                 height: 16px;
             }
 
-            /* Card Meta Bar: Title + User + Action Buttons */
+            /* Bottom-Right Floating Time Stack (in Card Body) */
+            .tautulli-time-stack {
+                position: absolute;
+                bottom: 12px;
+                right: 14px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 2px;
+                z-index: 3;
+                pointer-events: none;
+            }
+
+            .tautulli-time-progress {
+                color: #94a3b8;
+                font-family: monospace;
+                font-size: 11px;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .tautulli-time-eta {
+                font-size: 11px;
+                font-weight: 700;
+                color: #e5a00d;
+                letter-spacing: 0.02em;
+                font-family: monospace;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .tautulli-time-paused {
+                color: #fbbf24;
+                font-weight: 700;
+                text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+            }
+
+            /* Timeline Bar: Sleek Horizontal Line between Card Body and Meta Bar */
+            .tautulli-card-timeline {
+                position: relative;
+                z-index: 2;
+                width: 100%;
+                height: 3px;
+                background: rgba(255, 255, 255, 0.08);
+                overflow: hidden;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-buffer {
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                background: rgba(255, 255, 255, 0.22);
+                transition: width 0.35s ease;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill {
+                position: relative;
+                height: 100%;
+                background: #e5a00d;
+                box-shadow: 0 0 8px rgba(229, 160, 13, 0.5);
+                transition: width 1s linear;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.paused {
+                background: #f59e0b;
+                box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+                transition: none;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.live {
+                background: #ef4444 !important;
+                box-shadow: 0 0 8px rgba(239, 68, 68, 0.6) !important;
+                transition: none;
+            }
+
+            /* Card Meta Bar: 2-Line Left (Play/Title/Rating + Type/Subline) + Right User/Actions */
             .tautulli-card-meta-bar {
                 position: relative;
                 z-index: 1;
@@ -1052,24 +899,63 @@
                 align-items: center;
                 justify-content: space-between;
                 gap: 12px;
-                padding: 8px 16px;
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
-                background: rgba(0, 0, 0, 0.2);
+                padding: 8px 14px;
+                background: rgba(9, 10, 16, 0.75);
+                backdrop-filter: blur(20px) saturate(160%);
+                -webkit-backdrop-filter: blur(20px) saturate(160%);
             }
 
             .tautulli-meta-left {
                 display: flex;
-                align-items: center;
-                gap: 8px;
+                flex-direction: column;
+                gap: 2px;
                 min-width: 0;
                 flex: 1;
             }
 
-            .tautulli-play-indicator {
-                color: #38bdf8;
+            .tautulli-meta-line-1 {
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                min-width: 0;
+            }
+
+            .tautulli-meta-line-2 {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-width: 0;
+                color: #94a3b8;
                 font-size: 11px;
+                font-weight: 500;
+            }
+
+            .tautulli-meta-play-btn {
+                background: none;
+                border: none;
+                padding: 0;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #e5a00d;
                 flex-shrink: 0;
-                user-select: none;
+                transition: transform 0.15s ease, color 0.15s ease;
+            }
+
+            .tautulli-meta-play-btn:hover {
+                transform: scale(1.18);
+                color: #fbbf24;
+            }
+
+            .tautulli-meta-play-btn:active {
+                transform: scale(0.92);
+            }
+
+            .tautulli-meta-play-btn svg {
+                width: 13px;
+                height: 13px;
+                fill: currentColor;
             }
 
             .tautulli-meta-title {
@@ -1084,17 +970,26 @@
             }
 
             .tautulli-meta-title:hover {
-                color: #38bdf8;
+                color: #e5a00d;
+            }
+
+            .tautulli-meta-type-icon {
+                display: inline-flex;
+                align-items: center;
+                color: #94a3b8;
+                flex-shrink: 0;
+            }
+
+            .tautulli-meta-type-icon svg {
+                width: 12px;
+                height: 12px;
+                fill: currentColor;
             }
 
             .tautulli-meta-sub {
-                font-size: 11px;
-                color: #94a3b8;
-                font-weight: 500;
                 white-space: nowrap;
                 overflow: hidden;
                 text-overflow: ellipsis;
-                flex-shrink: 0;
             }
 
             .tautulli-meta-right {
@@ -1108,7 +1003,7 @@
                 display: flex;
                 align-items: center;
                 gap: 6px;
-                color: #94a3b8;
+                color: #cbd5e1;
                 text-decoration: none;
                 font-size: 11.5px;
                 font-weight: 600;
@@ -1116,7 +1011,7 @@
             }
 
             .tautulli-meta-user:hover {
-                color: #f1f5f9;
+                color: #ffffff;
             }
 
             .tautulli-meta-user .tautulli-user-avatar {
@@ -1296,62 +1191,6 @@
                 border: 1px solid rgba(245, 158, 11, 0.28);
                 border-radius: 4px;
                 padding: 2px 5.5px;
-            }
-
-            .tautulli-badge-multi-ip {
-                background: rgba(239, 68, 68, 0.16);
-                color: #fca5a5;
-                border: 1px solid rgba(239, 68, 68, 0.42);
-                border-radius: 4px;
-                padding: 2px 6px;
-                font-weight: 700;
-                letter-spacing: 0.03em;
-                animation: tautulli-stutter-pulse 2.2s infinite ease-in-out;
-            }
-
-            .tautulli-security-alert-pill {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                padding: 3px 9px;
-                border-radius: 9999px;
-                background: rgba(239, 68, 68, 0.16);
-                color: #fca5a5;
-                border: 1px solid rgba(239, 68, 68, 0.38);
-                font-size: 11px;
-                font-weight: 600;
-                animation: tautulli-stutter-pulse 2.2s infinite ease-in-out;
-            }
-
-            /* Bottleneck Splitter Badges */
-            .tautulli-bottleneck-server {
-                background: rgba(239, 68, 68, 0.14);
-                color: #fca5a5;
-                border: 1px solid rgba(239, 68, 68, 0.32);
-            }
-
-            .tautulli-bottleneck-marginal {
-                background: rgba(245, 158, 11, 0.14);
-                color: #fcd34d;
-                border: 1px solid rgba(245, 158, 11, 0.3);
-            }
-
-            .tautulli-bottleneck-client {
-                background: rgba(56, 189, 248, 0.14);
-                color: #7dd3fc;
-                border: 1px solid rgba(56, 189, 248, 0.3);
-            }
-
-            .tautulli-bottleneck-healthy {
-                background: rgba(16, 185, 129, 0.12);
-                color: #6ee7b7;
-                border: 1px solid rgba(16, 185, 129, 0.28);
-            }
-
-            .tautulli-bottleneck-paused {
-                background: rgba(148, 163, 184, 0.12);
-                color: #cbd5e1;
-                border: 1px solid rgba(148, 163, 184, 0.25);
             }
 
             /* Live Bandwidth History Sparkline */
@@ -1818,243 +1657,6 @@
                 background: rgba(0, 0, 0, 0.2);
                 border: 1px dashed rgba(255, 255, 255, 0.08);
             }
-
-            /* Stream Pipeline Chips (Diskovarr dashboard precision with vector glyphs) */
-            .tautulli-pipeline-grid {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-                margin: 8px 0;
-            }
-
-            .tautulli-chip {
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-                padding: 3.5px 8px;
-                border-radius: 7px;
-                background: var(--lg-chip-bg);
-                border: var(--lg-chip-border);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
-                font-size: 11px;
-                color: #cbd5e1;
-                font-variant-numeric: tabular-nums;
-                backdrop-filter: blur(12px) saturate(140%);
-                -webkit-backdrop-filter: blur(12px) saturate(140%);
-                transition: background var(--lg-duration) ease, border-color var(--lg-duration) ease, color var(--lg-duration) ease, transform var(--lg-duration) var(--lg-ease);
-            }
-
-            .tautulli-chip:hover {
-                background: rgba(255, 255, 255, 0.075);
-                border-color: rgba(255, 255, 255, 0.16);
-                color: #f8fafc;
-                transform: translateY(-0.5px);
-            }
-
-            .tautulli-chip strong {
-                color: #ffffff;
-                font-weight: 600;
-                letter-spacing: 0.015em;
-            }
-
-            .tautulli-chip-icon {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 12px;
-                height: 12px;
-                flex-shrink: 0;
-                color: #94a3b8;
-            }
-
-            .tautulli-chip-icon svg {
-                width: 100%;
-                height: 100%;
-                fill: currentColor;
-            }
-
-            /* Transcode Reason Banner */
-            .tautulli-reason-banner {
-                font-size: 10.5px;
-                color: rgba(253, 230, 138, 0.9);
-                background: rgba(245, 158, 11, 0.08);
-                border: 1px solid rgba(245, 158, 11, 0.2);
-                border-radius: 6px;
-                padding: 3px 8px;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                overflow: hidden;
-                white-space: nowrap;
-                text-overflow: ellipsis;
-            }
-
-            .tautulli-reason-label {
-                font-size: 9.5px;
-                font-weight: 700;
-                letter-spacing: 0.05em;
-                color: #fbbf24;
-                flex-shrink: 0;
-            }
-
-            .tautulli-reason-val {
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-            }
-
-            /* Card Footer: Interactive Timeline & Playback Status */
-            .tautulli-card-footer {
-                position: relative;
-                z-index: 1;
-                padding: 10px 15px 12px 15px;
-                background: rgba(9, 10, 16, 0.82);
-                border-top: 1px solid rgba(255, 255, 255, 0.05);
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-                backdrop-filter: blur(20px) saturate(160%);
-                -webkit-backdrop-filter: blur(20px) saturate(160%);
-                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
-            }
-
-            .tautulli-progress-row {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-
-            .tautulli-state-icon {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 24px;
-                height: 24px;
-                min-width: 24px;
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.06);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: #ffffff;
-                cursor: pointer;
-                transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease;
-            }
-
-            .tautulli-state-icon:hover {
-                transform: scale(1.1);
-                background: rgba(255, 255, 255, 0.14);
-            }
-
-            .tautulli-state-icon:active {
-                transform: scale(0.92);
-                transition: transform 0.08s cubic-bezier(0.16, 1, 0.3, 1);
-            }
-
-            .tautulli-state-icon svg {
-                width: 12px;
-                height: 12px;
-                fill: currentColor;
-            }
-
-            .tautulli-state-playing {
-                color: #34d399;
-                box-shadow: 0 0 10px rgba(52, 211, 153, 0.15);
-            }
-
-            .tautulli-state-paused {
-                color: #fbbf24;
-                box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
-            }
-
-            .tautulli-progress-track {
-                flex: 1;
-                height: 4px;
-                border-radius: 9999px;
-                background: rgba(255, 255, 255, 0.08);
-                position: relative;
-            }
-
-            .tautulli-progress-buffer {
-                position: absolute;
-                top: 0;
-                left: 0;
-                height: 100%;
-                background: rgba(255, 255, 255, 0.18);
-                border-radius: 9999px;
-                transition: width 0.35s ease;
-                z-index: 1;
-            }
-
-            .tautulli-progress-fill {
-                position: relative;
-                z-index: 2;
-                height: 100%;
-                border-radius: 9999px;
-                background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
-                box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
-                transition: width 1s linear;
-            }
-
-            .tautulli-progress-fill::after {
-                content: '';
-                position: absolute;
-                right: -4px;
-                top: 50%;
-                transform: translateY(-50%);
-                width: 8px;
-                height: 8px;
-                border-radius: 50%;
-                background: #ffffff;
-                box-shadow: 0 0 8px #38bdf8, 0 0 2px #ffffff;
-                z-index: 3;
-            }
-
-            .tautulli-progress-fill.paused {
-                background: linear-gradient(90deg, #d97706 0%, #fbbf24 100%);
-                box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-                transition: none;
-            }
-
-            .tautulli-progress-fill.paused::after {
-                box-shadow: 0 0 8px #fbbf24, 0 0 2px #ffffff;
-            }
-
-            .tautulli-progress-fill.live {
-                background: linear-gradient(90deg, #dc2626 0%, #f43f5e 100%) !important;
-                box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
-                transition: none;
-            }
-
-            .tautulli-progress-fill.live::after {
-                box-shadow: 0 0 8px #f43f5e, 0 0 2px #ffffff;
-            }
-
-            .tautulli-time-row {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                font-size: 10.5px;
-                padding: 0 2px;
-            }
-
-            .tautulli-time-progress {
-                color: #94a3b8;
-                font-family: monospace;
-                font-variant-numeric: tabular-nums;
-            }
-
-            .tautulli-time-eta {
-                font-weight: 700;
-                color: #38bdf8;
-                letter-spacing: 0.02em;
-                text-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
-            }
-
-            .tautulli-time-paused {
-                color: #fbbf24;
-                font-weight: 700;
-                text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
-            }
-
             /* Empty State Container */
             .tautulli-empty-container {
                 display: flex;
@@ -2177,181 +1779,6 @@
                 padding: 2px 7px;
                 flex-shrink: 0;
             }
-
-            /* Stream Details Inspector Modal */
-            .tautulli-modal-backdrop {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background: rgba(0, 0, 0, 0.75);
-                backdrop-filter: blur(14px);
-                -webkit-backdrop-filter: blur(14px);
-                z-index: 99999;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 20px;
-                box-sizing: border-box;
-                animation: tautulli-fade-in 0.2s ease;
-            }
-
-            @keyframes tautulli-fade-in {
-                from { opacity: 0; }
-                to { opacity: 1; }
-            }
-
-            .tautulli-modal {
-                position: relative;
-                width: 100%;
-                max-width: 600px;
-                max-height: 88vh;
-                overflow-y: auto;
-                background: var(--lg-lens-highlight), linear-gradient(145deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(9, 10, 16, 0.98) 100%), #090a10;
-                border: 1px solid rgba(255, 255, 255, 0.16);
-                border-radius: 20px;
-                backdrop-filter: blur(36px) saturate(190%) contrast(105%);
-                -webkit-backdrop-filter: blur(36px) saturate(190%) contrast(105%);
-                box-shadow: 
-                    inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
-                    inset 1px 0 0 0 rgba(255, 255, 255, 0.12),
-                    var(--lg-dispersion-cyan),
-                    var(--lg-dispersion-magenta),
-                    0 32px 72px -8px rgba(0, 0, 0, 0.95);
-                color: #e2e8f0;
-                padding: 24px;
-                box-sizing: border-box;
-                animation: tautulli-modal-pop var(--lg-duration) var(--lg-ease);
-            }
-
-            @keyframes tautulli-modal-pop {
-                from { transform: scale(0.94); opacity: 0; }
-                to { transform: scale(1); opacity: 1; }
-            }
-
-            .tautulli-modal-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-                padding-bottom: 14px;
-                margin-bottom: 16px;
-            }
-
-            .tautulli-modal-title {
-                font-size: 15px;
-                font-weight: 700;
-                color: #ffffff;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .tautulli-modal-header-actions {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-
-            .tautulli-modal-tool-btn {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.14);
-                color: #e2e8f0;
-                font-size: 11px;
-                font-weight: 600;
-                padding: 5px 10px;
-                border-radius: 8px;
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                cursor: pointer;
-                backdrop-filter: blur(8px);
-                transition: all 0.2s ease;
-            }
-
-            .tautulli-modal-tool-btn:hover {
-                background: rgba(56, 189, 248, 0.18);
-                border-color: rgba(56, 189, 248, 0.45);
-                color: #38bdf8;
-                transform: scale(1.03);
-            }
-
-            .tautulli-modal-tool-btn:active {
-                transform: scale(0.96);
-            }
-
-            .tautulli-modal-close {
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.12);
-                color: #94a3b8;
-                width: 28px;
-                height: 28px;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                transition: all 0.15s ease;
-            }
-
-            .tautulli-modal-close:hover {
-                background: rgba(239, 68, 68, 0.25);
-                color: #f87171;
-                border-color: rgba(239, 68, 68, 0.5);
-            }
-
-            .tautulli-modal-close:active {
-                transform: scale(0.92);
-            }
-
-            .tautulli-modal-section {
-                margin-bottom: 18px;
-            }
-
-            .tautulli-modal-section-title {
-                font-size: 11px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.06em;
-                color: #38bdf8;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-
-            .tautulli-modal-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 12px;
-                background: rgba(0, 0, 0, 0.35);
-                border-radius: 10px;
-                overflow: hidden;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-            }
-
-            .tautulli-modal-table td {
-                padding: 7px 12px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            }
-
-            .tautulli-modal-table tr:last-child td {
-                border-bottom: none;
-            }
-
-            .tautulli-modal-table td:first-child {
-                color: #94a3b8;
-                font-weight: 500;
-                width: 38%;
-            }
-
-            .tautulli-modal-table td:last-child {
-                color: #f1f5f9;
-                font-weight: 600;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-            }
-
             /* ==========================================================================
                Responsive Multi-Screen Optimization (Web >768px, Tablet 481-768px, Mobile <=480px)
                Borrowed from NuvioMobile & Diskovarr
@@ -2561,337 +1988,6 @@
                     width: 15px;
                     height: 15px;
                 }
-
-                /* Nuvio Bottom-sheet modal inspector on mobile */
-                .tautulli-modal-backdrop {
-                    align-items: flex-end;
-                    padding: 0;
-                }
-
-                .tautulli-modal {
-                    max-width: 100%;
-                    width: 100%;
-                    max-height: 85vh;
-                    border-radius: 20px 20px 0 0;
-                    padding: 14px 16px 18px 16px;
-                    margin: 0;
-                    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
-                }
-
-                /* Apple iOS GlassBottomSheet presentation drag indicator (sanjaynela) */
-                .tautulli-modal::before {
-                    content: '';
-                    display: block;
-                    width: 36px;
-                    height: 4.5px;
-                    border-radius: 9999px;
-                    background: rgba(255, 255, 255, 0.32);
-                    margin: 0 auto 14px auto;
-                }
-
-                .tautulli-modal-table td {
-                    padding: 6px 8px;
-                    font-size: 11px;
-                }
-            }
-
-            /* Stream Doctor: Interactive Explainer Panel & Fix Presets */
-            .tautulli-reason-banner {
-                cursor: pointer;
-                transition: background var(--lg-duration) ease, border-color var(--lg-duration) ease;
-            }
-
-            .tautulli-reason-banner:hover {
-                background: rgba(245, 158, 11, 0.16);
-                border-color: rgba(245, 158, 11, 0.4);
-            }
-
-            .tautulli-doctor-panel {
-                margin: 8px 0 4px 0;
-                padding: 10px 12px;
-                border-radius: 10px;
-                background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(9, 10, 16, 0.95) 100%);
-                border: 1px solid rgba(245, 158, 11, 0.25);
-                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.4);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-                font-size: 11px;
-                line-height: 1.4;
-            }
-
-            .tautulli-doctor-header {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 8px;
-                color: #fbbf24;
-                font-weight: 700;
-                font-size: 11.5px;
-            }
-
-            .tautulli-doctor-desc {
-                color: #e2e8f0;
-            }
-
-            .tautulli-doctor-advice {
-                color: #7dd3fc;
-                background: rgba(14, 165, 233, 0.12);
-                border: 1px solid rgba(56, 189, 248, 0.25);
-                padding: 5px 8px;
-                border-radius: 6px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 8px;
-                flex-wrap: wrap;
-            }
-
-            .tautulli-send-tip-btn {
-                background: rgba(56, 189, 248, 0.2);
-                border: 1px solid rgba(56, 189, 248, 0.4);
-                color: #38bdf8;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 3px 8px;
-                border-radius: 5px;
-                cursor: pointer;
-                transition: all var(--lg-duration) ease;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }
-
-            .tautulli-send-tip-btn:hover {
-                background: rgba(56, 189, 248, 0.35);
-                border-color: rgba(56, 189, 248, 0.65);
-                color: #ffffff;
-                transform: scale(1.02);
-            }
-
-            .tautulli-send-tip-btn:active {
-                transform: scale(0.96);
-            }
-
-            /* Severe Stutter Buffering Alarm (<1.0x transcode speed) */
-            .tautulli-stutter-alarm {
-                animation: tautulli-stutter-pulse 1.4s infinite ease-in-out !important;
-                background: rgba(239, 68, 68, 0.25) !important;
-                border-color: rgba(239, 68, 68, 0.6) !important;
-                color: #fca5a5 !important;
-            }
-
-            @keyframes tautulli-stutter-pulse {
-                0%, 100% {
-                    transform: scale(1);
-                    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
-                }
-                50% {
-                    transform: scale(1.06);
-                    box-shadow: 0 0 14px 2px rgba(239, 68, 68, 0.7);
-                }
-            }
-
-            /* Smart Stream Guard Rules Modal */
-            .tautulli-guard-badge {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                background: rgba(56, 189, 248, 0.25);
-                color: #38bdf8;
-                border-radius: 999px;
-                padding: 1px 6px;
-                font-size: 9.5px;
-                font-weight: 700;
-                margin-left: 4px;
-            }
-
-            .tautulli-rule-card {
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                padding: 12px 14px;
-                margin-bottom: 10px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .tautulli-rule-row {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 12px;
-            }
-
-            .tautulli-rule-title {
-                font-size: 12.5px;
-                font-weight: 600;
-                color: #f1f5f9;
-            }
-
-            .tautulli-rule-desc {
-                font-size: 11px;
-                color: #94a3b8;
-                line-height: 1.35;
-            }
-
-            .tautulli-switch {
-                position: relative;
-                display: inline-block;
-                width: 38px;
-                height: 22px;
-                flex-shrink: 0;
-            }
-
-            .tautulli-switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-
-            .tautulli-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background-color: rgba(255, 255, 255, 0.14);
-                transition: .25s cubic-bezier(0.16, 1, 0.3, 1);
-                border-radius: 34px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            }
-
-            .tautulli-slider:before {
-                position: absolute;
-                content: "";
-                height: 14px;
-                width: 14px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: .25s cubic-bezier(0.16, 1, 0.3, 1);
-                border-radius: 50%;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-            }
-
-            .tautulli-switch input:checked + .tautulli-slider {
-                background-color: #00a4dc;
-                border-color: #38bdf8;
-            }
-
-            .tautulli-switch input:checked + .tautulli-slider:before {
-                transform: translateX(16px);
-            }
-
-            .tautulli-rule-input {
-                background: rgba(0, 0, 0, 0.5);
-                border: 1px solid rgba(255, 255, 255, 0.16);
-                border-radius: 6px;
-                color: #ffffff;
-                font-size: 11.5px;
-                padding: 4px 8px;
-                width: 60px;
-                text-align: center;
-            }
-
-            /* Zombie Transcode Pipeline Watchdog */
-            .tautulli-badge-zombie {
-                animation: tautulli-stutter-pulse 1.8s infinite ease-in-out !important;
-                background: rgba(245, 158, 11, 0.25) !important;
-                border-color: rgba(245, 158, 11, 0.6) !important;
-                color: #fcd34d !important;
-            }
-
-            .tautulli-btn-flush {
-                background: rgba(239, 68, 68, 0.2) !important;
-                border: 1px solid rgba(239, 68, 68, 0.5) !important;
-                color: #fca5a5 !important;
-            }
-
-            .tautulli-btn-flush:hover {
-                background: rgba(239, 68, 68, 0.4) !important;
-                border-color: rgba(239, 68, 68, 0.8) !important;
-                color: #ffffff !important;
-                transform: scale(1.04);
-            }
-
-            /* Servarr Subtitle Remediation (Bazarr) */
-            .tautulli-servarr-btn {
-                background: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 182, 212, 0.25) 100%);
-                border: 1px solid rgba(16, 185, 129, 0.5);
-                color: #6ee7b7;
-                font-size: 10px;
-                font-weight: 700;
-                padding: 3px 8px;
-                border-radius: 5px;
-                cursor: pointer;
-                transition: all var(--lg-duration) ease;
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }
-
-            .tautulli-servarr-btn:hover {
-                background: linear-gradient(135deg, rgba(16, 185, 129, 0.45) 0%, rgba(6, 182, 212, 0.45) 100%);
-                border-color: rgba(16, 185, 129, 0.85);
-                color: #ffffff;
-                transform: scale(1.02);
-            }
-
-            .tautulli-servarr-btn:active {
-                transform: scale(0.96);
-            }
-
-            .tautulli-pipeline-pill {
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-                padding: 2px 7px;
-                border-radius: 999px;
-                font-size: 10px;
-                font-weight: 600;
-                background: rgba(0, 164, 220, 0.15);
-                color: #38bdf8;
-                border: 1px solid rgba(0, 164, 220, 0.3);
-            }
-
-            .tautulli-pipeline-zombie {
-                background: rgba(245, 158, 11, 0.2) !important;
-                color: #fcd34d !important;
-                border-color: rgba(245, 158, 11, 0.5) !important;
-                animation: tautulli-stutter-pulse 2s infinite ease-in-out;
-            }
-
-            .tautulli-form-row {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                margin-bottom: 12px;
-            }
-
-            .tautulli-form-row label {
-                font-size: 11.5px;
-                font-weight: 600;
-                color: #cbd5e1;
-            }
-
-            .tautulli-input {
-                background: rgba(0, 0, 0, 0.5);
-                border: 1px solid rgba(255, 255, 255, 0.16);
-                border-radius: 6px;
-                color: #ffffff;
-                font-size: 12px;
-                padding: 6px 10px;
-                width: 100%;
-                box-sizing: border-box;
-                font-family: inherit;
-            }
-
-            .tautulli-input:focus {
-                outline: none;
-                border-color: #00a4dc;
-                box-shadow: 0 0 0 2px rgba(0, 164, 220, 0.3);
             }
         `;
     }
@@ -3044,77 +2140,6 @@
         return `HW: ${hwType.toUpperCase()}`;
     }
 
-    /**
-     * P1.3 Bottleneck Splitter: Diagnoses whether a stream stall/buffering is caused by server or client.
-     */
-    function computeBottleneckDiagnostic(card) {
-        if (!card) return null;
-
-        // Server Overload: Transcode speed is below real-time (< 1.0x)
-        if (card.isTranscode && card.transcodeSpeedMultiplier && parseFloat(card.transcodeSpeedMultiplier) < 1.0) {
-            return {
-                key: 'server-overload',
-                badgeClass: 'tautulli-bottleneck-server',
-                badgeText: '✕ Server Overload (<1.0x)',
-                shortName: 'Server Overload',
-                title: 'Server GPU/CPU cannot encode fast enough (speed < 1.0x). Playback will buffer/freeze.',
-                explanation: 'The server processing capacity is the bottleneck. The transcode speed is below real-time playback speed (1.0x), causing client buffer starvation.',
-                recommendation: 'Enable hardware acceleration (NVENC/QuickSync) or reduce video transcode bitrate.'
-            };
-        }
-
-        // Server Marginal: Transcode speed is between 1.0x and 1.35x
-        if (card.isTranscode && card.transcodeSpeedMultiplier && parseFloat(card.transcodeSpeedMultiplier) >= 1.0 && parseFloat(card.transcodeSpeedMultiplier) < 1.35) {
-            return {
-                key: 'server-marginal',
-                badgeClass: 'tautulli-bottleneck-marginal',
-                badgeText: '· Server Marginal (1.0–1.3x)',
-                shortName: 'Server Marginal',
-                title: 'Server transcode speed is near real-time (1.0x–1.35x). Minor spikes may cause brief buffering.',
-                explanation: 'The server is barely outpacing playback. Temporary background loads on the server may cause micro-stutters.',
-                recommendation: 'Monitor server CPU/GPU load to ensure speed stays comfortably above 1.5x.'
-            };
-        }
-
-        // Client Paused: Stream is paused on client device
-        if (card.isPaused && card.pausedDurationSeconds > 15) {
-            return {
-                key: 'client-paused',
-                badgeClass: 'tautulli-bottleneck-paused',
-                badgeText: '· Client Paused',
-                shortName: 'Client Paused',
-                title: `Client paused playback for ${formatDuration(card.pausedDurationSeconds)}. No active data transmission needed.`,
-                explanation: 'Playback is paused on the user device. Server stream session is held open.',
-                recommendation: 'Smart Stream Guard will auto-reclaim resources if pause exceeds limit.'
-            };
-        }
-
-        // High Bitrate WAN direct stream
-        if (!card.isPaused && (card.isDirectPlay || card.isDirectStream || (card.transcodeSpeedMultiplier && parseFloat(card.transcodeSpeedMultiplier) >= 2.0))) {
-            if (!card.isLan && card.bandwidthNumber > 35000000) {
-                return {
-                    key: 'wan-high-bitrate',
-                    badgeClass: 'tautulli-bottleneck-client',
-                    badgeText: '· WAN High Bitrate',
-                    shortName: 'WAN High Bitrate',
-                    title: 'High remote bitrate (>35 Mbps). Stutters are likely caused by client Wi-Fi or ISP upload limit.',
-                    explanation: 'Server is direct playing or transcoding fast (>2.0x). If client reports buffering, the bottleneck is remote WAN connection or client 2.4GHz Wi-Fi.',
-                    recommendation: 'Client should switch to 5GHz Wi-Fi / Ethernet or select a lower remote streaming quality.'
-                };
-            }
-        }
-
-        // Optimal / Healthy Pipeline
-        return {
-            key: 'healthy',
-            badgeClass: 'tautulli-bottleneck-healthy',
-            badgeText: '✓ Pipeline Healthy',
-            shortName: 'Pipeline Healthy',
-            title: 'Server pipeline throughput is healthy with no detected bottlenecks.',
-            explanation: 'Server encoding speed and delivery throughput are optimal.',
-            recommendation: 'Stream is operating smoothly.'
-        };
-    }
 
     /**
      * P1.1 Live Bandwidth History Sparkline: Generates an SVG micro-trendline.
@@ -3519,71 +2544,6 @@
         }
     }
 
-    /**
-     * P1.5 Interactive Action: Force Flush Zombie Transcode Pipeline
-     * Halts runaway/orphaned FFmpeg processes and clears stalled session tracking.
-     */
-    async function handleFlushPipeline(sessionId, userName, mediaTitle) {
-        if (!window.ApiClient || !sessionId) return;
-        const confirmMsg = `Force Flush Zombie Pipeline for ${userName} (${mediaTitle})?\nThis terminates stalled FFmpeg transcode processes and frees server resources.`;
-        if (!window.confirm(confirmMsg)) {
-            return;
-        }
-
-        try {
-            sessionTranscodeStallCycles.delete(sessionId);
-            sessionLastTicks.delete(sessionId);
-            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
-                await window.ApiClient.sendPlaystateCommand(sessionId, 'Stop');
-            } else if (typeof window.ApiClient.ajax === 'function') {
-                await window.ApiClient.ajax({
-                    type: 'POST',
-                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/Stop`)
-                });
-            }
-            lastRenderedHash = '';
-            fetchAndRenderSessions();
-        } catch (err) {
-            console.error('[PlaybackCard] Failed to flush pipeline:', err);
-            alert('Could not terminate stalled pipeline. Please check server permissions.');
-        }
-    }
-
-    /**
-     * P1.6 Interactive Action: Trigger Bazarr Subtitle Remediation
-     * Searches and downloads text-based SRT subtitles to eliminate CPU transcode burn-in.
-     */
-    async function handleFetchSrtBazarr(sessionId, title) {
-        if (!servarrConfig.bazarrUrl) {
-            if (window.confirm('Bazarr is not configured yet. Would you like to configure your Bazarr URL & API key now?')) {
-                openServarrModal();
-            }
-            return;
-        }
-
-        const baseUrl = servarrConfig.bazarrUrl.replace(/\/$/, '');
-        const apiKey = servarrConfig.bazarrApiKey || '';
-
-        try {
-            const res = await fetch(`${baseUrl}/api/command`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Api-Key': apiKey
-                },
-                body: JSON.stringify({ name: 'WantedSubtitlesSearch' }),
-                mode: 'cors'
-            });
-            if (res.ok) {
-                alert(`✓ Bazarr Subtitle Search triggered successfully for "${title || 'playing media'}". SRT subtitles will be synced in background.`);
-            } else {
-                window.open(`${baseUrl}/series`, '_blank');
-            }
-        } catch (err) {
-            // Browser CORS or network isolation: gracefully open Bazarr UI directly
-            window.open(`${baseUrl}/series`, '_blank');
-        }
-    }
 
     /**
      * Maps raw Jellyfin session data into Tautulli/Jellywatch card view model.
@@ -3973,7 +2933,7 @@
             ? Math.min(100, Math.max(0, Math.round(transcodeInfo.CompletionPercentage)))
             : null;
 
-        // Detailed media specs for stream inspector
+        // Detailed media specs
         const videoProfile = videoStream.Profile || null;
         const videoBitDepth = videoStream.BitDepth ? `${videoStream.BitDepth}-bit` : null;
         const videoFrameRate = videoStream.AverageFrameRate ? `${Math.round(videoStream.AverageFrameRate)} fps` : (videoStream.RealFrameRate ? `${Math.round(videoStream.RealFrameRate)} fps` : null);
@@ -3981,42 +2941,6 @@
         const audioBitRate = audioStream.BitRate ? formatBitrate(audioStream.BitRate) : null;
         const isMuted = Boolean(playState.IsMuted);
         const volumeLevel = playState.VolumeLevel != null ? Math.round(playState.VolumeLevel) : null;
-        const isSlowTranscode = Boolean(isTranscode && transcodeSpeedMultiplier && parseFloat(transcodeSpeedMultiplier) < 1.0);
-        let slowCycleCount = 0;
-        if (isSlowTranscode) {
-            slowCycleCount = (sessionSlowCycles.get(session.Id) || 0) + 1;
-            sessionSlowCycles.set(session.Id, slowCycleCount);
-        } else {
-            sessionSlowCycles.delete(session.Id);
-        }
-        const isSevereStutter = slowCycleCount >= 2; // Buffering alarm after 2+ consecutive checks
-
-        // P1.5 Zombie Transcode Tracking: stalled playback position during active transcoding
-        let isZombieTranscode = false;
-        let zombieStallDurationSec = 0;
-        if (isTranscode && !playState.IsPaused) {
-            const lastTicks = sessionLastTicks.get(session.Id);
-            if (lastTicks !== undefined && lastTicks === positionTicks) {
-                const stalledCycles = (sessionTranscodeStallCycles.get(session.Id) || 0) + 1;
-                sessionTranscodeStallCycles.set(session.Id, stalledCycles);
-                if (stalledCycles >= 5) {
-                    isZombieTranscode = true;
-                    zombieStallDurationSec = stalledCycles * 3;
-                }
-            } else {
-                sessionTranscodeStallCycles.set(session.Id, 0);
-            }
-            sessionLastTicks.set(session.Id, positionTicks);
-        } else {
-            sessionTranscodeStallCycles.set(session.Id, 0);
-            if (playState.PositionTicks != null) {
-                sessionLastTicks.set(session.Id, playState.PositionTicks);
-            }
-        }
-
-        // P1.6 Subtitle Burn-In & Bazarr Remediation readiness
-        const canRemediateSubtitlesWithBazarr = isSubtitleBurnIn || Boolean(subStream && ['pgs', 'vobsub', 'dvdsub', 'dvb_subtitle'].includes((subStream.Codec || '').toLowerCase()));
-
         // Resolution Badge (4K UHD, 1080p FHD, 720p HD, SD)
         const resBadge = origResInfo.badge;
 
@@ -4100,19 +3024,10 @@
             syncPlayGroupId,
             syncPlayMembersCount: 1,
             syncPlayBadge: null,
-            isMultiIpSharing: false,
-            distinctWanIpCount: 1,
-            wanIpList: [],
             audioSampleRate,
             audioBitRate,
             isMuted,
             volumeLevel,
-            isSlowTranscode,
-            isSevereStutter,
-            isZombieTranscode,
-            zombieStallDurationSec,
-            zombieBadge: isZombieTranscode ? `ZOMBIE PIPELINE (${zombieStallDurationSec}s)` : null,
-            canRemediateSubtitlesWithBazarr,
             mediaItemName: item.Name || primaryTitle,
             mediaItemYear: item.ProductionYear || '',
             mediaItemType: item.Type || 'Movie',
@@ -4161,12 +3076,11 @@
             isLiveStream
         };
 
-        model.bottleneck = computeBottleneckDiagnostic(model);
         return model;
     }
 
     /**
-     * Renders an individual session card element HTML string.
+     * Renders an individual session card element HTML string aligned 1:1 with Tautulli.
      */
     function renderSessionCard(card) {
         // Poster image or clean SVG fallback
@@ -4202,13 +3116,15 @@
             avatarHtml = `<div class="tautulli-user-avatar" style="background: ${bgColor};">${initial}</div>`;
         }
 
-        // Play/Pause icon
-        const stateIconHtml = card.isPaused
-            ? `<div class="tautulli-state-icon tautulli-state-paused" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="true" title="Click to Resume"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>`
-            : `<div class="tautulli-state-icon tautulli-state-playing" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="false" title="Click to Pause"><svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></div>`;
-
-        // ETA / Paused overlay class
-        const etaClass = card.isPaused ? 'tautulli-time-paused' : 'tautulli-time-eta';
+        // Media Type Icon
+        let typeIconSvg = '';
+        if (card.isAudioItem || card.mediaItemType === 'Audio') {
+            typeIconSvg = '<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
+        } else if (card.mediaItemType === 'Episode' || card.seriesName) {
+            typeIconSvg = '<svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>';
+        } else {
+            typeIconSvg = '<svg viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>';
+        }
 
         // Direct detail link
         const detailHref = card.itemId ? `#!/details?id=${encodeURIComponent(card.itemId)}` : '#';
@@ -4219,7 +3135,7 @@
                 ${card.posterUrl ? `<div class="tautulli-card-ambient-bg" style="background-image: url('${escapeHtml(card.posterUrl)}');"></div>` : ''}
                 ${card.backdropUrl ? `<div class="tautulli-card-fanart-backdrop" style="background-image: url('${escapeHtml(card.backdropUrl)}');"></div>` : ''}
 
-                <!-- Card Body: Poster + Authentic Tautulli Spec Grid -->
+                <!-- Card Body: Poster + Authentic Tautulli Spec Grid + Floating Time Stack -->
                 <div class="tautulli-card-body">
                     <!-- Left Poster Artwork -->
                     <a href="${detailHref}" class="tautulli-poster-wrapper" title="View details: ${escapeHtml(card.primaryTitle)}">
@@ -4254,18 +3170,20 @@
                             <span class="tautulli-spec-label">CONTAINER</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.containerDisplay)}">${escapeHtml(card.containerDisplay)}</span>
                         </div>
+                        ${!card.isAudioItem ? `
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">VIDEO</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.videoDisplay)}">${escapeHtml(card.videoDisplay)}</span>
-                        </div>
+                        </div>` : ''}
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">AUDIO</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.audioDisplay)}">${escapeHtml(card.audioDisplay)}</span>
                         </div>
+                        ${!card.isAudioItem ? `
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">SUBTITLE</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.subtitleDisplay)}">${escapeHtml(card.subtitleDisplay)}</span>
-                        </div>
+                        </div>` : ''}
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">LOCATION</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.locationDisplay)}">${escapeHtml(card.locationDisplay)}</span>
@@ -4279,26 +3197,43 @@
                             <span class="tautulli-spec-value" title="${escapeHtml(card.filePath || card.fileDisplay)}">${escapeHtml(card.fileDisplay)}</span>
                         </div>
                     </div>
+
+                    <!-- Bottom-Right Floating Time Stack -->
+                    <div class="tautulli-time-stack">
+                        <span class="tautulli-time-eta ${card.isPaused ? 'tautulli-time-paused' : ''}">${escapeHtml(card.etaStr)}</span>
+                        <span class="tautulli-time-progress">${escapeHtml(card.timeProgressStr)}</span>
+                    </div>
                 </div>
 
-                <!-- Bottom Meta Bar: Title, Rating, User & Stream Actions -->
+                <!-- Timeline Bar (Sleek Horizontal Line) -->
+                <div class="tautulli-card-timeline">
+                    ${card.transcodeCompletionPercentage != null ? `<div class="tautulli-progress-buffer" style="width: ${card.transcodeCompletionPercentage}%;"></div>` : ''}
+                    <div class="tautulli-progress-fill ${card.isLiveStream ? 'live' : ''} ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
+                </div>
+
+                <!-- Bottom Meta Bar: Title, Subline, Rating, User & Stream Actions -->
                 <div class="tautulli-card-meta-bar">
                     <div class="tautulli-meta-left">
-                        <span class="tautulli-play-indicator" title="${card.isPaused ? 'Paused' : 'Playing'}">
-                            ${card.isPaused 
-                                ? '<svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'
-                                : '<svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;"><path d="M8 5v14l11-7z"/></svg>'}
-                        </span>
-                        <a href="${detailHref}" class="tautulli-meta-title" title="${escapeHtml(card.primaryTitle)}">
-                            ${escapeHtml(card.primaryTitle)}
-                        </a>
-                        ${card.officialRating ? `<span class="tautulli-rating-badge">${escapeHtml(card.officialRating)}</span>` : ''}
-                        ${card.secondaryTitle ? `<span class="tautulli-meta-sub">${escapeHtml(card.secondaryTitle)}</span>` : ''}
+                        <div class="tautulli-meta-line-1">
+                            <button class="tautulli-meta-play-btn ${card.isPaused ? 'paused' : 'playing'}" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="${card.isPaused ? 'true' : 'false'}" title="${card.isPaused ? 'Click to Resume' : 'Click to Pause'}">
+                                ${card.isPaused 
+                                    ? '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
+                                    : '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>'}
+                            </button>
+                            <a href="${detailHref}" class="tautulli-meta-title" title="${escapeHtml(card.primaryTitle)}">
+                                ${escapeHtml(card.primaryTitle)}
+                            </a>
+                            ${card.officialRating ? `<span class="tautulli-rating-badge">${escapeHtml(card.officialRating)}</span>` : ''}
+                        </div>
+                        <div class="tautulli-meta-line-2">
+                            <span class="tautulli-meta-type-icon">${typeIconSvg}</span>
+                            <span class="tautulli-meta-sub">${escapeHtml(card.secondaryTitle || '')}</span>
+                        </div>
                     </div>
                     <div class="tautulli-meta-right">
                         <a href="${userHref}" class="tautulli-meta-user" title="User: ${escapeHtml(card.userName)}">
                             ${avatarHtml}
-                            <span>${escapeHtml(card.userName)}</span>
+                            <span class="tautulli-meta-username">${escapeHtml(card.userName)}</span>
                         </a>
                         <div class="tautulli-action-cluster">
                             <button class="tautulli-action-btn tautulli-action-btn-mute ${card.isMuted ? 'muted' : ''}" data-action="toggle-mute" data-session-id="${escapeHtml(card.sessionId)}" data-muted="${card.isMuted ? 'true' : 'false'}" title="${card.isMuted ? 'Unmute Player' : 'Mute Player'}">
@@ -4312,24 +3247,6 @@
                             <button class="tautulli-action-btn tautulli-action-btn-kill" data-action="kill-stream" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" title="Terminate stream">
                                 <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card Footer: Interactive Timeline & Playback Status -->
-                <div class="tautulli-card-footer">
-                    <div class="tautulli-progress-row">
-                        ${stateIconHtml}
-                        <div class="tautulli-progress-track">
-                            ${card.transcodeCompletionPercentage != null ? `<div class="tautulli-progress-buffer" style="width: ${card.transcodeCompletionPercentage}%;" title="Transcode Buffer: ${card.transcodeCompletionPercentage}%"></div>` : ''}
-                            <div class="tautulli-progress-fill ${card.isLiveStream ? 'live' : ''} ${card.isPaused ? 'paused' : ''}" style="width: ${card.progressPercent}%;"></div>
-                        </div>
-                    </div>
-                    <div class="tautulli-time-row">
-                        <span class="tautulli-time-progress">${escapeHtml(card.timeProgressStr)}</span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            ${card.transcodeCompletionPercentage != null ? `<span style="color: #94a3b8; font-family: monospace; font-size: 10px;">Buffer: ${card.transcodeCompletionPercentage}%</span>` : ''}
-                            <span class="${etaClass}">${escapeHtml(card.etaStr)}</span>
                         </div>
                     </div>
                 </div>
@@ -4380,12 +3297,6 @@
             const movieItems = (topMoviesResp.status === 'fulfilled' && topMoviesResp.value && topMoviesResp.value.Items) ? topMoviesResp.value.Items : [];
             const episodeItems = (topEpisodesResp.status === 'fulfilled' && topEpisodesResp.value && topEpisodesResp.value.Items) ? topEpisodesResp.value.Items : [];
             const rawUsers = (usersResp.status === 'fulfilled' && Array.isArray(usersResp.value)) ? usersResp.value : [];
-
-            // Cache known admin users
-            if (rawUsers.length > 0) {
-                adminUserIds = new Set(rawUsers.filter(u => u.Policy && u.Policy.IsAdministrator).map(u => u.Id));
-                adminUserNames = new Set(rawUsers.filter(u => u.Policy && u.Policy.IsAdministrator).map(u => (u.Name || '').toLowerCase()));
-            }
 
             // Aggregate watched episode counts per TV series
             const seriesPlayMap = new Map();
@@ -4684,12 +3595,12 @@
                         const client = escapeHtml(s.Client || '');
                         const user = escapeHtml(s.UserName || 'User');
                         return `
-                            <div class="tautulli-connected-device-chip" data-action="edit-device-alias" data-device-key="${escapeHtml(s.DeviceId || s.DeviceName || s.Id)}" data-current-name="${devName}" style="cursor:pointer;" title="Click to rename or set accurate device model (e.g. iPhone 16 Pro Max)">
+                            <div class="tautulli-connected-device-chip">
                                 <div class="tautulli-connected-device-icon">
                                     <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
                                 </div>
                                 <div class="tautulli-connected-device-info">
-                                    <div class="tautulli-connected-device-name">${devName} ✎</div>
+                                    <div class="tautulli-connected-device-name">${devName}</div>
                                     <div class="tautulli-connected-device-meta">${user} · ${client}</div>
                                 </div>
                                 <div class="tautulli-connected-device-status" title="Active Jellyfin Session">Online</div>
@@ -4751,7 +3662,6 @@
         const directPlayCount = cards.filter((c) => c.isDirectPlay).length;
         const directStreamCount = cards.filter((c) => c.isDirectStream).length;
         const transcodeCount = cards.filter((c) => c.isTranscode).length;
-        const zombieCount = cards.filter((c) => c.isZombieTranscode).length;
         const wanCount = cards.filter((c) => !c.isLan).length;
         const pausedCount = cards.filter((c) => c.isPaused).length;
 
@@ -4768,7 +3678,7 @@
         });
         const totalBandwidth = lanBandwidth + wanBandwidth;
 
-        // P1.1 Live Bandwidth Rolling History update
+        // Bandwidth Rolling History update
         bandwidthHistory.push({
             time: Date.now(),
             total: totalBandwidth,
@@ -4779,34 +3689,6 @@
             bandwidthHistory.shift();
         }
         const sparklineHtml = renderBandwidthSparkline(bandwidthHistory, 104, 22);
-
-        // P1.2 Multi-IP Account Sharing Detection for Activity Banner
-        const hasMultiIpAlert = cards.some((c) => c.isMultiIpSharing);
-        const multiIpAlertBannerHtml = hasMultiIpAlert
-            ? `
-                <div class="tautulli-security-alert-pill" title="Security Warning: Multiple remote WAN IP addresses detected concurrently under the same user account. Possible credential sharing.">
-                    <svg style="width:11px;height:11px;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                    <span>Multi-IP Alert</span>
-                </div>
-            `
-            : '';
-
-        // P1.5 Zombie Pipeline & Transcode Watchdog Banner Pill
-        const pipelineStatusHtml = zombieCount > 0
-            ? `
-                <div class="tautulli-pipeline-pill tautulli-pipeline-zombie" title="Zombie FFmpeg Warning: Stalled transcode pipeline(s) detected with no playback progress for >=15 seconds.">
-                    <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                    <span>Zombie FFmpeg: ${zombieCount} Stalled</span>
-                </div>
-            `
-            : (transcodeCount > 0
-                ? `
-                    <div class="tautulli-pipeline-pill" title="Active Transcode Pipelines: Real-time FFmpeg worker processes">
-                        <svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:currentColor;flex-shrink:0;"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
-                        <span>${transcodeCount} Active Pipeline${transcodeCount > 1 ? 's' : ''}</span>
-                    </div>
-                `
-                : '');
 
         const breakdownParts = [];
         if (directPlayCount > 0) breakdownParts.push(`${directPlayCount} direct play${directPlayCount > 1 ? 's' : ''}`);
@@ -4891,744 +3773,7 @@
     }
 
     /**
-     * Renders and displays the Stream Details Inspector modal.
-     */
-    /**
-     * Keydown handler to dismiss the inspector modal via Escape key.
-     */
-    function handleModalEscape(e) {
-        if (e.key === 'Escape') {
-            closeStreamInspectorModal();
-        }
-    }
-
-    /**
-     * Copies text to clipboard with fallback.
-     */
-    function copyTextToClipboard(text, btnElement) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(() => {
-                const lbl = btnElement && btnElement.querySelector('.copy-label');
-                if (lbl) lbl.textContent = '✓ Copied!';
-                setTimeout(() => { if (lbl) lbl.textContent = 'Copy Telemetry'; }, 2000);
-            }).catch(() => fallbackPromptCopy(text));
-        } else {
-            fallbackPromptCopy(text);
-        }
-    }
-
-    function fallbackPromptCopy(text) {
-        try {
-            const ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.position = 'fixed';
-            ta.style.left = '-9999px';
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            ta.remove();
-        } catch (e) {
-            window.prompt('Copy telemetry data:', text);
-        }
-    }
-
-    /**
-     * Renders and displays the Stream Details Inspector modal.
-     */
-    function openStreamInspectorModal(card) {
-        if (!card) return;
-        closeStreamInspectorModal();
-
-        const backdrop = document.createElement('div');
-        backdrop.id = 'tautulli-inspector-modal-backdrop';
-        backdrop.className = 'tautulli-modal-backdrop';
-        backdrop.onclick = function (e) {
-            if (e.target === backdrop) {
-                closeStreamInspectorModal();
-            }
-        };
-
-        const modal = document.createElement('div');
-        modal.className = 'tautulli-modal';
-        modal.innerHTML = `
-            <div class="tautulli-modal-header">
-                <div class="tautulli-modal-title">
-                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
-                    <span>Stream Diagnostics &amp; Telemetry</span>
-                </div>
-                <div class="tautulli-modal-header-actions">
-                    <button class="tautulli-modal-tool-btn" data-action="copy-telemetry" title="Copy raw session telemetry to clipboard">
-                        <svg style="width:12px;height:12px;" fill="currentColor" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-                        <span class="copy-label">Copy Telemetry</span>
-                    </button>
-                    <button class="tautulli-modal-close" data-action="close-modal" title="Close">
-                        <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- P1.3 Bottleneck Splitter (Root Cause Diagnosis) -->
-            <div class="tautulli-modal-section">
-                <div class="tautulli-modal-section-title">
-                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                    <span>Bottleneck Splitter (Root Cause Analysis)</span>
-                </div>
-                <table class="tautulli-modal-table">
-                    <tr><td>Performance State</td><td><span class="tautulli-badge ${card.bottleneck ? card.bottleneck.badgeClass : 'tautulli-bottleneck-healthy'}">${escapeHtml(card.bottleneck ? card.bottleneck.badgeText : 'Pipeline Healthy')}</span></td></tr>
-                    <tr><td>Primary Diagnosis</td><td><strong>${escapeHtml(card.bottleneck ? card.bottleneck.shortName : 'Optimal')}</strong></td></tr>
-                    <tr><td>Technical Finding</td><td>${escapeHtml(card.bottleneck ? card.bottleneck.explanation : 'Encoder speed and transmission throughput are balanced.')}</td></tr>
-                    <tr><td>Admin Recommendation</td><td style="color:#38bdf8;">${escapeHtml(card.bottleneck ? card.bottleneck.recommendation : 'No intervention needed.')}</td></tr>
-                </table>
-            </div>
-
-            <!-- Media Source Telemetry -->
-            <div class="tautulli-modal-section">
-                <div class="tautulli-modal-section-title">
-                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
-                    <span>Media Source Specs</span>
-                </div>
-                <table class="tautulli-modal-table">
-                    <tr><td>Media Title</td><td>${escapeHtml(card.primaryTitle)}</td></tr>
-                    <tr><td>Production Year &amp; Duration</td><td>${escapeHtml(card.secondaryTitle || 'N/A')}</td></tr>
-                    <tr><td>Container</td><td>${escapeHtml(card.containerDisplay)}</td></tr>
-                    <tr><td>Video Codec &amp; Resolution</td><td>${escapeHtml(card.videoDisplay)}</td></tr>
-                    ${card.videoProfile ? `<tr><td>Video Profile &amp; Bit Depth</td><td>${escapeHtml(card.videoProfile)} (${escapeHtml(card.videoBitDepth || '8-bit')})</td></tr>` : ''}
-                    ${card.videoFrameRate ? `<tr><td>Source Frame Rate</td><td>${escapeHtml(card.videoFrameRate)}</td></tr>` : ''}
-                    ${card.colorSpace ? `<tr><td>Color Space / Gamut</td><td>${escapeHtml(card.colorSpace)}${card.colorPrimaries ? ` (${escapeHtml(card.colorPrimaries.toUpperCase())})` : ''} ${card.hdrBadge ? `[${escapeHtml(card.hdrBadge)}]` : ''}</td></tr>` : ''}
-                    ${card.colorTransfer ? `<tr><td>Transfer Characteristics</td><td>${escapeHtml(card.colorTransfer)} ${card.hdrStandardDesc ? `(${escapeHtml(card.hdrStandardDesc)})` : ''}</td></tr>` : ''}
-                    ${card.isToneMapped ? `<tr><td>HDR Tone Mapping</td><td><span style="color:#f59e0b;font-weight:600;">Active · ${escapeHtml(card.toneMappingDetail)}</span></td></tr>` : ''}
-                    <tr><td>Stream Bitrate</td><td>${escapeHtml(card.bandwidthDisplay)}</td></tr>
-                </table>
-            </div>
-
-            <!-- Audio & Subtitles -->
-            <div class="tautulli-modal-section">
-                <div class="tautulli-modal-section-title">
-                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                    <span>Audio &amp; Subtitle Specs</span>
-                </div>
-                <table class="tautulli-modal-table">
-                    <tr><td>Audio Stream</td><td>${escapeHtml(card.audioDisplay)}</td></tr>
-                    ${card.audioSampleRate ? `<tr><td>Audio Sample Rate</td><td>${escapeHtml(card.audioSampleRate)}</td></tr>` : ''}
-                    ${card.audioBitRate ? `<tr><td>Audio Bitrate</td><td>${escapeHtml(card.audioBitRate)}</td></tr>` : ''}
-                    ${card.audioBadge ? `<tr><td>Audio Fidelity</td><td><span style="color:#a5b4fc;font-weight:700;">${escapeHtml(card.audioBadge)}</span></td></tr>` : ''}
-                    <tr><td>Subtitle Stream</td><td>${escapeHtml(card.subtitleDisplay)}</td></tr>
-                    ${card.isSubtitleBurnIn ? `<tr><td>Subtitle Burn-In</td><td><span style="color:#fbbf24;font-weight:700;">Active (Subtitles Forcing Transcode)</span></td></tr>` : ''}
-                    ${card.canRemediateSubtitlesWithBazarr ? `
-                    <tr><td>Subtitle Remediation</td><td>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                            <span style="color:#fbbf24;font-size:11px;">Image subtitles forcing transcode</span>
-                            <button class="tautulli-servarr-btn" data-action="fetch-srt-bazarr" data-session-id="${escapeHtml(card.sessionId)}" data-title="${escapeHtml(card.mediaItemName || card.primaryTitle)}" style="padding:2px 8px;font-size:10.5px;">
-                                <svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
-                                <span>Fetch SRT (Bazarr)</span>
-                            </button>
-                        </div>
-                    </td></tr>` : ''}
-                </table>
-            </div>
-
-            <!-- Transcode Pipeline -->
-            ${card.isTranscode ? `
-            <div class="tautulli-modal-section">
-                <div class="tautulli-modal-section-title">
-                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
-                    <span style="color:#f87171;">Transcode Pipeline</span>
-                </div>
-                <table class="tautulli-modal-table">
-                    <tr><td>Hardware Acceleration</td><td>${escapeHtml(card.hwAccelBadge || (card.isSwTranscode ? 'Software (CPU)' : 'None'))}</td></tr>
-                    ${card.transcodeFps ? `<tr><td>Transcoding FPS &amp; Speed</td><td>${escapeHtml(card.transcodeFps)} fps (${escapeHtml(card.transcodeSpeedMultiplier)}x real-time)</td></tr>` : ''}
-                    ${card.transcodeCompletionPercentage != null ? `<tr><td>Transcode Buffer Ahead</td><td>${card.transcodeCompletionPercentage}% completed</td></tr>` : ''}
-                    <tr><td>Throttled State</td><td>${card.isThrottled ? '<span style="color:#34d399;">Active (Throttled / Power Saving)</span>' : 'Unthrottled'}</td></tr>
-                    ${card.transcodeReasons.length > 0 ? `<tr><td>Transcode Triggers</td><td>${escapeHtml(card.transcodeReasons.map(formatTranscodeReason).join(', '))}</td></tr>` : ''}
-                    ${card.isZombieTranscode ? `
-                    <tr><td>Pipeline Watchdog</td><td><span style="color:#ef4444;font-weight:700;"><svg viewBox="0 0 24 24" style="width:11px;height:11px;fill:currentColor;vertical-align:text-bottom;margin-right:4px;"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>Zombie Stalled (${card.zombieStallDurationSec}s no progress)</span></td></tr>
-                    <tr><td>Pipeline Action</td><td>
-                        <button class="tautulli-btn-flush" data-action="force-flush-pipeline" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" style="display:inline-flex;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:700;">
-                            Force Flush Pipeline
-                        </button>
-                    </td></tr>
-                    ` : '<tr><td>Pipeline Watchdog</td><td><span style="color:#34d399;font-weight:600;">Normal Active Flow</span></td></tr>'}
-                </table>
-            </div>` : ''}
-
-            <!-- Servarr Media Deep Links -->
-            <div class="tautulli-modal-section">
-                <div class="tautulli-modal-section-title">
-                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
-                    <span>Servarr Automation Deep Links</span>
-                </div>
-                <table class="tautulli-modal-table">
-                    <tr><td>Media Identity</td><td>${escapeHtml(card.mediaItemName || card.primaryTitle)} ${card.mediaItemYear ? `(${card.mediaItemYear})` : ''} [${escapeHtml(card.mediaItemType || 'Media')}]</td></tr>
-                    <tr><td>Remediation Links</td><td>
-                        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
-                            ${servarrConfig.bazarrUrl ? `
-                            <a href="${servarrConfig.bazarrUrl.replace(/\/$/, '')}/series" target="_blank" rel="noopener noreferrer" class="tautulli-servarr-btn" style="text-decoration:none;">
-                                <span>Open in Bazarr ➔</span>
-                            </a>` : ''}
-                            ${(card.mediaItemType === 'Episode' || card.seriesName) ? (servarrConfig.sonarrUrl ? `
-                            <a href="${servarrConfig.sonarrUrl.replace(/\/$/, '')}/series" target="_blank" rel="noopener noreferrer" class="tautulli-servarr-btn" style="text-decoration:none;">
-                                <span>Open in Sonarr ➔</span>
-                            </a>` : '') : (servarrConfig.radarrUrl ? `
-                            <a href="${servarrConfig.radarrUrl.replace(/\/$/, '')}/movies" target="_blank" rel="noopener noreferrer" class="tautulli-servarr-btn" style="text-decoration:none;">
-                                <span>Open in Radarr ➔</span>
-                            </a>` : '')}
-                            <button class="tautulli-tool-btn" data-action="open-servarr-modal" style="font-size:10px;padding:3px 8px;">
-                                <span>Configure Servarr URLs</span>
-                            </button>
-                        </div>
-                    </td></tr>
-                </table>
-            </div>
-
-            <!-- Client & Player -->
-            <div class="tautulli-modal-section">
-                <div class="tautulli-modal-section-title">
-                    <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;flex-shrink:0;"><path d="M4 6h16v10H4V6zm16 12H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2zm-8 1.5c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5-1.5.67-1.5 1.5.67 1.5 1.5 1.5z"/></svg>
-                    <span>Client &amp; Network</span>
-                </div>
-                <table class="tautulli-modal-table">
-                    <tr><td>User Account</td><td>${escapeHtml(card.userName)}</td></tr>
-                    <tr><td>Device Name</td><td>${escapeHtml(card.player)}</td></tr>
-                    <tr><td>Client App</td><td>${escapeHtml(card.product)}</td></tr>
-                    <tr><td>Network Endpoint</td><td>${card.isLan ? 'LAN (Local Private Network)' : `WAN (Remote Endpoint: ${escapeHtml(card.locationDisplay)})`}</td></tr>
-                    <tr><td>Multi-Location Check</td><td>${card.isMultiIpSharing ? `<span style="color:#f87171;font-weight:700;">Flagged: ${card.distinctWanIpCount} Distinct WAN IPs streaming concurrently</span>` : '<span style="color:#34d399;">Authorized Single Household</span>'}</td></tr>
-                    ${card.isMuted ? `<tr><td>Audio State</td><td><span style="color:#f87171;font-weight:700;">Muted</span></td></tr>` : ''}
-                    ${card.volumeLevel != null ? `<tr><td>Volume Level</td><td>${card.volumeLevel}%</td></tr>` : ''}
-                    <tr><td>Remote Controls</td><td>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <button class="tautulli-tool-btn" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="${card.isPaused ? 'true' : 'false'}" style="font-size:11px;padding:3px 9px;">
-                                ${card.isPaused ? 'Resume ▶' : 'Pause ❚❚'}
-                            </button>
-                            <button class="tautulli-tool-btn" data-action="toggle-mute" data-session-id="${escapeHtml(card.sessionId)}" data-muted="${card.isMuted ? 'true' : 'false'}" style="font-size:11px;padding:3px 9px;">
-                                ${card.isMuted ? 'Unmute' : 'Mute'}
-                            </button>
-                        </div>
-                    </td></tr>
-                    <tr><td>Session ID</td><td style="font-size:10px;word-break:break-all;">${escapeHtml(card.sessionId)}</td></tr>
-                </table>
-            </div>
-        `;
-
-        const copyBtn = modal.querySelector('[data-action="copy-telemetry"]');
-        if (copyBtn) {
-            copyBtn.onclick = function () {
-                const diag = {
-                    title: card.primaryTitle,
-                    media: card.secondaryTitle,
-                    playMethod: card.playMethod,
-                    bottleneck: card.bottleneck ? card.bottleneck.shortName : 'Healthy',
-                    container: card.containerDisplay,
-                    video: card.videoDisplay,
-                    videoProfile: card.videoProfile,
-                    videoBitDepth: card.videoBitDepth,
-                    framerate: card.videoFrameRate,
-                    colorSpace: card.colorSpace,
-                    colorTransfer: card.colorTransfer,
-                    colorPrimaries: card.colorPrimaries,
-                    toneMapping: card.toneMappingDetail || (card.isToneMapped ? 'Active' : 'Direct'),
-                    hdr: card.hdrBadge,
-                    resolution: card.resBadge,
-                    audio: card.audioDisplay,
-                    audioChannels: card.audioChannelsBadge,
-                    audioFidelity: card.audioBadge,
-                    sampleRate: card.audioSampleRate,
-                    audioBitrate: card.audioBitRate,
-                    subtitles: card.subtitleDisplay,
-                    subBurnIn: card.isSubtitleBurnIn,
-                    bitrate: card.bandwidthDisplay,
-                    transcodeReasons: card.transcodeReasons,
-                    hwAccel: card.hwAccelBadge || (card.isSwTranscode ? 'Software' : 'None'),
-                    fps: card.transcodeFps,
-                    speed: card.transcodeSpeedMultiplier ? `${card.transcodeSpeedMultiplier}x` : null,
-                    user: card.userName,
-                    client: card.product,
-                    device: card.player,
-                    network: card.isLan ? 'LAN' : 'WAN',
-                    location: card.locationDisplay,
-                    multiIpSharing: card.isMultiIpSharing ? `${card.distinctWanIpCount} WAN IPs` : 'None',
-                    sessionId: card.sessionId
-                };
-                copyTextToClipboard(JSON.stringify(diag, null, 2), copyBtn);
-            };
-        }
-
-        modal.onclick = function (e) {
-            const target = e.target.closest('[data-action]');
-            if (!target) return;
-            const action = target.getAttribute('data-action');
-            if (action === 'close-modal') {
-                closeStreamInspectorModal();
-            } else if (action === 'force-flush-pipeline') {
-                closeStreamInspectorModal();
-                handleFlushPipeline(card.sessionId, card.userName, card.primaryTitle);
-            } else if (action === 'fetch-srt-bazarr') {
-                handleFetchSrtBazarr(card.sessionId, card.mediaItemName || card.primaryTitle);
-            } else if (action === 'open-servarr-modal') {
-                closeStreamInspectorModal();
-                openServarrModal();
-            } else if (action === 'toggle-play') {
-                const isPaused = target.getAttribute('data-paused') === 'true';
-                handleTogglePlayPause(card.sessionId, isPaused);
-                closeStreamInspectorModal();
-            } else if (action === 'toggle-mute') {
-                const isMuted = target.getAttribute('data-muted') === 'true';
-                handleToggleMute(card.sessionId, isMuted);
-                closeStreamInspectorModal();
-            }
-        };
-
-        backdrop.appendChild(modal);
-        document.body.appendChild(backdrop);
-        document.addEventListener('keydown', handleModalEscape);
-    }
-
-    /**
-     * Closes the active stream inspector modal if open.
-     */
-    function closeStreamInspectorModal() {
-        document.removeEventListener('keydown', handleModalEscape);
-        const existing = document.getElementById('tautulli-inspector-modal-backdrop');
-        if (existing) {
-            existing.remove();
-        }
-    }
-
-    /**
-     * Keydown handler to dismiss the Stream Guard modal via Escape key.
-     */
-    function handleGuardModalEscape(e) {
-        if (e.key === 'Escape') {
-            closeStreamGuardModal();
-        }
-    }
-
-    /**
-     * Renders and displays the Smart Stream Guard configuration modal.
-     */
-    function openStreamGuardModal() {
-        closeStreamGuardModal();
-
-        const backdrop = document.createElement('div');
-        backdrop.id = 'tautulli-guard-modal-backdrop';
-        backdrop.className = 'tautulli-modal-backdrop';
-        backdrop.onclick = function (e) {
-            if (e.target === backdrop) {
-                closeStreamGuardModal();
-            }
-        };
-
-        const modal = document.createElement('div');
-        modal.className = 'tautulli-modal';
-        modal.innerHTML = `
-            <div class="tautulli-modal-header">
-                <div class="tautulli-modal-title">
-                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-                    <span>Smart Stream Guard (Automated Rules)</span>
-                </div>
-                <div class="tautulli-modal-header-actions">
-                    <button class="tautulli-modal-close" data-action="close-guard-modal" title="Close">
-                        <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Rule 1: Auto-Kill Paused Streams -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Auto-Kill Paused Streams</div>
-                        <div class="tautulli-rule-desc">Automatically terminates sessions paused longer than threshold to free transcode slots and network sockets.</div>
-                    </div>
-                    <label class="tautulli-switch">
-                        <input type="checkbox" id="guard-rule-paused" ${streamGuardRules.killPausedEnabled ? 'checked' : ''}>
-                        <span class="tautulli-slider"></span>
-                    </label>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:#cbd5e1;padding-top:4px;">
-                    <span>Terminate after:</span>
-                    <input type="number" id="guard-paused-minutes" class="tautulli-rule-input" min="1" max="120" value="${streamGuardRules.killPausedMinutes}">
-                    <span>minutes of inactivity</span>
-                </div>
-            </div>
-
-            <!-- Rule 2: Block 4K Software Transcodes -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Block 4K CPU Software Transcodes</div>
-                        <div class="tautulli-rule-desc">Instantly terminates unaccelerated 4K CPU transcodes that peg CPU at 100% and alerts the client player with educational advice.</div>
-                    </div>
-                    <label class="tautulli-switch">
-                        <input type="checkbox" id="guard-rule-4k" ${streamGuardRules.kill4kSwEnabled ? 'checked' : ''}>
-                        <span class="tautulli-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Rule 3: Concurrent Streams per User Cap -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Concurrent Streams Limit per User</div>
-                        <div class="tautulli-rule-desc">Prevents account sharing by terminating the newest excess playback session if a user exceeds maximum simultaneous streams.</div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <input type="number" id="guard-concurrent-limit" class="tautulli-rule-input" min="0" max="10" value="${streamGuardRules.maxConcurrentStreams}">
-                        <span style="font-size:11px;color:#94a3b8;">(0 = unlimited)</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Safeguard: Exempt Server Administrators -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Exempt Server Administrators</div>
-                        <div class="tautulli-rule-desc">Never auto-terminate playback sessions initiated by server administrators, regardless of guard thresholds.</div>
-                    </div>
-                    <label class="tautulli-switch">
-                        <input type="checkbox" id="guard-rule-exempt-admins" ${streamGuardRules.exemptAdmins !== false ? 'checked' : ''}>
-                        <span class="tautulli-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Auto-Kill Event Log -->
-            <div style="margin-top:16px;">
-                <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
-                    <span>Recent Guard Enforcement Log (${autoKillEventsLog.length})</span>
-                    ${autoKillEventsLog.length > 0 ? `<span style="font-size:10px;color:#94a3b8;cursor:pointer;" id="guard-clear-log">Clear Log</span>` : ''}
-                </div>
-                <div style="max-height:140px;overflow-y:auto;border-radius:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);padding:6px 10px;">
-                    ${autoKillEventsLog.length === 0 
-                        ? `<div style="font-size:11px;color:#64748b;text-align:center;padding:12px 0;">No automated enforcement actions triggered yet</div>`
-                        : autoKillEventsLog.map(item => `
-                            <div style="font-size:11px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;justify-content:space-between;gap:8px;">
-                                <span style="color:#f87171;font-weight:600;">[Auto-Killed] ${escapeHtml(item.userName)}</span>
-                                <span style="color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.title)}</span>
-                                <span style="color:#fbbf24;font-size:10px;flex-shrink:0;">${escapeHtml(item.reason)}</span>
-                            </div>
-                        `).join('')}
-                </div>
-            </div>
-
-            <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px;">
-                <button class="tautulli-modal-tool-btn" id="guard-save-btn" style="background:rgba(0,164,220,0.3);border-color:#38bdf8;color:#ffffff;font-size:12px;padding:6px 16px;">
-                    Save &amp; Apply Guard Rules
-                </button>
-            </div>
-        `;
-
-        modal.querySelector('[data-action="close-guard-modal"]').onclick = closeStreamGuardModal;
-
-        const clearLogBtn = modal.querySelector('#guard-clear-log');
-        if (clearLogBtn) {
-            clearLogBtn.onclick = function () {
-                autoKillEventsLog.length = 0;
-                openStreamGuardModal();
-            };
-        }
-
-        const saveBtn = modal.querySelector('#guard-save-btn');
-        if (saveBtn) {
-            saveBtn.onclick = function () {
-                const pausedChk = modal.querySelector('#guard-rule-paused');
-                const pausedMin = modal.querySelector('#guard-paused-minutes');
-                const fourKChk = modal.querySelector('#guard-rule-4k');
-                const concurrentInp = modal.querySelector('#guard-concurrent-limit');
-                const exemptChk = modal.querySelector('#guard-rule-exempt-admins');
-
-                streamGuardRules.killPausedEnabled = pausedChk ? pausedChk.checked : false;
-                streamGuardRules.killPausedMinutes = pausedMin ? Math.max(1, parseInt(pausedMin.value, 10) || 15) : 15;
-                streamGuardRules.kill4kSwEnabled = fourKChk ? fourKChk.checked : false;
-                streamGuardRules.maxConcurrentStreams = concurrentInp ? Math.max(0, parseInt(concurrentInp.value, 10) || 0) : 0;
-                streamGuardRules.exemptAdmins = exemptChk ? exemptChk.checked : true;
-
-                saveStreamGuardRules(streamGuardRules);
-                closeStreamGuardModal();
-                lastRenderedHash = '';
-                fetchAndRenderSessions();
-            };
-        }
-
-        backdrop.appendChild(modal);
-        document.body.appendChild(backdrop);
-        document.addEventListener('keydown', handleGuardModalEscape);
-    }
-
-    /**
-     * Closes the active Stream Guard modal if open.
-     */
-    function closeStreamGuardModal() {
-        document.removeEventListener('keydown', handleGuardModalEscape);
-        const existing = document.getElementById('tautulli-guard-modal-backdrop');
-        if (existing) {
-            existing.remove();
-        }
-    }
-
-    /**
-     * Keydown handler to dismiss the Servarr Remediation modal via Escape key.
-     */
-    function handleServarrModalEscape(e) {
-        if (e.key === 'Escape') {
-            closeServarrModal();
-        }
-    }
-
-    /**
-     * Renders and displays the Servarr Remediation Suite configuration modal.
-     */
-    function openServarrModal() {
-        closeServarrModal();
-
-        const backdrop = document.createElement('div');
-        backdrop.id = 'tautulli-servarr-modal-backdrop';
-        backdrop.className = 'tautulli-modal-backdrop';
-        backdrop.onclick = function (e) {
-            if (e.target === backdrop) {
-                closeServarrModal();
-            }
-        };
-
-        const modal = document.createElement('div');
-        modal.className = 'tautulli-modal';
-        modal.innerHTML = `
-            <div class="tautulli-modal-header">
-                <div class="tautulli-modal-title">
-                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM13 13v4h-2v-4H8l4-4 4 4h-3z"/></svg>
-                    <span>Servarr Remediation Suite (Bazarr · Radarr · Sonarr)</span>
-                </div>
-                <div class="tautulli-modal-header-actions">
-                    <button class="tautulli-modal-close" data-action="close-servarr-modal" title="Close">
-                        <svg style="width:14px;height:14px;" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Bazarr Configuration -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Bazarr (Subtitle Automation)</div>
-                        <div class="tautulli-rule-desc">Automatically trigger searches for text SRT subtitles when PGS/VOBSUB subtitles force CPU transcode burn-in.</div>
-                    </div>
-                </div>
-                <div class="tautulli-form-row">
-                    <label class="tautulli-form-label">Bazarr Base URL</label>
-                    <input type="text" id="servarr-bazarr-url" class="tautulli-input" placeholder="http://192.168.1.50:6767" value="${escapeHtml(servarrConfig.bazarrUrl || '')}">
-                </div>
-                <div class="tautulli-form-row" style="margin-top:6px;">
-                    <label class="tautulli-form-label">Bazarr API Key</label>
-                    <input type="password" id="servarr-bazarr-api-key" class="tautulli-input" placeholder="Enter API Key from Bazarr Settings &gt; General" value="${escapeHtml(servarrConfig.bazarrApiKey || '')}">
-                </div>
-            </div>
-
-            <!-- Radarr Configuration -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Radarr (Movie Management)</div>
-                        <div class="tautulli-rule-desc">Quickly inspect movie quality profiles, storage file paths, and trigger automatic media upgrades.</div>
-                    </div>
-                </div>
-                <div class="tautulli-form-row">
-                    <label class="tautulli-form-label">Radarr Base URL</label>
-                    <input type="text" id="servarr-radarr-url" class="tautulli-input" placeholder="http://192.168.1.50:7878" value="${escapeHtml(servarrConfig.radarrUrl || '')}">
-                </div>
-                <div class="tautulli-form-row" style="margin-top:6px;">
-                    <label class="tautulli-form-label">Radarr API Key</label>
-                    <input type="password" id="servarr-radarr-api-key" class="tautulli-input" placeholder="Enter API Key from Radarr Settings &gt; General" value="${escapeHtml(servarrConfig.radarrApiKey || '')}">
-                </div>
-            </div>
-
-            <!-- Sonarr Configuration -->
-            <div class="tautulli-rule-card">
-                <div class="tautulli-rule-row">
-                    <div>
-                        <div class="tautulli-rule-title">Sonarr (TV Show Management)</div>
-                        <div class="tautulli-rule-desc">Quickly inspect series quality profiles, episode paths, and trigger automatic episode upgrades.</div>
-                    </div>
-                </div>
-                <div class="tautulli-form-row">
-                    <label class="tautulli-form-label">Sonarr Base URL</label>
-                    <input type="text" id="servarr-sonarr-url" class="tautulli-input" placeholder="http://192.168.1.50:8989" value="${escapeHtml(servarrConfig.sonarrUrl || '')}">
-                </div>
-                <div class="tautulli-form-row" style="margin-top:6px;">
-                    <label class="tautulli-form-label">Sonarr API Key</label>
-                    <input type="password" id="servarr-sonarr-api-key" class="tautulli-input" placeholder="Enter API Key from Sonarr Settings &gt; General" value="${escapeHtml(servarrConfig.sonarrApiKey || '')}">
-                </div>
-            </div>
-
-            <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px;">
-                <button class="tautulli-modal-tool-btn" id="servarr-save-btn" style="background:rgba(0,164,220,0.3);border-color:#38bdf8;color:#ffffff;font-size:12px;padding:6px 16px;">
-                    Save Servarr Configuration
-                </button>
-            </div>
-        `;
-
-        modal.querySelector('[data-action="close-servarr-modal"]').onclick = closeServarrModal;
-
-        const saveBtn = modal.querySelector('#servarr-save-btn');
-        if (saveBtn) {
-            saveBtn.onclick = function () {
-                const bUrl = modal.querySelector('#servarr-bazarr-url');
-                const bKey = modal.querySelector('#servarr-bazarr-api-key');
-                const rUrl = modal.querySelector('#servarr-radarr-url');
-                const rKey = modal.querySelector('#servarr-radarr-api-key');
-                const sUrl = modal.querySelector('#servarr-sonarr-url');
-                const sKey = modal.querySelector('#servarr-sonarr-api-key');
-
-                servarrConfig.bazarrUrl = bUrl ? bUrl.value.trim() : '';
-                servarrConfig.bazarrApiKey = bKey ? bKey.value.trim() : '';
-                servarrConfig.radarrUrl = rUrl ? rUrl.value.trim() : '';
-                servarrConfig.radarrApiKey = rKey ? rKey.value.trim() : '';
-                servarrConfig.sonarrUrl = sUrl ? sUrl.value.trim() : '';
-                servarrConfig.sonarrApiKey = sKey ? sKey.value.trim() : '';
-
-                saveServarrConfig(servarrConfig);
-                closeServarrModal();
-                lastRenderedHash = '';
-                fetchAndRenderSessions();
-            };
-        }
-
-        backdrop.appendChild(modal);
-        document.body.appendChild(backdrop);
-        document.addEventListener('keydown', handleServarrModalEscape);
-    }
-
-    /**
-     * Closes the active Servarr Remediation modal if open.
-     */
-    function closeServarrModal() {
-        document.removeEventListener('keydown', handleServarrModalEscape);
-        const existing = document.getElementById('tautulli-servarr-modal-backdrop');
-        if (existing) {
-            existing.remove();
-        }
-    }
-
-    /**
-     * Executes automatic termination of a non-compliant playback session (Smart Stream Guard).
-     */
-    async function executeAutoKill(sessionId, userName, mediaTitle, ruleReason, clientMessage) {
-        if (!window.ApiClient || !sessionId) return;
-        try {
-            // Log the auto-kill event
-            autoKillEventsLog.unshift({
-                id: sessionId,
-                time: new Date().toLocaleTimeString(),
-                userName: userName || 'User',
-                title: mediaTitle || 'Media',
-                reason: ruleReason
-            });
-            if (autoKillEventsLog.length > 30) autoKillEventsLog.pop();
-
-            // Send polite educational on-screen message to client player first
-            if (clientMessage && typeof window.ApiClient.ajax === 'function') {
-                try {
-                    await window.ApiClient.ajax({
-                        type: 'POST',
-                        url: window.ApiClient.getUrl(`Sessions/${sessionId}/Message`),
-                        data: JSON.stringify({
-                            Text: clientMessage,
-                            Header: 'Playback Notice',
-                            TimeoutMs: 6000
-                        }),
-                        contentType: 'application/json'
-                    });
-                } catch (msgErr) {
-                    console.warn('[PlaybackCard] Could not send notice prior to auto-kill:', msgErr);
-                }
-            }
-
-            // Terminate the playback session
-            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
-                await window.ApiClient.sendPlaystateCommand(sessionId, 'Stop');
-            } else if (typeof window.ApiClient.ajax === 'function') {
-                await window.ApiClient.ajax({
-                    type: 'POST',
-                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/Stop`)
-                });
-            }
-            console.info(`[PlaybackCard] Stream Guard auto-killed session ${sessionId} (${userName}): ${ruleReason}`);
-        } catch (err) {
-            console.error('[PlaybackCard] Failed to auto-kill session:', err);
-        }
-    }
-
-    /**
-     * Evaluates active sessions against Smart Stream Guard rules after each poll.
-     */
-    async function evaluateAutoKillRules(cards) {
-        if (!cards || cards.length === 0) return;
-
-        // Rule 1: Auto-Kill Paused Streams
-        if (streamGuardRules.killPausedEnabled && streamGuardRules.killPausedMinutes > 0) {
-            const maxPausedSeconds = streamGuardRules.killPausedMinutes * 60;
-            for (const card of cards) {
-                if (streamGuardRules.exemptAdmins !== false && isSessionAdmin(card)) continue;
-                if (card.isPaused && card.pausedDurationSeconds >= maxPausedSeconds) {
-                    await executeAutoKill(
-                        card.sessionId,
-                        card.userName,
-                        card.primaryTitle,
-                        `Paused > ${streamGuardRules.killPausedMinutes}m`,
-                        `Playback was automatically closed after being paused for more than ${streamGuardRules.killPausedMinutes} minutes to conserve server resources.`
-                    );
-                    return; // one action per evaluation cycle
-                }
-            }
-        }
-
-        // Rule 2: Block 4K CPU Software Transcodes
-        if (streamGuardRules.kill4kSwEnabled) {
-            for (const card of cards) {
-                if (streamGuardRules.exemptAdmins !== false && isSessionAdmin(card)) continue;
-                if (card.isTranscode && card.isSwTranscode && card.is4k) {
-                    await executeAutoKill(
-                        card.sessionId,
-                        card.userName,
-                        card.primaryTitle,
-                        '4K Software Transcode Blocked',
-                        '4K CPU transcoding is disabled to protect server performance. Please select Original Quality or 1080p.'
-                    );
-                    return;
-                }
-            }
-        }
-
-        // Rule 3: Concurrent Streams per User Cap
-        if (streamGuardRules.maxConcurrentStreams > 0) {
-            const userCounts = new Map();
-            for (const card of cards) {
-                if (streamGuardRules.exemptAdmins !== false && isSessionAdmin(card)) continue;
-                const uid = card.userId || card.userName;
-                const list = userCounts.get(uid) || [];
-                list.push(card);
-                userCounts.set(uid, list);
-            }
-
-            for (const [uid, list] of userCounts.entries()) {
-                if (list.length > streamGuardRules.maxConcurrentStreams) {
-                    // Kill the newest excess stream
-                    const excessCard = list[list.length - 1];
-                    await executeAutoKill(
-                        excessCard.sessionId,
-                        excessCard.userName,
-                        excessCard.primaryTitle,
-                        `Concurrent Cap (> ${streamGuardRules.maxConcurrentStreams})`,
-                        `Maximum simultaneous streams limit (${streamGuardRules.maxConcurrentStreams}) reached for this account.`
-                    );
-                    return;
-                }
-            }
-        }
-    }
-
-    /**
-     * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Privacy, Filter, Inspect).
+     * Attaches interactive event listeners to container elements (Stop, Message, PlayPause, Mute, Privacy, Filter, Stats).
      */
     function attachContainerEvents(container) {
         container.onclick = function (e) {
@@ -5636,19 +3781,6 @@
             if (!target) return;
 
             const action = target.getAttribute('data-action');
-            if (action === 'edit-device-alias') {
-                e.preventDefault();
-                e.stopPropagation();
-                const key = target.getAttribute('data-device-key');
-                const currentName = target.getAttribute('data-current-name') || '';
-                const newName = prompt('Enter accurate device model / nickname (e.g. iPhone 16 Pro Max):', currentName);
-                if (newName !== null) {
-                    saveDeviceAlias(key, newName);
-                    lastRenderedHash = '';
-                    fetchAndRenderSessions();
-                }
-                return;
-            }
 
             if (action === 'toggle-privacy') {
                 e.preventDefault();
@@ -5686,54 +3818,7 @@
             const userName = target.getAttribute('data-user') || 'User';
             const mediaTitle = target.getAttribute('data-title') || 'Media';
 
-            if (action === 'open-stream-guard') {
-                e.preventDefault();
-                openStreamGuardModal();
-                return;
-            }
-
-            if (action === 'open-servarr-modal') {
-                e.preventDefault();
-                openServarrModal();
-                return;
-            }
-
-            if (action === 'force-flush-pipeline') {
-                e.preventDefault();
-                handleFlushPipeline(sessionId, userName, mediaTitle);
-                return;
-            }
-
-            if (action === 'fetch-srt-bazarr') {
-                e.preventDefault();
-                const title = target.getAttribute('data-title') || mediaTitle;
-                handleFetchSrtBazarr(sessionId, title);
-                return;
-            }
-
-            if (action === 'toggle-doctor') {
-                e.preventDefault();
-                const docPanel = container.querySelector(`#tautulli-doctor-${sessionId}`);
-                if (docPanel) {
-                    docPanel.style.display = docPanel.style.display === 'none' ? 'flex' : 'none';
-                }
-                return;
-            }
-
-            if (action === 'send-fix-tip') {
-                e.preventDefault();
-                const tipText = target.getAttribute('data-tip') || 'Please check playback settings.';
-                handleSendMessage(sessionId, userName, tipText);
-                return;
-            }
-
-            if (action === 'inspect-stream') {
-                e.preventDefault();
-                const card = currentCardModels.find((c) => c.sessionId === sessionId);
-                if (card) {
-                    openStreamInspectorModal(card);
-                }
-            } else if (action === 'kill-stream') {
+            if (action === 'kill-stream') {
                 e.preventDefault();
                 handleKillStream(sessionId, userName, mediaTitle);
             } else if (action === 'message-user') {
@@ -5807,32 +3892,6 @@
 
             const cards = activeSessions.map((s, idx) => mapSessionToCardModel(s, idx));
 
-            // P1.2 Multi-IP concurrent account sharing cross-analysis
-            const userWanMap = new Map(); // userId -> Set of distinct clean WAN IPs
-            cards.forEach((c) => {
-                if (!c.isLan && c.rawCleanIp) {
-                    const uid = c.userId || c.userName;
-                    if (!userWanMap.has(uid)) {
-                        userWanMap.set(uid, new Set());
-                    }
-                    userWanMap.get(uid).add(c.rawCleanIp);
-                }
-            });
-
-            cards.forEach((c) => {
-                const uid = c.userId || c.userName;
-                const wanSet = userWanMap.get(uid);
-                if (wanSet && wanSet.size > 1) {
-                    c.isMultiIpSharing = true;
-                    c.distinctWanIpCount = wanSet.size;
-                    c.wanIpList = Array.from(wanSet);
-                } else {
-                    c.isMultiIpSharing = false;
-                    c.distinctWanIpCount = 1;
-                }
-                c.bottleneck = computeBottleneckDiagnostic(c);
-            });
-
             // Tautulli Feature 4: SyncPlay watch party group clustering
             const syncPlayGroupMap = new Map();
             cards.forEach((c) => {
@@ -5873,15 +3932,10 @@
                     bw: c.bandwidthDisplay,
                     hw: c.hwAccelBadge,
                     speed: c.transcodeSpeedMultiplier,
-                    stutter: c.isSevereStutter,
-                    multiIp: c.isMultiIpSharing,
-                    bottleneck: c.bottleneck ? c.bottleneck.key : '',
                     savings: c.bandwidthSavingsBadge || '',
                     conn: c.connectionType || '',
                     sync: c.syncPlayBadge || '',
-                    hires: c.isHiResAudio || false,
-                    zombie: c.isZombieTranscode || false,
-                    bazarr: c.canRemediateSubtitlesWithBazarr || false
+                    hires: c.isHiResAudio || false
                 }))
             });
 
@@ -5911,8 +3965,6 @@
                 });
             }
 
-            // Smart Stream Guard automated policy evaluation
-            await evaluateAutoKillRules(cards);
         } catch (err) {
             console.warn('[PlaybackCard] Failed to fetch active playback sessions:', err);
         } finally {
@@ -6278,7 +4330,6 @@
         const view = e.target || (e.detail && e.detail.element);
         if (isDashboardView(view)) {
             stopPolling();
-            closeStreamInspectorModal();
             if (defaultDevicesElement && defaultDevicesElement.style) {
                 defaultDevicesElement.style.display = '';
             }
