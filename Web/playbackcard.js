@@ -1,5 +1,5 @@
 /**
- * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.1.0
+ * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.0
  * 
  * Injects a real-time, Tautulli & Jellywatch-inspired visual monitoring grid directly into
  * the Jellyfin Admin Dashboard (/dashboard.html / .dashboardForm).
@@ -10,10 +10,13 @@
  * - Transcode Performance Metrics (Transcode FPS & real-time playback speed multiplier).
  * - Paused Stream Timer (Counts up paused duration to detect resource locks).
  * - Subtitle Burn-In Diagnostic Badges (Identifies forced transcode causes like PGS/VOBSUB).
- * - Interactive Session Controls (Kill Stream, Send Message to Device, Pause/Resume).
+ * - Interactive Session Controls (Kill Stream, Send Message to Device, Pause/Resume, Mute/Unmute).
  * - Bandwidth Breakdown in Activity Banner (Total Bandwidth, LAN Bandwidth, WAN Upload).
  * - Admin Privacy Mode (1-click toggle to mask IPs and usernames for screenshots/streaming).
  * - Deep-Navigation Links (Click poster/title to open media details, click user for user settings).
+ * - Multi-View Watch Statistics Leaderboards (Combined Top 3, Top Movies, Top Shows, Top Users).
+ * - Fluid 1-Second Client Progress Interpolation at 60fps.
+ * - Smart Stream Guard with Admin Exemption Safeguard.
  * - Audio/Music Mode support (Artist, Album, Sample Rate, FLAC/MP3).
  * - Strict memory leak prevention with viewshow/viewhide/viewdestroy lifecycle management.
  * - Isolated DOM rendering (zero scroll reset, zero global state mutation).
@@ -55,10 +58,15 @@
 
     // Watch Statistics Drawer State
     let showWatchStats = true;
+    let activeStatsTab = 'combined'; // 'combined' | 'movies' | 'series' | 'users'
     let cachedWatchStats = null;
     let lastWatchStatsFetchTime = 0;
     let isFetchingWatchStats = false;
     const itemBitrateCache = new Map(); // itemId -> bitrate in bps
+
+    // Cached Admin Users for Safeguard Policies
+    let adminUserIds = new Set();
+    let adminUserNames = new Set();
 
     // Placement state: locked to 'replace-devices' in place of default Devices section
     const placementMode = 'replace-devices';
@@ -72,7 +80,8 @@
         killPausedEnabled: false,
         killPausedMinutes: 15,
         kill4kSwEnabled: false,
-        maxConcurrentStreams: 0 // 0 = disabled
+        maxConcurrentStreams: 0, // 0 = disabled
+        exemptAdmins: true // Never auto-terminate admin playback sessions
     };
 
     function loadStreamGuardRules() {
@@ -132,6 +141,36 @@
     }
 
     let servarrConfig = loadServarrConfig();
+
+    /**
+     * Checks whether a session belongs to an administrator.
+     */
+    function isSessionAdmin(card) {
+        if (!card) return false;
+        const apiClient = getApiClient();
+        const currentUserId = (apiClient && typeof apiClient.getCurrentUserId === 'function') ? apiClient.getCurrentUserId() : null;
+        if (currentUserId && card.userId === currentUserId) return true;
+        if (card.userId && adminUserIds.has(card.userId)) return true;
+        if (card.userName && adminUserNames.has(card.userName.toLowerCase())) return true;
+        return false;
+    }
+
+    /**
+     * Formats an ISO date string into relative time ago (e.g. "5m ago", "2h ago", "1d ago").
+     */
+    function formatTimeAgo(dateStr) {
+        if (!dateStr) return 'Recently';
+        try {
+            const date = new Date(dateStr);
+            const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+            if (isNaN(diffSec) || diffSec < 60) return 'Just now';
+            if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+            if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+            return `${Math.floor(diffSec / 86400)}d ago`;
+        } catch (e) {
+            return 'Recently';
+        }
+    }
 
     // Stream Doctor: Transcode Reasons & Client Fix Recommendations
     const TRANSCODE_EXPLANATIONS = {
@@ -736,6 +775,19 @@
                 box-shadow: 0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             }
 
+            .tautulli-action-btn-mute:hover {
+                background: rgba(56, 189, 248, 0.2);
+                border-color: rgba(56, 189, 248, 0.5);
+                color: #38bdf8;
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            .tautulli-action-btn-mute.muted {
+                background: rgba(239, 68, 68, 0.2);
+                border-color: rgba(239, 68, 68, 0.5);
+                color: #f87171;
+            }
+
             .tautulli-action-btn svg {
                 width: 13px;
                 height: 13px;
@@ -1172,6 +1224,8 @@
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 8px;
                 margin-bottom: 14px;
                 padding-bottom: 10px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -1186,6 +1240,40 @@
                 text-transform: uppercase;
                 letter-spacing: 0.08em;
                 color: #ffffff;
+            }
+
+            .tautulli-stats-tabs {
+                display: flex;
+                align-items: center;
+                gap: 3px;
+                background: rgba(0, 0, 0, 0.35);
+                padding: 3px;
+                border-radius: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .tautulli-stats-tab {
+                background: transparent;
+                border: none;
+                border-radius: 6px;
+                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 3px 9px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                white-space: nowrap;
+            }
+
+            .tautulli-stats-tab:hover {
+                color: #f8fafc;
+                background: rgba(255, 255, 255, 0.06);
+            }
+
+            .tautulli-stats-tab.active {
+                color: #38bdf8;
+                background: rgba(56, 189, 248, 0.15);
+                box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
             }
 
             .tautulli-stats-header .tautulli-modal-tool-btn {
@@ -1401,6 +1489,41 @@
                 text-decoration: none !important;
             }
 
+            .tautulli-stats-user-thumb {
+                border-radius: 50% !important;
+                border: 1px solid rgba(56, 189, 248, 0.35);
+                object-fit: cover;
+            }
+
+            .tautulli-admin-pill {
+                display: inline-block;
+                padding: 1px 5px;
+                font-size: 9px;
+                font-weight: 700;
+                border-radius: 4px;
+                background: rgba(56, 189, 248, 0.18);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.4);
+                margin-left: 5px;
+                vertical-align: middle;
+                letter-spacing: 0.04em;
+            }
+
+            .tautulli-stats-empty {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 24px 16px;
+                color: #64748b;
+                font-size: 12px;
+                font-weight: 500;
+                text-align: center;
+                border-radius: 8px;
+                background: rgba(0, 0, 0, 0.2);
+                border: 1px dashed rgba(255, 255, 255, 0.08);
+            }
+
             /* Stream Pipeline Chips (Diskovarr dashboard precision with vector glyphs) */
             .tautulli-pipeline-grid {
                 display: flex;
@@ -1573,7 +1696,7 @@
                 border-radius: 9999px;
                 background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
                 box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
-                transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+                transition: width 1s linear;
             }
 
             .tautulli-progress-fill::after {
@@ -1593,6 +1716,7 @@
             .tautulli-progress-fill.paused {
                 background: linear-gradient(90deg, #d97706 0%, #fbbf24 100%);
                 box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+                transition: none;
             }
 
             .tautulli-progress-fill.paused::after {
@@ -3070,6 +3194,27 @@
     }
 
     /**
+     * Interactive Action: Toggle Mute / Unmute on client session
+     */
+    async function handleToggleMute(sessionId, isCurrentlyMuted) {
+        if (!window.ApiClient || !sessionId) return;
+        const command = isCurrentlyMuted ? 'Unmute' : 'Mute';
+        try {
+            if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
+                await window.ApiClient.sendPlaystateCommand(sessionId, command);
+            } else if (typeof window.ApiClient.ajax === 'function') {
+                await window.ApiClient.ajax({
+                    type: 'POST',
+                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/${command}`)
+                });
+            }
+            fetchAndRenderSessions();
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to toggle mute state:', err);
+        }
+    }
+
+    /**
      * P1.5 Interactive Action: Force Flush Zombie Transcode Pipeline
      * Halts runaway/orphaned FFmpeg processes and clears stalled session tracking.
      */
@@ -3607,6 +3752,8 @@
             totalSeconds,
             isPaused: Boolean(playState.IsPaused),
             pausedDurationSeconds,
+            isMuted: Boolean(playState.IsMuted),
+            volumeLevel,
             primaryTitle,
             secondaryTitle,
             userName: displayName,
@@ -3811,6 +3958,11 @@
                                 <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                             </button>
                             ` : ''}
+                            <button class="tautulli-action-btn tautulli-action-btn-mute ${card.isMuted ? 'muted' : ''}" data-action="toggle-mute" data-session-id="${escapeHtml(card.sessionId)}" data-muted="${card.isMuted ? 'true' : 'false'}" title="${card.isMuted ? 'Unmute Player' : 'Mute Player'}">
+                                ${card.isMuted 
+                                    ? '<svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>' 
+                                    : '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>'}
+                            </button>
                             <button class="tautulli-action-btn tautulli-action-btn-info" data-action="inspect-stream" data-session-id="${escapeHtml(card.sessionId)}" title="Stream Telemetry & Diagnostics">
                                 <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                             </button>
@@ -3819,6 +3971,7 @@
                             </button>
                             <button class="tautulli-action-btn tautulli-action-btn-kill" data-action="kill-stream" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" data-title="${escapeHtml(card.primaryTitle)}" title="Terminate stream">
                                 <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3922,7 +4075,7 @@
     }
 
     /**
-     * Tautulli-Inspired Feature 5: Fetches server top watched statistics for the collapsible leaderboard drawer (Top 3 Combined).
+     * Tautulli-Inspired Feature 5: Fetches server top watched statistics for the collapsible leaderboard drawer (Multi-View Leaderboards).
      */
     async function fetchWatchStatistics() {
         const now = Date.now();
@@ -3933,7 +4086,7 @@
 
         const apiClient = getApiClient();
         if (!apiClient || typeof apiClient.getItems !== 'function') {
-            return cachedWatchStats || { topCombined: [], topSeries: [], topMovies: [] };
+            return cachedWatchStats || { topCombined: [], topSeries: [], topMovies: [], topUsers: [] };
         }
 
         isFetchingWatchStats = true;
@@ -3941,12 +4094,12 @@
 
         try {
             const userId = typeof apiClient.getCurrentUserId === 'function' ? apiClient.getCurrentUserId() : undefined;
-            const [topMoviesResp, topEpisodesResp] = await Promise.allSettled([
+            const [topMoviesResp, topEpisodesResp, usersResp] = await Promise.allSettled([
                 apiClient.getItems(userId, {
                     SortBy: 'PlayCount,SortName',
                     SortOrder: 'Descending',
                     IncludeItemTypes: 'Movie',
-                    Limit: 10,
+                    Limit: 15,
                     Recursive: true,
                     Fields: 'PrimaryImageAspectRatio,UserData,ImageTags,MediaSources,MediaStreams,Container'
                 }),
@@ -3957,11 +4110,19 @@
                     Limit: 50,
                     Recursive: true,
                     Fields: 'SeriesId,SeriesName,SeriesPrimaryImageTag,UserData,ImageTags,MediaSources,MediaStreams,Container'
-                })
+                }),
+                (typeof apiClient.getUsers === 'function') ? apiClient.getUsers() : Promise.resolve([])
             ]);
 
             const movieItems = (topMoviesResp.status === 'fulfilled' && topMoviesResp.value && topMoviesResp.value.Items) ? topMoviesResp.value.Items : [];
             const episodeItems = (topEpisodesResp.status === 'fulfilled' && topEpisodesResp.value && topEpisodesResp.value.Items) ? topEpisodesResp.value.Items : [];
+            const rawUsers = (usersResp.status === 'fulfilled' && Array.isArray(usersResp.value)) ? usersResp.value : [];
+
+            // Cache known admin users
+            if (rawUsers.length > 0) {
+                adminUserIds = new Set(rawUsers.filter(u => u.Policy && u.Policy.IsAdministrator).map(u => u.Id));
+                adminUserNames = new Set(rawUsers.filter(u => u.Policy && u.Policy.IsAdministrator).map(u => (u.Name || '').toLowerCase()));
+            }
 
             // Aggregate watched episode counts per TV series
             const seriesPlayMap = new Map();
@@ -3989,9 +4150,8 @@
                 }
             });
 
-            const combinedList = [];
-
-            // Movies
+            // Process Movies
+            const parsedMovies = [];
             movieItems.forEach((m) => {
                 const plays = (m.UserData && m.UserData.PlayCount) || m.PlayCount || 0;
                 const imgTag = (m.ImageTags && m.ImageTags.Primary) || m.PrimaryImageTag || undefined;
@@ -4012,7 +4172,7 @@
                 const audioChannels = as.Channels === 6 ? '5.1' : as.Channels === 8 ? '7.1' : as.Channels === 2 ? 'Stereo' : '';
                 const audioDesc = [audioCodec, audioChannels].filter(Boolean).join(' ');
 
-                combinedList.push({
+                parsedMovies.push({
                     id: m.Id,
                     name: m.Name,
                     playCount: plays,
@@ -4030,27 +4190,26 @@
                 });
             });
 
-            // Series
-            seriesPlayMap.forEach((s) => {
-                combinedList.push({
-                    id: s.id,
-                    name: s.name,
-                    playCount: s.playCount,
-                    year: s.year,
-                    type: 'TV Series',
-                    resolution: s.resolution,
-                    codec: s.codec,
-                    size: null,
-                    bitrate: null,
-                    container: null,
-                    audioDesc: null,
-                    imgUrl: (typeof apiClient.getImageUrl === 'function')
-                        ? apiClient.getImageUrl(s.id, { type: 'Primary', maxHeight: 200, tag: s.imageTag || undefined })
-                        : null
-                });
-            });
+            // Process Series
+            const parsedSeries = Array.from(seriesPlayMap.values()).map(s => ({
+                id: s.id,
+                name: s.name,
+                playCount: s.playCount,
+                year: s.year,
+                type: 'TV Series',
+                resolution: s.resolution,
+                codec: s.codec,
+                size: null,
+                bitrate: null,
+                container: null,
+                audioDesc: null,
+                imgUrl: (typeof apiClient.getImageUrl === 'function')
+                    ? apiClient.getImageUrl(s.id, { type: 'Primary', maxHeight: 200, tag: s.imageTag || undefined })
+                    : null
+            }));
 
-            // Sort all by play count descending
+            // Combine Movies and Series for Top Combined
+            const combinedList = [...parsedMovies, ...parsedSeries];
             combinedList.sort((a, b) => b.playCount - a.playCount);
 
             // Deduplicate items by name
@@ -4064,14 +4223,53 @@
                 }
             }
 
-            // Take Top 3 items! Prioritize items with plays > 0
-            const withPlays = uniqueCombined.filter((it) => it.playCount > 0);
-            const finalTop3 = withPlays.length > 0 ? withPlays.slice(0, 3) : uniqueCombined.slice(0, 3);
+            parsedMovies.sort((a, b) => b.playCount - a.playCount);
+            parsedSeries.sort((a, b) => b.playCount - a.playCount);
+
+            const withPlaysCombined = uniqueCombined.filter((it) => it.playCount > 0);
+            const finalTopCombined = withPlaysCombined.length > 0 ? withPlaysCombined.slice(0, 3) : uniqueCombined.slice(0, 3);
+
+            const withPlaysMovies = parsedMovies.filter((it) => it.playCount > 0);
+            const finalTopMovies = withPlaysMovies.length > 0 ? withPlaysMovies.slice(0, 3) : parsedMovies.slice(0, 3);
+
+            const withPlaysSeries = parsedSeries.filter((it) => it.playCount > 0);
+            const finalTopSeries = withPlaysSeries.length > 0 ? withPlaysSeries.slice(0, 3) : parsedSeries.slice(0, 3);
+
+            // Fetch Top Users with total play count
+            const userStatsPromises = rawUsers.map(async (u) => {
+                let count = 0;
+                try {
+                    const res = await apiClient.getItems(u.Id, {
+                        Filters: 'IsPlayed',
+                        Recursive: true,
+                        Limit: 0
+                    });
+                    count = (res && res.TotalRecordCount) || 0;
+                } catch (e) {
+                    // Ignore error for individual user query
+                }
+                return {
+                    id: u.Id,
+                    name: u.Name || 'User',
+                    playCount: count,
+                    lastActivity: u.LastActivityDate,
+                    isAdmin: Boolean(u.Policy && u.Policy.IsAdministrator),
+                    imgUrl: (typeof apiClient.getUserImageUrl === 'function' && u.PrimaryImageTag)
+                        ? apiClient.getUserImageUrl(u.Id, { tag: u.PrimaryImageTag, maxHeight: 150 })
+                        : null
+                };
+            });
+            const userResults = await Promise.allSettled(userStatsPromises);
+            const userList = userResults
+                .filter(r => r.status === 'fulfilled' && r.value)
+                .map(r => r.value)
+                .sort((a, b) => b.playCount - a.playCount);
 
             cachedWatchStats = {
-                topCombined: finalTop3,
-                topSeries: finalTop3.filter((i) => i.type === 'TV Series'),
-                topMovies: finalTop3.filter((i) => i.type === 'Movie')
+                topCombined: finalTopCombined,
+                topMovies: finalTopMovies,
+                topSeries: finalTopSeries,
+                topUsers: userList.slice(0, 3)
             };
             return cachedWatchStats;
         } catch (err) {
@@ -4084,35 +4282,88 @@
             cachedWatchStats = {
                 topCombined: [],
                 topSeries: [],
-                topMovies: []
+                topMovies: [],
+                topUsers: []
             };
         }
         return cachedWatchStats;
     }
 
     /**
-     * Renders the Tautulli-inspired Watch Statistics Mini-Drawer (Top 3 Combined Leaderboard).
+     * Renders the Tautulli-inspired Watch Statistics Mini-Drawer with Multi-View tabs (Top 3 Combined, Movies, Shows, Users).
      */
     function renderWatchStatisticsDrawer(stats) {
         if (!stats) return '';
-        const top3 = stats.topCombined || [];
-        if (top3.length === 0) return '';
+
+        let items = [];
+        let isUserView = false;
+        let emptyMessage = 'No watch activity recorded yet in this category';
+
+        if (activeStatsTab === 'movies') {
+            items = stats.topMovies || [];
+            emptyMessage = 'No movies played yet';
+        } else if (activeStatsTab === 'series') {
+            items = stats.topSeries || [];
+            emptyMessage = 'No TV series played yet';
+        } else if (activeStatsTab === 'users') {
+            items = stats.topUsers || [];
+            isUserView = true;
+            emptyMessage = 'No user watch history recorded yet';
+        } else {
+            items = stats.topCombined || [];
+            emptyMessage = 'No playback history recorded yet';
+        }
 
         return `
             <div class="tautulli-stats-drawer" id="tautulli-watch-stats-drawer">
                 <div class="tautulli-stats-header">
                     <div class="tautulli-stats-title">
                         <svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:#38bdf8;flex-shrink:0;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
-                        <span>Top 3 Watched (Server Leaderboard)</span>
+                        <span>Watch Statistics Leaderboard</span>
+                    </div>
+                    <div class="tautulli-stats-tabs">
+                        <button class="tautulli-stats-tab ${activeStatsTab === 'combined' ? 'active' : ''}" data-action="set-stats-tab" data-tab="combined">Combined (Top 3)</button>
+                        <button class="tautulli-stats-tab ${activeStatsTab === 'movies' ? 'active' : ''}" data-action="set-stats-tab" data-tab="movies">Top Movies</button>
+                        <button class="tautulli-stats-tab ${activeStatsTab === 'series' ? 'active' : ''}" data-action="set-stats-tab" data-tab="series">Top Shows</button>
+                        <button class="tautulli-stats-tab ${activeStatsTab === 'users' ? 'active' : ''}" data-action="set-stats-tab" data-tab="users">Top Users</button>
                     </div>
                     <button class="tautulli-modal-tool-btn" data-action="toggle-watch-stats" style="font-size:10px;padding:3px 8px;" title="Collapse watch statistics drawer">
                         Hide Stats ✕
                     </button>
                 </div>
+                ${items.length === 0 ? `
+                <div class="tautulli-stats-empty">
+                    <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#64748b;margin-bottom:6px;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+                    <div>${emptyMessage}</div>
+                </div>
+                ` : `
                 <div class="tautulli-stats-top3-grid">
-                    ${top3.map((item, idx) => {
+                    ${items.map((item, idx) => {
                         const rankClass = idx === 0 ? 'tautulli-stats-rank-1' : (idx === 1 ? 'tautulli-stats-rank-2' : 'tautulli-stats-rank-3');
                         const rankLabel = `#${idx + 1}`;
+
+                        if (isUserView) {
+                            const tooltipText = `${item.name}${item.isAdmin ? ' (Administrator)' : ''} · ${item.playCount} total plays · ${item.lastActivity ? 'Last active ' + formatTimeAgo(item.lastActivity) : 'User'}`;
+                            const userLink = `#!/useredit.html?userId=${encodeURIComponent(item.id)}`;
+                            return `
+                                <a href="${userLink}" class="tautulli-stats-top3-card" style="text-decoration:none!important;color:#f1f5f9!important;" title="${escapeHtml(tooltipText)}">
+                                    <div class="tautulli-stats-top3-rank ${rankClass}">${rankLabel}</div>
+                                    ${item.imgUrl 
+                                        ? `<img class="tautulli-stats-thumb tautulli-stats-user-thumb" src="${escapeHtml(item.imgUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" onerror="this.style.display='none'" />` 
+                                        : '<div class="tautulli-stats-thumb tautulli-stats-user-thumb" style="display:flex;align-items:center;justify-content:center;color:#64748b;background:rgba(255,255,255,0.04);"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>'}
+                                    <div class="tautulli-stats-info">
+                                        <div class="tautulli-stats-name" style="text-decoration:none!important;color:#f8fafc!important;" title="${escapeHtml(item.name)}">
+                                            ${escapeHtml(item.name)}
+                                            ${item.isAdmin ? '<span class="tautulli-admin-pill">Admin</span>' : ''}
+                                        </div>
+                                        <div class="tautulli-stats-subline">
+                                            <span class="tautulli-stats-meta" style="text-decoration:none!important;color:#94a3b8!important;">${item.lastActivity ? formatTimeAgo(item.lastActivity) : 'User'}</span>
+                                            <span class="tautulli-stats-metric" style="text-decoration:none!important;">${item.playCount} play${item.playCount === 1 ? '' : 's'}</span>
+                                        </div>
+                                    </div>
+                                </a>
+                            `;
+                        }
 
                         // Compact meta line: e.g. "2019 · 1080p · 4.8 GB"
                         const metaParts = [];
@@ -4148,6 +4399,7 @@
                         `;
                     }).join('')}
                 </div>
+                `}
             </div>
         `;
     }
@@ -4589,6 +4841,16 @@
                     <tr><td>Multi-Location Check</td><td>${card.isMultiIpSharing ? `<span style="color:#f87171;font-weight:700;">Flagged: ${card.distinctWanIpCount} Distinct WAN IPs streaming concurrently</span>` : '<span style="color:#34d399;">Authorized Single Household</span>'}</td></tr>
                     ${card.isMuted ? `<tr><td>Audio State</td><td><span style="color:#f87171;font-weight:700;">Muted</span></td></tr>` : ''}
                     ${card.volumeLevel != null ? `<tr><td>Volume Level</td><td>${card.volumeLevel}%</td></tr>` : ''}
+                    <tr><td>Remote Controls</td><td>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <button class="tautulli-tool-btn" data-action="toggle-play" data-session-id="${escapeHtml(card.sessionId)}" data-paused="${card.isPaused ? 'true' : 'false'}" style="font-size:11px;padding:3px 9px;">
+                                ${card.isPaused ? 'Resume ▶' : 'Pause ❚❚'}
+                            </button>
+                            <button class="tautulli-tool-btn" data-action="toggle-mute" data-session-id="${escapeHtml(card.sessionId)}" data-muted="${card.isMuted ? 'true' : 'false'}" style="font-size:11px;padding:3px 9px;">
+                                ${card.isMuted ? 'Unmute' : 'Mute'}
+                            </button>
+                        </div>
+                    </td></tr>
                     <tr><td>Session ID</td><td style="font-size:10px;word-break:break-all;">${escapeHtml(card.sessionId)}</td></tr>
                 </table>
             </div>
@@ -4651,6 +4913,14 @@
             } else if (action === 'open-servarr-modal') {
                 closeStreamInspectorModal();
                 openServarrModal();
+            } else if (action === 'toggle-play') {
+                const isPaused = target.getAttribute('data-paused') === 'true';
+                handleTogglePlayPause(card.sessionId, isPaused);
+                closeStreamInspectorModal();
+            } else if (action === 'toggle-mute') {
+                const isMuted = target.getAttribute('data-muted') === 'true';
+                handleToggleMute(card.sessionId, isMuted);
+                closeStreamInspectorModal();
             }
         };
 
@@ -4756,6 +5026,20 @@
                 </div>
             </div>
 
+            <!-- Safeguard: Exempt Server Administrators -->
+            <div class="tautulli-rule-card">
+                <div class="tautulli-rule-row">
+                    <div>
+                        <div class="tautulli-rule-title">Exempt Server Administrators</div>
+                        <div class="tautulli-rule-desc">Never auto-terminate playback sessions initiated by server administrators, regardless of guard thresholds.</div>
+                    </div>
+                    <label class="tautulli-switch">
+                        <input type="checkbox" id="guard-rule-exempt-admins" ${streamGuardRules.exemptAdmins !== false ? 'checked' : ''}>
+                        <span class="tautulli-slider"></span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Auto-Kill Event Log -->
             <div style="margin-top:16px;">
                 <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
@@ -4799,11 +5083,13 @@
                 const pausedMin = modal.querySelector('#guard-paused-minutes');
                 const fourKChk = modal.querySelector('#guard-rule-4k');
                 const concurrentInp = modal.querySelector('#guard-concurrent-limit');
+                const exemptChk = modal.querySelector('#guard-rule-exempt-admins');
 
                 streamGuardRules.killPausedEnabled = pausedChk ? pausedChk.checked : false;
                 streamGuardRules.killPausedMinutes = pausedMin ? Math.max(1, parseInt(pausedMin.value, 10) || 15) : 15;
                 streamGuardRules.kill4kSwEnabled = fourKChk ? fourKChk.checked : false;
                 streamGuardRules.maxConcurrentStreams = concurrentInp ? Math.max(0, parseInt(concurrentInp.value, 10) || 0) : 0;
+                streamGuardRules.exemptAdmins = exemptChk ? exemptChk.checked : true;
 
                 saveStreamGuardRules(streamGuardRules);
                 closeStreamGuardModal();
@@ -5029,6 +5315,7 @@
         if (streamGuardRules.killPausedEnabled && streamGuardRules.killPausedMinutes > 0) {
             const maxPausedSeconds = streamGuardRules.killPausedMinutes * 60;
             for (const card of cards) {
+                if (streamGuardRules.exemptAdmins !== false && isSessionAdmin(card)) continue;
                 if (card.isPaused && card.pausedDurationSeconds >= maxPausedSeconds) {
                     await executeAutoKill(
                         card.sessionId,
@@ -5045,6 +5332,7 @@
         // Rule 2: Block 4K CPU Software Transcodes
         if (streamGuardRules.kill4kSwEnabled) {
             for (const card of cards) {
+                if (streamGuardRules.exemptAdmins !== false && isSessionAdmin(card)) continue;
                 if (card.isTranscode && card.isSwTranscode && card.is4k) {
                     await executeAutoKill(
                         card.sessionId,
@@ -5062,6 +5350,7 @@
         if (streamGuardRules.maxConcurrentStreams > 0) {
             const userCounts = new Map();
             for (const card of cards) {
+                if (streamGuardRules.exemptAdmins !== false && isSessionAdmin(card)) continue;
                 const uid = card.userId || card.userName;
                 const list = userCounts.get(uid) || [];
                 list.push(card);
@@ -5132,6 +5421,14 @@
                 return;
             }
 
+            if (action === 'set-stats-tab') {
+                e.preventDefault();
+                activeStatsTab = target.getAttribute('data-tab') || 'combined';
+                lastRenderedHash = '';
+                fetchAndRenderSessions();
+                return;
+            }
+
             const sessionId = target.getAttribute('data-session-id');
             const userName = target.getAttribute('data-user') || 'User';
             const mediaTitle = target.getAttribute('data-title') || 'Media';
@@ -5193,6 +5490,10 @@
                 e.preventDefault();
                 const isPaused = target.getAttribute('data-paused') === 'true';
                 handleTogglePlayPause(sessionId, isPaused);
+            } else if (action === 'toggle-mute') {
+                e.preventDefault();
+                const isMuted = target.getAttribute('data-muted') === 'true';
+                handleToggleMute(sessionId, isMuted);
             }
         };
     }
@@ -5307,14 +5608,14 @@
                 privacy: isPrivacyMode,
                 filter: currentFilter,
                 showStats: showWatchStats,
+                statsTab: activeStatsTab,
                 idleCount: idleSessions.length,
-                statsItemsCount: cachedWatchStats ? ((cachedWatchStats.topCombined || []).length) : 0,
+                statsHash: cachedWatchStats ? `${(cachedWatchStats.topCombined || []).length}-${(cachedWatchStats.topMovies || []).length}-${(cachedWatchStats.topSeries || []).length}-${(cachedWatchStats.topUsers || []).length}` : '',
                 cards: cards.map((c) => ({
                     id: c.sessionId,
                     method: c.playMethod,
                     paused: c.isPaused,
-                    pauseSec: Math.floor(c.pausedDurationSeconds / 5), // re-render every 5s if paused
-                    pos: c.timeProgressStr,
+                    muted: c.isMuted,
                     buf: c.transcodeCompletionPercentage,
                     bw: c.bandwidthDisplay,
                     hw: c.hwAccelBadge,
@@ -5335,6 +5636,26 @@
                 lastRenderedHash = contentHash;
                 container.innerHTML = renderContainer(cards, idleSessions);
                 attachContainerEvents(container);
+            } else {
+                // In-place smooth re-sync on poll: updates progress & ETA without DOM teardown
+                cards.forEach((card) => {
+                    const cardEl = container.querySelector(`.tautulli-card[data-session-id="${card.sessionId}"]`);
+                    if (!cardEl) return;
+                    if (!card.isPaused) {
+                        const fillEl = cardEl.querySelector('.tautulli-progress-fill');
+                        if (fillEl && card.totalSeconds > 0) {
+                            fillEl.style.width = `${card.progressPercent}%`;
+                        }
+                        const timeProgressEl = cardEl.querySelector('.tautulli-time-progress');
+                        if (timeProgressEl) {
+                            timeProgressEl.textContent = card.timeProgressStr;
+                        }
+                        const etaEl = cardEl.querySelector('.tautulli-time-eta');
+                        if (etaEl) {
+                            etaEl.textContent = card.etaStr;
+                        }
+                    }
+                });
             }
 
             // Smart Stream Guard automated policy evaluation
@@ -5756,5 +6077,5 @@
     checkAndMount();
     setInterval(checkAndMount, 1000);
 
-    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.1.0 initialized successfully.');
+    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.0 initialized successfully.');
 })();

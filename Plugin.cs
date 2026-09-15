@@ -61,6 +61,14 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                     CultureInfo.InvariantCulture,
                     "{0}.Web.playbackcard.js",
                     GetType().Namespace)
+            },
+            new PluginPageInfo
+            {
+                Name = "playbackcard",
+                EmbeddedResourcePath = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}.Web.configPage.html",
+                    GetType().Namespace)
             }
         };
     }
