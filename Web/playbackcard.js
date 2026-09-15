@@ -4656,22 +4656,88 @@
     }
 
     /**
+     * Helper to check if an element is inside any sidebar, navigation drawer, or panel across Jellyfin versions (including MUI Drawer).
+     */
+    function isInsideSidebar(el) {
+        if (!el || typeof el.closest !== 'function') return false;
+        return Boolean(el.closest([
+            '.MuiDrawer-root',
+            '.MuiDrawer-docked',
+            '.MuiDrawer-paper',
+            '[class*="MuiDrawer"]',
+            '[class*="drawer"]',
+            '[class*="Drawer"]',
+            '.mainDrawer',
+            '.sidebar',
+            '.sidebarLinks',
+            '.navMenu',
+            '.drawer-content',
+            'nav',
+            'aside',
+            '[data-role="panel"]',
+            '[role="navigation"]',
+            '.mainAnimatedPages > .drawer'
+        ].join(',')));
+    }
+
+    /**
+     * Retrieves the main dashboard content container, strictly excluding navigation sidebars.
+     */
+    function getDashboardContentRoot() {
+        const primarySelectors = [
+            '#dashboardPage .content-primary',
+            '.dashboardPage .content-primary',
+            '.content-primary',
+            '#dashboardPage',
+            '.dashboardPage',
+            '.dashboardForm',
+            'div[data-role="page"]:not(.hide)',
+            '.view:not(.hide)'
+        ];
+        for (const sel of primarySelectors) {
+            try {
+                const el = document.querySelector(sel);
+                if (el && !isInsideSidebar(el)) return el;
+            } catch (e) {}
+        }
+        return null;
+    }
+
+    /**
      * Finds the Devices section in the dashboard to enable seamless in-place replacement.
      */
     function findDevicesSection(viewElement) {
-        // Find the main dashboard page area, explicitly excluding the sidebar navigation drawer
-        const dashboardPage = document.querySelector('.dashboardPage, .content-primary, .dashboardForm, div[data-role="page"]:not(.hide), .view:not(.hide)');
-        const root = (viewElement && typeof viewElement.querySelector === 'function' && !viewElement.classList.contains('mainDrawer'))
+        const root = (viewElement && typeof viewElement.querySelector === 'function' && !isInsideSidebar(viewElement) && viewElement !== document.body)
             ? viewElement
-            : (dashboardPage || document.body);
+            : getDashboardContentRoot();
 
-        // Helper to check if an element is inside the sidebar or navigation drawer
-        function isInsideSidebar(el) {
+        if (!root) return null;
+
+        function isValidTarget(el) {
             if (!el || typeof el.closest !== 'function') return false;
-            return Boolean(el.closest('.mainDrawer, .sidebar, nav, aside, [data-role="panel"], .drawer-content, .navMenu, .mainAnimatedPages > .drawer'));
+            if (isInsideSidebar(el)) return false;
+            if (el === root || el === document.body) return false;
+            return true;
         }
 
-        // 1. Direct active devices class or ID inside dashboard
+        // 1. Jellyfin 12 (MUI) / React dashboard: Widget with link to "/dashboard/devices" or "/devices"
+        try {
+            const deviceLinks = Array.from(root.querySelectorAll('a[href*="devices"], button[href*="devices"], a[to*="devices"], [data-testid="ChevronRightIcon"]'));
+            for (const el of deviceLinks) {
+                if (isInsideSidebar(el)) continue;
+                const href = (el.getAttribute('href') || el.getAttribute('to') || '').toLowerCase();
+                const text = (el.textContent || '').trim().toLowerCase();
+                if (href.includes('devices') || text.includes('devices')) {
+                    // In MUI, Widget renders: <Box><Button to="/dashboard/devices"><Typography>Devices</Typography></Button>{children}</Box>
+                    const widgetBox = el.closest('.MuiBox-root') || el.parentElement;
+                    if (widgetBox && isValidTarget(widgetBox)) {
+                        return widgetBox;
+                    }
+                }
+            }
+        } catch (e) {}
+
+        // 2. Direct active devices class or ID inside dashboard (Jellyfin 10.8 / 10.9)
         const directSelectors = [
             '.activeDevices',
             '#activeDevices',
@@ -4684,34 +4750,33 @@
             try {
                 const candidates = Array.from(root.querySelectorAll(sel));
                 for (const el of candidates) {
-                    if (isInsideSidebar(el)) continue;
-                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, div[class*="section"], div[class*="Section"]');
+                    if (!isValidTarget(el)) continue;
+                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, .MuiBox-root, div[class*="section"], div[class*="Section"]');
                     return parentSection || el;
                 }
             } catch (e) {}
         }
 
-        // 2. Headings or link tags matching "Devices" inside dashboard
+        // 3. Headings matching "Devices" inside dashboard
         try {
-            const candidates = Array.from(root.querySelectorAll('a, h2, h3, h4, .sectionTitle, .sectionTitleContainer'));
-            for (const el of candidates) {
+            const headings = Array.from(root.querySelectorAll('h1, h2, h3, h4, .sectionTitle, .sectionTitleContainer, .MuiTypography-h3, .MuiTypography-h2, .MuiTypography-root'));
+            for (const el of headings) {
                 if (isInsideSidebar(el)) continue;
-                const href = (el.getAttribute('href') || '').toLowerCase();
                 const text = (el.textContent || '').trim().toLowerCase();
-                if (href.includes('devices') || text === 'devices' || text.startsWith('devices')) {
-                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, div[class*="section"], div[class*="Section"]');
-                    if (parentSection && parentSection !== document.body && parentSection !== root && !isInsideSidebar(parentSection)) {
+                if (text === 'devices' || text.startsWith('devices')) {
+                    const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, .MuiBox-root, div[class*="section"], div[class*="Section"]');
+                    if (parentSection && isValidTarget(parentSection)) {
                         return parentSection;
                     }
-                    // Find the section container enclosing this header and its sibling device cards
                     let curr = el;
                     while (curr && curr.parentElement && curr.parentElement !== root && curr.parentElement !== document.body) {
-                        if (curr.parentElement.querySelector('.activeDevices, .card, [data-role="controlgroup"]')) {
+                        if (isInsideSidebar(curr.parentElement)) break;
+                        if (curr.parentElement.querySelector('.activeDevices, .card, .MuiCard-root, [data-role="controlgroup"]')) {
                             return curr.parentElement;
                         }
                         curr = curr.parentElement;
                     }
-                    return el.parentElement || el;
+                    if (isValidTarget(el.parentElement)) return el.parentElement;
                 }
             }
         } catch (e) {}
@@ -4720,9 +4785,21 @@
     }
 
     /**
-     * Searches for the optimal insertion point across Jellyfin 10.8, 10.9, and 10.10 dashboard layouts.
+     * Searches for the optimal insertion point across Jellyfin 10.8, 10.9, and 10.10/12 dashboard layouts.
      */
     function findDashboardTarget(viewElement) {
+        const root = (viewElement && typeof viewElement.querySelector === 'function' && !isInsideSidebar(viewElement) && viewElement !== document.body)
+            ? viewElement
+            : getDashboardContentRoot();
+
+        if (!root) return null;
+
+        // In Jellyfin 12 MUI, find the left column Stack (which holds ServerInfo and ItemCounts)
+        try {
+            const muiStack = root.querySelector('.MuiGrid-item .MuiStack-root, .content-primary .MuiStack-root');
+            if (muiStack && !isInsideSidebar(muiStack)) return muiStack;
+        } catch (e) {}
+
         const candidateSelectors = [
             '.activeDevices',
             '#activeDevices',
@@ -4730,34 +4807,19 @@
             '#dashboardServerActivity',
             '.dashboardForm',
             '.dashboardGeneralForm',
-            '.dashboardPage .content-primary',
-            '.dashboardPage',
             '.content-primary',
-            '.pageTabContent:not(.hide)',
-            '.pageContainer:not(.hide)',
-            'div[data-role="page"]:not(.hide)',
-            '.view:not(.hide)',
-            '.mainAnimatedPages > .page:not(.hide)',
-            '.mainAnimatedPages > div:not(.hide)'
+            '#dashboardPage',
+            '.dashboardPage'
         ];
-
-        if (viewElement && typeof viewElement.querySelector === 'function') {
-            for (const sel of candidateSelectors) {
-                try {
-                    const el = viewElement.querySelector(sel);
-                    if (el) return el;
-                } catch (e) {}
-            }
-        }
 
         for (const sel of candidateSelectors) {
             try {
-                const el = document.querySelector(sel);
-                if (el) return el;
+                const el = root.querySelector(sel);
+                if (el && !isInsideSidebar(el)) return el;
             } catch (e) {}
         }
 
-        return null;
+        return root;
     }
 
     /**
@@ -4797,9 +4859,9 @@
             return false;
         }
 
-        // If target is an existing dashboard section (e.g. .activeDevices or .dashboardServerActivity), insert directly before it
-        const isExistingSection = (target.classList && (target.classList.contains('activeDevices') || target.classList.contains('dashboardServerActivity'))) || target.id === 'activeDevices';
-        if (isExistingSection) {
+        if (target.classList && target.classList.contains('MuiStack-root')) {
+            target.appendChild(container);
+        } else if (target.classList && (target.classList.contains('activeDevices') || target.classList.contains('dashboardServerActivity') || target.id === 'activeDevices')) {
             if (target.parentNode) {
                 target.parentNode.insertBefore(container, target);
             } else {
@@ -4873,13 +4935,13 @@
             const isAttached = existing && document.body && (typeof document.body.contains === 'function' ? document.body.contains(existing) : true);
 
             const devicesTarget = findDevicesSection(document.body);
-            if (devicesTarget) {
+            if (devicesTarget && devicesTarget.parentNode) {
                 // Ensure default devices section stays hidden
                 if (devicesTarget.style && devicesTarget.style.display !== 'none') {
                     devicesTarget.style.setProperty('display', 'none', 'important');
                 }
-                // If container was mounted elsewhere (e.g. at the top of the dashboard), move it to replace Devices!
-                if (existing && devicesTarget.parentNode && existing.nextSibling !== devicesTarget) {
+                // If container is inside the sidebar OR mounted elsewhere, relocate it to replace devicesTarget!
+                if (existing && (isInsideSidebar(existing) || existing.nextSibling !== devicesTarget)) {
                     devicesTarget.parentNode.insertBefore(existing, devicesTarget);
                 }
             }
