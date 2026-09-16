@@ -89,17 +89,77 @@ Before copying, an automated redaction check scans for sensitive keywords (`Remo
 
 ---
 
+## Installation
+
+### Method 1: Jellyfin Plugin Repository (Catalog Delivery)
+> [!NOTE]
+> Method 1 delivery requires the plugin repository URL to be configured in your Jellyfin server. Until catalog updates are released to production, install via Method 2 (Manual ZIP).
+
+1. In Jellyfin Web, navigate to **Dashboard** &rarr; **Plugins** &rarr; **Repositories**.
+2. Add the custom repository:
+   - **Repository Name**: `Playback Info Card`
+   - **Repository URL**: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
+3. Navigate to **Catalog**, find **Playback Info Card**, and select version **0.2.3.1**.
+4. Click **Install** and restart Jellyfin server.
+
+### Method 2: Manual Installation (ZIP / Binary)
+1. Download `jellyfin-plugin-playbackcard.zip` from [v0.2.3.1 GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases/tag/v0.2.3.1).
+2. Locate your Jellyfin `plugins` directory:
+   - **Linux (systemd)**: `/var/lib/jellyfin/plugins/PlaybackCard/`
+   - **Docker**: `<path-to-config>/plugins/PlaybackCard/`
+   - **Windows**: `%ProgramData%\Jellyfin\Server\plugins\PlaybackCard\` or `<install-dir>\plugins\PlaybackCard\`
+   - **macOS**: `~/.local/share/jellyfin/plugins/PlaybackCard/`
+3. Extract `Jellyfin.Plugin.PlaybackCard.dll` and `plugin.json` into the `PlaybackCard` subdirectory.
+4. Restart Jellyfin Media Server.
+
+---
+
+## Deployment Notes by Platform
+
+### Linux (Debian / Ubuntu / Arch / Fedora)
+* Ensure file permissions for the extracted files match the `jellyfin` service account:
+  ```bash
+  sudo chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/PlaybackCard
+  sudo chmod 644 /var/lib/jellyfin/plugins/PlaybackCard/*
+  sudo systemctl restart jellyfin
+  ```
+
+### Docker
+* Mount the plugins directory from the host into the container:
+  ```yaml
+  volumes:
+    - /path/to/jellyfin/config:/config
+    - /path/to/jellyfin/plugins:/plugins
+  ```
+* Place the plugin files in `<host-plugins-dir>/PlaybackCard/` and restart the container:
+  ```bash
+  docker restart jellyfin
+  ```
+
+### Windows
+* Ensure the service account has read permissions to `%ProgramData%\Jellyfin\Server\plugins\PlaybackCard`.
+* Restart the Jellyfin Server service using the Windows Services app or Jellyfin tray tool.
+
+### Reverse Proxy and Custom Base Paths
+* **Base Path Support**: The monitor page resolves URLs using Jellyfin's runtime `ApiClient.getUrl()`, which respects custom base paths (such as `/jellyfin` or `/media`).
+* **Sub-path / Nginx / Caddy / Traefik / Cloudflare**:
+  - No special proxy header rewrites are required.
+  - Standard WebSocket and HTTP proxy pass directives for Jellyfin are sufficient.
+  - Do not cache dynamic responses for `/Sessions` or `/web/configurationpage`.
+
+---
+
 ## Client Compatibility
 
 * **Jellyfin Web (Desktop & Mobile)**: Fully supported modern browser interface.
-* **Native Client Apps (Android TV, Apple TV, Roku, iOS, Infuse)**: Native client playback sessions are reported by the server and will appear on the Web Playback Monitor. However, native client apps do not render internal Web plugin pages.
+* **Native Client Apps (Android TV, Apple TV, Roku, iOS, Infuse, Moonfin, Jellyfin Enhanced)**: Native client playback sessions are reported by the server and will appear in the Web Playback Monitor. However, native client apps do not render internal Web plugin pages.
 
 ---
 
 ## Migration from v0.2.3.0
 
 1. **Uninstall Legacy Injection**: If you previously installed `0.2.3.0`, replace the plugin DLL and `plugin.json` in your server's `plugins/PlaybackCard/` directory with `0.2.3.1`.
-2. **Remove Host Modifications**: If you previously inserted `<script>` tags into `index.html` or used custom CSS tweaks for earlier versions, remove them. Version `0.2.3.1` requires zero file modifications.
+2. **Remove Host Modifications**: If you previously inserted `<script>` tags into `index.html` or used custom CSS tweaks for earlier versions, remove them. Version `0.2.3.1` requires zero host file modifications.
 3. **Restart Jellyfin**: Restart the server to initialize the updated assembly.
 4. **Access the New Location**: Open Jellyfin Web &rarr; Dashboard &rarr; Server &rarr; **Playback Monitor**.
 
@@ -131,8 +191,10 @@ The previous `0.2.3.0` release artifact and repository manifest entry remain pre
 
 ## Known Limitations
 
-* Polling frequency is 3 seconds while the monitor page is actively viewed; background tabs pause polling to conserve server resources.
-* Native TV and mobile apps report session telemetry to Jellyfin, but the monitor UI itself can only be viewed in web browsers.
+* **Client and Device Metadata**: Device names, client app titles, and operating system labels depend entirely on the strings reported by the client during session registration. Unidentified clients report as "Generic / Unknown Client".
+* **Transcode Telemetry Availability**: Transcode reasons and hardware acceleration engine indicators are populated by the server only when video transcoding is active. In direct stream or direct play modes, transcode telemetry fields are omitted.
+* **Polling Lifecycle**: Polling frequency is 3 seconds while the monitor page is actively viewed. Switching away or leaving the page stops polling after the current cycle.
+* **Native Apps**: Native TV and mobile apps report session telemetry to Jellyfin, but the monitor UI itself can only be viewed in web browsers.
 
 ---
 
