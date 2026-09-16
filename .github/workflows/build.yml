@@ -81,6 +81,7 @@ jobs:
               overview: 'Transient live monitoring displaying real-time session telemetry, direct play vs transcode status, transcode reasons, stream bandwidth, and ETA.',
               owner: 'Ubaidofficial',
               category: 'General',
+              imageUrl: 'https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png',
               versions: [
                 {
                   version: '${VERSION}',
