@@ -26,11 +26,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         TryDiskInjection(applicationPaths);
     }
 
+#pragma warning disable CA1031
     private static void TryDiskInjection(IApplicationPaths applicationPaths)
     {
         try
         {
-            var webPath = (applicationPaths as MediaBrowser.Controller.Configuration.IServerApplicationPaths)?.WebPath;
+            var webPath = applicationPaths?.GetType().GetProperty("WebPath")?.GetValue(applicationPaths) as string;
             var candidates = new List<string>();
             if (!string.IsNullOrEmpty(webPath))
             {
@@ -62,6 +63,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             // Silently ignore disk write permission errors; in-memory middleware handles injection seamlessly
         }
     }
+#pragma warning restore CA1031
 
     /// <summary>
     /// Gets the current plugin instance.

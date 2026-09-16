@@ -46,7 +46,7 @@ public class PlaybackCardMiddleware
         }
 
         var originalBodyStream = context.Response.Body;
-        await using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream();
         context.Response.Body = memoryStream;
 
         try
