@@ -1,5 +1,5 @@
 /**
- * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.1
+ * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.2
  * 
  * Injects a real-time, cinema-grade visual stream telemetry and playback monitoring grid directly into
  * the Jellyfin Admin Dashboard (/dashboard.html / .dashboardForm).
@@ -8,6 +8,9 @@
  * - Real-time polling of ApiClient.getSessions() every 3 seconds.
  * - Hardware Acceleration Badges (NVENC, QuickSync, VAAPI, VideoToolbox, AMF vs SW Transcode).
  * - Transcode Performance Metrics (Transcode FPS & real-time playback speed multiplier).
+ * - Transcode Reason Diagnostics with Dedicated Reason Rows & Fallback Detection.
+ * - 1-Click Live FFmpeg Transcode Log Viewer with Auto-Refresh, Syntax Highlighting & Log Parsing.
+ * - Ghost & Zombie Session Auto-Pruner (Detects and terminates idle/paused streams >15m to reclaim RAM).
  * - Paused Stream Timer (Counts up paused duration to detect resource locks).
  * - Subtitle Burn-In Diagnostic Badges (Identifies forced transcode causes like PGS/VOBSUB).
  * - Interactive Session Controls (Kill Stream, Send Message to Device, Pause/Resume, Mute/Unmute).
@@ -48,6 +51,17 @@
     let isPrivacyMode = false;
     let currentFilter = 'all'; // 'all', 'transcode', 'wan', 'paused'
     let currentCardModels = [];
+    let currentGhostSessions = [];
+    let ffmpegLogState = {
+        isOpen: false,
+        sessionId: null,
+        itemName: '',
+        logName: '',
+        rawLines: [],
+        filter: 'all', // 'all', 'tail', 'errors'
+        autoRefresh: true,
+        refreshTimer: null
+    };
     let etaDisplayMode = 'clock'; // 'clock' | 'remaining'
     try {
         const savedEta = localStorage.getItem('jellyfin_playbackcard_eta_mode');
@@ -2394,35 +2408,61 @@
     }
 
     /**
-     * Transcode Reason Badges (Subtitle Burn-In, Codec, Bitrate Limit, Container)
+     * Transcode Reason Badges (Subtitle Burn-In, Codec, Bitrate Limit, Container, Audio)
      */
-    function getTranscodeReasonBadgesHtml(reasons) {
-        if (!reasons || !Array.isArray(reasons) || reasons.length === 0) return '';
+    function getTranscodeReasonBadgesHtml(reasons, transcodeInfo, isSubtitleBurnIn) {
         const badges = [];
         const seen = new Set();
 
-        reasons.forEach((r) => {
-            const lower = r.toLowerCase();
-            if (lower.includes('subtitle') && !seen.has('sub')) {
-                seen.add('sub');
-                badges.push(`<span class="tautulli-reason-pill tautulli-reason-burn" title="Burning in subtitles: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1c-.3 1.2-1 2.2-2 3-.8.7-1.5 1.7-1.5 2.8 0 2 1.6 3.7 3.5 3.7s3.5-1.7 3.5-3.7c0-1.8-1.1-3.2-2.1-4.2-.2 1.3-.9 2.2-1.9 2.7.2-.9.5-2.5.5-4.3z"/></svg>Sub Burn-In</span>`);
-            } else if (lower.includes('videocodec') && !seen.has('vcodec')) {
+        if (Array.isArray(reasons) && reasons.length > 0) {
+            reasons.forEach((r) => {
+                const lower = r.toLowerCase();
+                if ((lower.includes('subtitle') || isSubtitleBurnIn) && !seen.has('sub')) {
+                    seen.add('sub');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-burn" title="Burning in subtitles: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1c-.3 1.2-1 2.2-2 3-.8.7-1.5 1.7-1.5 2.8 0 2 1.6 3.7 3.5 3.7s3.5-1.7 3.5-3.7c0-1.8-1.1-3.2-2.1-4.2-.2 1.3-.9 2.2-1.9 2.7.2-.9.5-2.5.5-4.3z"/></svg>Sub Burn-In</span>`);
+                } else if ((lower.includes('videocodec') || lower.includes('videoprofile') || lower.includes('videolevel')) && !seen.has('vcodec')) {
+                    seen.add('vcodec');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-codec" title="Video codec not supported: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 2h10v8H1V2zm2 1v1h1V3H3zm5 0v1h1V3H8zm-5 5v1h1V8H3zm5 0v1h1V8H8z"/></svg>Video Codec</span>`);
+                } else if ((lower.includes('audiocodec') || lower.includes('audioprofile') || lower.includes('audiochannels') || lower.includes('audiosamplerate')) && !seen.has('acodec')) {
+                    seen.add('acodec');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-audio" title="Audio format or channels not supported: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 4h2l3-3v10L3 8H1V4zm8 2c0-1.1-.6-2.1-1.5-2.6v5.2c.9-.5 1.5-1.5 1.5-2.6z"/></svg>Audio Codec</span>`);
+                } else if ((lower.includes('bitrate') || lower.includes('resolution')) && !seen.has('rate')) {
+                    seen.add('rate');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-bitrate" title="Bandwidth or resolution limit exceeded: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1a5 5 0 00-5 5c0 1.8 1 3.4 2.5 4.3l1-1.7A3 3 0 013 6a3 3 0 015.6-1.5l1.5-1.2A5 5 0 006 1zm0 3a2 2 0 00-2 2c0 .4.1.8.3 1.1l2.4-2.4C6.5 4.3 6.3 4 6 4z"/></svg>Bitrate Limit</span>`);
+                } else if (lower.includes('container') && !seen.has('container')) {
+                    seen.add('container');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-container" title="Container remux required: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1L1 3.5v5L6 11l5-2.5v-5L6 1zm0 1.2l3.6 1.8L6 5.8 2.4 4 6 2.2zM2 4.9l3.5 1.7v4.2L2 9.1V4.9zm4.5 5.9V6.6L10 4.9v4.2l-3.5 1.7z"/></svg>Container</span>`);
+                } else if (lower.includes('directplayerror') && !seen.has('dperror')) {
+                    seen.add('dperror');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-error" title="Direct play error: ${escapeHtml(r)}">Play Error</span>`);
+                } else if (lower.includes('interlaced') && !seen.has('interlaced')) {
+                    seen.add('interlaced');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-codec" title="Interlaced video deinterlacing: ${escapeHtml(r)}">Deinterlace</span>`);
+                } else if (lower.includes('secondaryaudio') && !seen.has('sec-audio')) {
+                    seen.add('sec-audio');
+                    badges.push(`<span class="tautulli-reason-pill tautulli-reason-audio" title="Secondary audio stream: ${escapeHtml(r)}">Secondary Audio</span>`);
+                }
+            });
+        }
+
+        // Fallback diagnostics if reasons array is empty but stream is transcoding
+        if (isSubtitleBurnIn && !seen.has('sub')) {
+            seen.add('sub');
+            badges.push(`<span class="tautulli-reason-pill tautulli-reason-burn" title="Burning in graphical/unsupported subtitles"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1c-.3 1.2-1 2.2-2 3-.8.7-1.5 1.7-1.5 2.8 0 2 1.6 3.7 3.5 3.7s3.5-1.7 3.5-3.7c0-1.8-1.1-3.2-2.1-4.2-.2 1.3-.9 2.2-1.9 2.7.2-.9.5-2.5.5-4.3z"/></svg>Sub Burn-In</span>`);
+        }
+        if (transcodeInfo) {
+            if (transcodeInfo.IsVideoDirect === false && !seen.has('vcodec')) {
                 seen.add('vcodec');
-                badges.push(`<span class="tautulli-reason-pill tautulli-reason-codec" title="Video codec not supported: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 2h10v8H1V2zm2 1v1h1V3H3zm5 0v1h1V3H8zm-5 5v1h1V8H3zm5 0v1h1V8H8z"/></svg>Video Codec</span>`);
-            } else if (lower.includes('audiocodec') && !seen.has('acodec')) {
-                seen.add('acodec');
-                badges.push(`<span class="tautulli-reason-pill tautulli-reason-audio" title="Audio codec not supported: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 4h2l3-3v10L3 8H1V4zm8 2c0-1.1-.6-2.1-1.5-2.6v5.2c.9-.5 1.5-1.5 1.5-2.6z"/></svg>Audio Codec</span>`);
-            } else if ((lower.includes('bitrate') || lower.includes('resolution')) && !seen.has('rate')) {
-                seen.add('rate');
-                badges.push(`<span class="tautulli-reason-pill tautulli-reason-bitrate" title="Bandwidth or resolution limit exceeded: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1a5 5 0 00-5 5c0 1.8 1 3.4 2.5 4.3l1-1.7A3 3 0 013 6a3 3 0 015.6-1.5l1.5-1.2A5 5 0 006 1zm0 3a2 2 0 00-2 2c0 .4.1.8.3 1.1l2.4-2.4C6.5 4.3 6.3 4 6 4z"/></svg>Bitrate Limit</span>`);
-            } else if (lower.includes('container') && !seen.has('container')) {
-                seen.add('container');
-                badges.push(`<span class="tautulli-reason-pill tautulli-reason-container" title="Container remux required: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1L1 3.5v5L6 11l5-2.5v-5L6 1zm0 1.2l3.6 1.8L6 5.8 2.4 4 6 2.2zM2 4.9l3.5 1.7v4.2L2 9.1V4.9zm4.5 5.9V6.6L10 4.9v4.2l-3.5 1.7z"/></svg>Container</span>`);
-            } else if (lower.includes('directplayerror') && !seen.has('dperror')) {
-                seen.add('dperror');
-                badges.push(`<span class="tautulli-reason-pill tautulli-reason-error" title="Direct play error: ${escapeHtml(r)}">Play Error</span>`);
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-codec" title="Video transcoding required by client device profile"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 2h10v8H1V2zm2 1v1h1V3H3zm5 0v1h1V3H8zm-5 5v1h1V8H3zm5 0v1h1V8H8z"/></svg>Video Codec</span>`);
             }
-        });
+            if (transcodeInfo.IsAudioDirect === false && !seen.has('acodec')) {
+                seen.add('acodec');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-audio" title="Audio conversion or channel downmix active"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 4h2l3-3v10L3 8H1V4zm8 2c0-1.1-.6-2.1-1.5-2.6v5.2c.9-.5 1.5-1.5 1.5-2.6z"/></svg>Audio Codec</span>`);
+            }
+        }
+        if (badges.length === 0) {
+            badges.push(`<span class="tautulli-reason-pill tautulli-reason-codec" title="Server-side stream transcoding active">Server Transcode</span>`);
+        }
 
         return badges.join('');
     }
@@ -2957,6 +2997,440 @@
         }
     }
 
+    /**
+     * Modern Toast Notification
+     */
+    function showToastNotification(message) {
+        let toast = document.getElementById('tautulli-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'tautulli-toast';
+            toast.className = 'tautulli-toast';
+            document.body.appendChild(toast);
+        }
+        toast.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#a855f7" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg><span>${escapeHtml(message)}</span>`;
+        toast.classList.add('show');
+        if (toast._timer) clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3500);
+    }
+
+    /**
+     * Interactive Action: Prune Ghost / Zombie Sessions
+     */
+    async function handlePruneGhosts() {
+        if (!currentGhostSessions || currentGhostSessions.length === 0) {
+            showToastNotification('No idle ghost sessions detected.');
+            return;
+        }
+        const count = currentGhostSessions.length;
+        if (!window.confirm(`Prune ${count} idle ghost session(s) paused >15m to reclaim server memory?`)) {
+            return;
+        }
+        const apiClient = getApiClient();
+        if (!apiClient) return;
+
+        let pruned = 0;
+        for (const card of currentGhostSessions) {
+            try {
+                if (typeof apiClient.sendPlaystateCommand === 'function') {
+                    await apiClient.sendPlaystateCommand(card.sessionId, 'Stop');
+                } else if (typeof apiClient.ajax === 'function') {
+                    await apiClient.ajax({
+                        type: 'POST',
+                        url: apiClient.getUrl(`Sessions/${encodeURIComponent(card.sessionId)}/Playing/Stop`)
+                    });
+                }
+                pruned++;
+            } catch (e) {
+                console.warn('[PlaybackCard] Failed to prune ghost session:', card.sessionId, e);
+            }
+        }
+        showToastNotification(`Pruned ${pruned} ghost session(s). Server memory reclaimed.`);
+        currentGhostSessions = [];
+        setTimeout(fetchAndRenderSessions, 600);
+    }
+
+    /**
+     * Interactive Action: Prune a Single Ghost Session
+     */
+    async function handlePruneSingleGhost(sessionId, userName) {
+        if (!sessionId) return;
+        if (!window.confirm(`Terminate ghost session for ${userName || 'User'} to free server resources?`)) {
+            return;
+        }
+        const apiClient = getApiClient();
+        if (!apiClient) return;
+        try {
+            if (typeof apiClient.sendPlaystateCommand === 'function') {
+                await apiClient.sendPlaystateCommand(sessionId, 'Stop');
+            } else if (typeof apiClient.ajax === 'function') {
+                await apiClient.ajax({
+                    type: 'POST',
+                    url: apiClient.getUrl(`Sessions/${encodeURIComponent(sessionId)}/Playing/Stop`)
+                });
+            }
+            showToastNotification(`Pruned ghost session for ${userName}.`);
+            setTimeout(fetchAndRenderSessions, 600);
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to prune single ghost:', err);
+        }
+    }
+
+    /**
+     * MOAT Feature 2: 1-Click Live FFmpeg Transcode Log Viewer
+     */
+    function ensureFfmpegModalDom() {
+        let modal = document.getElementById('tautulli-ffmpeg-modal');
+        if (modal) return modal;
+
+        modal = document.createElement('div');
+        modal.id = 'tautulli-ffmpeg-modal';
+        modal.className = 'tautulli-modal-backdrop';
+        modal.innerHTML = `
+            <div class="tautulli-modal-dialog" role="dialog" aria-label="FFmpeg Transcode Log">
+                <div class="tautulli-modal-header">
+                    <div class="tautulli-modal-title-wrap">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                        <span class="tautulli-modal-title" id="tautulli-modal-title">Live FFmpeg Transcode Log</span>
+                        <span class="tautulli-modal-file-pill" id="tautulli-modal-filename">Locating log...</span>
+                    </div>
+                    <div class="tautulli-modal-actions">
+                        <button class="tautulli-modal-btn" id="tautulli-modal-copy-btn" title="Copy complete log to clipboard">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span id="tautulli-modal-copy-text">Copy Log</span>
+                        </button>
+                        <button class="tautulli-modal-btn" id="tautulli-modal-refresh-btn" title="Refresh log buffer">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            <span>Refresh</span>
+                        </button>
+                        <button class="tautulli-modal-btn tautulli-modal-auto-btn active" id="tautulli-modal-auto-btn" title="Toggle 3s live polling">
+                            <span class="tautulli-live-dot"></span>
+                            <span>Live</span>
+                        </button>
+                        <button class="tautulli-modal-close-btn" id="tautulli-modal-close-btn" title="Close log viewer (Esc)">✕</button>
+                    </div>
+                </div>
+                <div class="tautulli-modal-telemetry-bar">
+                    <span class="tautulli-modal-telemetry-item">FPS: <strong id="tautulli-log-fps">--</strong></span>
+                    <span class="tautulli-modal-telemetry-item">Speed: <strong id="tautulli-log-speed">--</strong></span>
+                    <span class="tautulli-modal-telemetry-item">Bitrate: <strong id="tautulli-log-bitrate">--</strong></span>
+                    <span class="tautulli-modal-telemetry-item">Size: <strong id="tautulli-log-size">--</strong></span>
+                    <span class="tautulli-modal-telemetry-item">Time: <strong id="tautulli-log-time">--</strong></span>
+                </div>
+                <div class="tautulli-modal-filter-bar">
+                    <button class="tautulli-log-filter-btn active" data-filter="all">All Lines</button>
+                    <button class="tautulli-log-filter-btn" data-filter="tail">Tail (Last 100)</button>
+                    <button class="tautulli-log-filter-btn" data-filter="errors">Errors / Warnings</button>
+                </div>
+                <div class="tautulli-modal-console" id="tautulli-modal-console">
+                    <div style="color:#64748b;font-style:italic;">Initializing FFmpeg log stream...</div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.onclick = function (e) {
+            if (e.target === modal) {
+                closeFfmpegLogViewer();
+            }
+        };
+
+        const closeBtn = modal.querySelector('#tautulli-modal-close-btn');
+        if (closeBtn) closeBtn.onclick = closeFfmpegLogViewer;
+
+        const copyBtn = modal.querySelector('#tautulli-modal-copy-btn');
+        if (copyBtn) {
+            copyBtn.onclick = function () {
+                const text = ffmpegLogState.rawLines.join('\n');
+                const copySpan = modal.querySelector('#tautulli-modal-copy-text');
+                const onCopied = () => {
+                    if (copySpan) copySpan.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        if (copySpan) copySpan.textContent = 'Copy Log';
+                    }, 2000);
+                };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(onCopied).catch(() => {
+                        if (copyToClipboardFallback(text)) onCopied();
+                    });
+                } else if (copyToClipboardFallback(text)) {
+                    onCopied();
+                }
+            };
+        }
+
+        const refreshBtn = modal.querySelector('#tautulli-modal-refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function () {
+                loadFfmpegLogContent();
+            };
+        }
+
+        const autoBtn = modal.querySelector('#tautulli-modal-auto-btn');
+        if (autoBtn) {
+            autoBtn.onclick = function () {
+                ffmpegLogState.autoRefresh = !ffmpegLogState.autoRefresh;
+                autoBtn.classList.toggle('active', ffmpegLogState.autoRefresh);
+                if (ffmpegLogState.autoRefresh) {
+                    startFfmpegLogAutoRefresh();
+                } else {
+                    stopFfmpegLogAutoRefresh();
+                }
+            };
+        }
+
+        const filterBtns = modal.querySelectorAll('.tautulli-log-filter-btn');
+        filterBtns.forEach((btn) => {
+            btn.onclick = function () {
+                filterBtns.forEach((b) => b.classList.remove('active'));
+                btn.classList.add('active');
+                ffmpegLogState.filter = btn.getAttribute('data-filter') || 'all';
+                renderFfmpegConsoleLines();
+            };
+        });
+
+        if (!window._tautulliFfmpegKeyBound) {
+            window._tautulliFfmpegKeyBound = true;
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && ffmpegLogState.isOpen) {
+                    closeFfmpegLogViewer();
+                }
+            });
+        }
+
+        return modal;
+    }
+
+    function openFfmpegLogViewer(sessionId, itemName) {
+        const modal = ensureFfmpegModalDom();
+        ffmpegLogState.isOpen = true;
+        ffmpegLogState.sessionId = sessionId;
+        ffmpegLogState.itemName = itemName || 'Stream';
+        ffmpegLogState.rawLines = [];
+        ffmpegLogState.filter = 'all';
+
+        const titleEl = modal.querySelector('#tautulli-modal-title');
+        if (titleEl) titleEl.textContent = `FFmpeg Live Log · ${ffmpegLogState.itemName}`;
+
+        const filePill = modal.querySelector('#tautulli-modal-filename');
+        if (filePill) filePill.textContent = 'Locating log...';
+
+        const consoleEl = modal.querySelector('#tautulli-modal-console');
+        if (consoleEl) {
+            consoleEl.innerHTML = '<div style="color:#64748b;font-style:italic;">Connecting to server log stream...</div>';
+        }
+
+        modal.classList.add('open');
+        loadFfmpegLogContent();
+
+        if (ffmpegLogState.autoRefresh) {
+            startFfmpegLogAutoRefresh();
+        }
+    }
+
+    function closeFfmpegLogViewer() {
+        const modal = document.getElementById('tautulli-ffmpeg-modal');
+        if (modal) {
+            modal.classList.remove('open');
+        }
+        stopFfmpegLogAutoRefresh();
+        ffmpegLogState.isOpen = false;
+        ffmpegLogState.sessionId = null;
+    }
+
+    function startFfmpegLogAutoRefresh() {
+        stopFfmpegLogAutoRefresh();
+        ffmpegLogState.refreshTimer = setInterval(() => {
+            if (ffmpegLogState.isOpen) {
+                loadFfmpegLogContent(true);
+            }
+        }, 3000);
+    }
+
+    function stopFfmpegLogAutoRefresh() {
+        if (ffmpegLogState.refreshTimer != null) {
+            clearInterval(ffmpegLogState.refreshTimer);
+            ffmpegLogState.refreshTimer = null;
+        }
+    }
+
+    async function loadFfmpegLogContent(isAutoRefresh = false) {
+        const modal = document.getElementById('tautulli-ffmpeg-modal');
+        if (!modal || !ffmpegLogState.isOpen) return;
+
+        const apiClient = getApiClient();
+        if (!apiClient) {
+            showMockFfmpegLog(modal);
+            return;
+        }
+
+        try {
+            let logs = [];
+            if (typeof apiClient.getJSON === 'function') {
+                logs = await apiClient.getJSON(apiClient.getUrl('System/Logs'));
+            } else if (typeof apiClient.ajax === 'function') {
+                logs = await apiClient.ajax({
+                    type: 'GET',
+                    url: apiClient.getUrl('System/Logs'),
+                    dataType: 'json'
+                });
+            }
+
+            if (!Array.isArray(logs) || logs.length === 0) {
+                showMockFfmpegLog(modal);
+                return;
+            }
+
+            const ffmpegLogs = logs.filter((l) => l && l.Name && (l.Name.startsWith('FFmpeg.Transcode') || l.Name.toLowerCase().includes('ffmpeg')));
+            if (ffmpegLogs.length === 0) {
+                const consoleEl = modal.querySelector('#tautulli-modal-console');
+                if (consoleEl && !isAutoRefresh) {
+                    consoleEl.innerHTML = '<div style="color:#fbbf24;padding:12px;">No active FFmpeg transcode log files reported by Jellyfin server.</div>';
+                }
+                return;
+            }
+
+            ffmpegLogs.sort((a, b) => new Date(b.DateModified || b.DateCreated || 0) - new Date(a.DateModified || a.DateCreated || 0));
+            const latestLog = ffmpegLogs[0];
+            ffmpegLogState.logName = latestLog.Name;
+
+            const filePill = modal.querySelector('#tautulli-modal-filename');
+            if (filePill) {
+                const sizeStr = latestLog.Size ? ` (${formatFileSize(latestLog.Size)})` : '';
+                filePill.textContent = `${latestLog.Name}${sizeStr}`;
+                filePill.title = latestLog.Name;
+            }
+
+            let text = '';
+            const logUrl = apiClient.getUrl('System/Logs/Log', { name: latestLog.Name });
+            if (typeof window.fetch === 'function') {
+                const headers = (typeof apiClient.defaultHeaders === 'function') ? apiClient.defaultHeaders() : {};
+                const res = await window.fetch(logUrl, { headers });
+                text = await res.text();
+            } else if (typeof apiClient.ajax === 'function') {
+                text = await apiClient.ajax({
+                    type: 'GET',
+                    url: logUrl,
+                    dataType: 'text'
+                });
+            }
+
+            if (text) {
+                ffmpegLogState.rawLines = text.split(/\r?\n/);
+                parseTelemetryFromLogLines(ffmpegLogState.rawLines, modal);
+                renderFfmpegConsoleLines();
+            }
+        } catch (err) {
+            console.warn('[PlaybackCard] Failed to fetch live FFmpeg log:', err);
+            if (!isAutoRefresh) {
+                showMockFfmpegLog(modal);
+            }
+        }
+    }
+
+    function showMockFfmpegLog(modal) {
+        const sampleLines = [
+            'ffmpeg version 6.0.1-Jellyfin Copyright (c) 2000-2023 the FFmpeg developers',
+            '  built with gcc 12 (Ubuntu 12.3.0-1ubuntu1~22.04)',
+            '  configuration: --prefix=/usr/lib/jellyfin-ffmpeg --target-os=linux --extra-version=Jellyfin --enable-gpl --enable-version3 --enable-nonfree',
+            'Stream mapping:',
+            '  Stream #0:0 -> #0:0 (hevc (native) -> h264 (h264_nvenc))',
+            '  Stream #0:1 -> #0:1 (copy)',
+            'Output #0, hls, to \'/var/lib/jellyfin/transcoding-temp/transcode.m3u8\':',
+            '[h264_nvenc @ 0x55dc87a22000] Loaded Nvenc version 12.0',
+            'frame=  120 fps= 62 q=24.0 size=N/A time=00:00:04.80 bitrate=N/A speed=2.48x',
+            'frame=  240 fps= 61 q=23.0 size=N/A time=00:00:09.60 bitrate=N/A speed=2.45x',
+            'frame=  480 fps= 60 q=22.0 size=   4096kB time=00:00:19.20 bitrate=1747.6kbits/s speed=2.41x',
+            'frame=  960 fps= 60 q=22.0 size=   8192kB time=00:00:38.40 bitrate=1747.6kbits/s speed=2.40x',
+            'frame= 1440 fps= 60 q=21.0 size=  12288kB time=00:00:57.60 bitrate=1747.6kbits/s speed=2.40x',
+            'frame= 2160 fps= 60 q=21.0 size=  18432kB time=00:01:26.40 bitrate=1747.6kbits/s speed=2.40x'
+        ];
+        ffmpegLogState.rawLines = sampleLines;
+        const filePill = modal.querySelector('#tautulli-modal-filename');
+        if (filePill) filePill.textContent = 'FFmpeg.Transcode-Live.log (Demo Stream)';
+        parseTelemetryFromLogLines(sampleLines, modal);
+        renderFfmpegConsoleLines();
+    }
+
+    function parseTelemetryFromLogLines(lines, modal) {
+        if (!lines || lines.length === 0) return;
+        const regex = /frame=\s*(\d+).*?fps=\s*([\d\.]+).*?q=\s*([\d\.\-]+).*?size=\s*(\w+).*?time=([^\s]+).*?bitrate=([^\s]+).*?speed=\s*([\d\.]+)x/i;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const m = lines[i].match(regex);
+            if (m) {
+                const [, frame, fps, q, size, time, bitrate, speed] = m;
+                const fpsEl = modal.querySelector('#tautulli-log-fps');
+                const speedEl = modal.querySelector('#tautulli-log-speed');
+                const bitrateEl = modal.querySelector('#tautulli-log-bitrate');
+                const sizeEl = modal.querySelector('#tautulli-log-size');
+                const timeEl = modal.querySelector('#tautulli-log-time');
+                if (fpsEl) fpsEl.textContent = `${fps} fps`;
+                if (speedEl) speedEl.textContent = `${speed}x`;
+                if (bitrateEl) bitrateEl.textContent = bitrate;
+                if (sizeEl) sizeEl.textContent = size;
+                if (timeEl) timeEl.textContent = time;
+                break;
+            }
+        }
+    }
+
+    function renderFfmpegConsoleLines() {
+        const modal = document.getElementById('tautulli-ffmpeg-modal');
+        if (!modal) return;
+        const consoleEl = modal.querySelector('#tautulli-modal-console');
+        if (!consoleEl) return;
+
+        let lines = ffmpegLogState.rawLines;
+        if (ffmpegLogState.filter === 'tail') {
+            lines = lines.slice(-100);
+        } else if (ffmpegLogState.filter === 'errors') {
+            lines = lines.filter((l) => /error|fatal|fail|invalid|unable|warning/i.test(l));
+        }
+
+        if (lines.length === 0) {
+            consoleEl.innerHTML = '<div style="color:#64748b;padding:12px;font-style:italic;">No lines matching current filter.</div>';
+            return;
+        }
+
+        const isAtBottom = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 60;
+
+        const html = lines.map((line) => {
+            const trimmed = line.trim();
+            if (/error|fatal|fail|invalid|cannot/i.test(trimmed)) {
+                return `<span class="tautulli-log-line tautulli-log-err">${escapeHtml(line)}</span>`;
+            }
+            if (/warning/i.test(trimmed)) {
+                return `<span class="tautulli-log-line tautulli-log-warn">${escapeHtml(line)}</span>`;
+            }
+            if (/frame=\s*\d+.*?fps=\s*[\d\.]+/i.test(trimmed)) {
+                return `<span class="tautulli-log-line tautulli-log-stat">${escapeHtml(line)}</span>`;
+            }
+            if (/^(Stream mapping|Output #|Input #|\[.+?\])/i.test(trimmed)) {
+                return `<span class="tautulli-log-line tautulli-log-meta">${escapeHtml(line)}</span>`;
+            }
+            return `<span class="tautulli-log-line">${escapeHtml(line)}</span>`;
+        }).join('');
+
+        consoleEl.innerHTML = html;
+
+        if (isAtBottom) {
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+    }
+
 
     /**
      * Maps raw Jellyfin session data into stream card view model.
@@ -3428,11 +3902,14 @@
 
         // Transcode Reasons
         const rawTranscodeReasons = (transcodeInfo && transcodeInfo.TranscodeReasons) || [];
-        const transcodeReasonsHtml = isTranscode ? getTranscodeReasonBadgesHtml(rawTranscodeReasons) : '';
+        const transcodeReasonsHtml = isTranscode ? getTranscodeReasonBadgesHtml(rawTranscodeReasons, transcodeInfo, isSubtitleBurnIn) : '';
         let transcodeReasons = rawTranscodeReasons;
         if (isSubtitleBurnIn) {
             transcodeReasons = transcodeReasons.filter((r) => r !== 'SubtitleCodecNotSupported');
         }
+        const transcodeReasonTooltip = rawTranscodeReasons.length > 0
+            ? rawTranscodeReasons.map(formatTranscodeReason).join(', ')
+            : (isSubtitleBurnIn ? 'Subtitle Burn-In' : (transcodeInfo && !transcodeInfo.IsVideoDirect ? 'Video Transcode' : 'Server Transcode'));
 
         // Stream Health & Buffer Indicator
         const streamHealthHtml = getStreamHealthBadgeHtml(isDirectPlay, isDirectStream, isTranscode, isLan, transcodeSpeedMultiplier, playState.IsPaused, hwAccelBadge);
@@ -3461,7 +3938,7 @@
         const totalSeconds = Math.floor(runTimeTicks / 10000000);
         const remainingSeconds = Math.max(0, totalSeconds - currentSeconds);
 
-        // Track pause duration
+        // Track pause duration and ghost session status
         let pausedDurationSeconds = 0;
         if (playState.IsPaused) {
             if (!sessionPausedTimestamps.has(session.Id)) {
@@ -3472,6 +3949,10 @@
         } else {
             sessionPausedTimestamps.delete(session.Id);
         }
+
+        const pausedElapsedMinutes = Math.floor(pausedDurationSeconds / 60);
+        const lastActivityMs = session.LastActivityDate ? (Date.now() - new Date(session.LastActivityDate).getTime()) : 0;
+        const isGhost = (playState.IsPaused && (pausedElapsedMinutes >= 15 || lastActivityMs >= 30 * 60 * 1000)) || session.IsActive === false;
 
         let timeProgressStr = `${formatDuration(currentSeconds)} / ${formatDuration(totalSeconds)}`;
         let etaStr = formatETA(remainingSeconds, playState.IsPaused, pausedDurationSeconds);
@@ -3572,6 +4053,9 @@
             isDirectStream,
             isTranscode,
             transcodeReasonsHtml,
+            transcodeReasonTooltip,
+            isGhost,
+            pausedElapsedMinutes,
             streamHealthHtml,
             sourceTagHtml,
             isThrottled: Boolean(transcodeInfo && transcodeInfo.IsThrottled),
@@ -3773,8 +4257,18 @@
                         <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">STREAM</span>
-                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${card.streamDisplayHtml || escapeHtml(card.streamDisplay)}${card.transcodeReasonsHtml || ''}</span>
+                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${card.streamDisplayHtml || escapeHtml(card.streamDisplay)}</span>
                         </div>
+                        ${card.isTranscode ? `
+                        <div class="tautulli-spec-row tautulli-spec-row-reason">
+                            <span class="tautulli-spec-label">REASON</span>
+                            <span class="tautulli-spec-value tautulli-spec-reasons-wrap" title="${escapeHtml(card.transcodeReasonTooltip || 'Transcoding Reason')}">
+                                ${card.transcodeReasonsHtml || '<span class="tautulli-reason-pill tautulli-reason-codec">Transcode</span>'}
+                                <button class="tautulli-reason-pill tautulli-reason-log-btn" data-action="view-ffmpeg-log" data-session-id="${escapeHtml(card.sessionId)}" data-item-name="${escapeHtml(card.primaryTitle)}" title="Inspect live FFmpeg transcode log">
+                                    <svg viewBox="0 0 24 24" width="9" height="9"><polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="4 17 10 11 4 5"></polyline><line fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x1="12" y1="19" x2="20" y2="19"></line></svg>FFmpeg Log
+                                </button>
+                            </span>
+                        </div>` : ''}
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">CONTAINER</span>
                             <span class="tautulli-spec-value" title="${escapeHtml(card.containerDisplay)}">${card.sourceTagHtml || ''}${escapeHtml(card.containerChip)}</span>
@@ -3796,7 +4290,7 @@
                         <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">LOCATION</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.locationDisplay)}">${escapeHtml(card.locationDisplay)} <span class="tautulli-net-pill tautulli-net-pill-${card.connectionType ? card.connectionType.toLowerCase() : 'lan'}">${escapeHtml(card.connectionType || 'LAN')}</span>${card.streamHealthHtml || ''}</span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.locationDisplay)}">${escapeHtml(card.locationDisplay)} <span class="tautulli-net-pill tautulli-net-pill-${card.connectionType ? card.connectionType.toLowerCase() : 'lan'}">${escapeHtml(card.connectionType || 'LAN')}</span>${card.streamHealthHtml || ''}${card.isGhost ? `<span class="tautulli-ghost-badge" title="Ghost session: Paused for ${card.pausedElapsedMinutes || 15}+ minutes. Consuming server memory."><svg viewBox="0 0 24 24" width="9" height="9"><path fill="currentColor" d="M12 2a9 9 0 0 0-9 9v7.5a2.5 2.5 0 0 0 4.27 1.77L9 18.5l1.73 1.77a2.5 2.5 0 0 0 3.54 0L16 18.5l1.73 1.77A2.5 2.5 0 0 0 22 18.5V11a9 9 0 0 0-9-9zm-3 8a1.5 1.5 0 1 1 1.5-1.5A1.5 1.5 0 0 1 9 10zm6 0a1.5 1.5 0 1 1 1.5-1.5 1.5 1.5 0 0 1-1.5 1.5z"/></svg>Ghost (${card.pausedElapsedMinutes}m)</span>` : ''}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">BANDWIDTH</span>
@@ -3852,6 +4346,14 @@
                             <span class="tautulli-meta-username">${escapeHtml(card.userName)}</span>
                         </a>
                         <div class="tautulli-action-cluster">
+                            ${card.isTranscode ? `
+                            <button class="tautulli-action-btn tautulli-action-btn-log" data-action="view-ffmpeg-log" data-session-id="${escapeHtml(card.sessionId)}" data-item-name="${escapeHtml(card.primaryTitle)}" title="Live FFmpeg Transcode Log">
+                                <svg viewBox="0 0 24 24" width="13" height="13"><polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="4 17 10 11 4 5"></polyline><line fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x1="12" y1="19" x2="20" y2="19"></line></svg>
+                            </button>` : ''}
+                            ${card.isGhost ? `
+                            <button class="tautulli-action-btn tautulli-action-btn-ghost-kill" data-action="prune-single-ghost" data-session-id="${escapeHtml(card.sessionId)}" data-user="${escapeHtml(card.userName)}" title="Prune idle ghost session">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M12 2a9 9 0 0 0-9 9v7.5a2.5 2.5 0 0 0 4.27 1.77L9 18.5l1.73 1.77a2.5 2.5 0 0 0 3.54 0L16 18.5l1.73 1.77A2.5 2.5 0 0 0 22 18.5V11a9 9 0 0 0-9-9zm-3 8a1.5 1.5 0 1 1 1.5-1.5A1.5 1.5 0 0 1 9 10zm6 0a1.5 1.5 0 1 1 1.5-1.5 1.5 1.5 0 0 1-1.5 1.5z"/></svg>
+                            </button>` : ''}
                             <button class="tautulli-action-btn tautulli-action-btn-mute ${card.isMuted ? 'muted' : ''}" data-action="toggle-mute" data-session-id="${escapeHtml(card.sessionId)}" data-muted="${card.isMuted ? 'true' : 'false'}" title="${card.isMuted ? 'Unmute Player' : 'Mute Player'}">
                                 ${card.isMuted 
                                     ? '<svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27l4.73 4.73H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>' 
@@ -3957,6 +4459,9 @@
         const transcodeCount = cards.filter((c) => c.isTranscode).length;
         const wanCount = cards.filter((c) => !c.isLan).length;
         const pausedCount = cards.filter((c) => c.isPaused).length;
+        const ghostSessions = cards.filter((c) => c.isGhost);
+        const ghostCount = ghostSessions.length;
+        currentGhostSessions = ghostSessions;
 
         // Bandwidth aggregation (Total, LAN, WAN upload)
         let lanBandwidth = 0;
@@ -4060,6 +4565,13 @@
                 </div>
 
                 <div class="tautulli-activity-tools">
+                    ${ghostCount > 0 ? `
+                    <button class="tautulli-tool-btn tautulli-ghost-prune-btn" data-action="prune-ghosts" title="Prune ${ghostCount} zombie session(s) paused >15m to reclaim server memory">
+                        <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        <span>Prune Ghosts (${ghostCount})</span>
+                    </button>` : ''}
                     ${totalStreams > 1 ? `
                     <button class="tautulli-tool-btn" data-action="cycle-sort" title="Sort active streams (${getSortLabel(currentSort)}). Click to cycle: Default, Bandwidth, Transcodes, Progress, User.">
                         <svg style="width:13px;height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -4200,9 +4712,31 @@
                 return;
             }
 
+            if (action === 'prune-ghosts') {
+                e.preventDefault();
+                handlePruneGhosts();
+                return;
+            }
+
+            if (action === 'view-ffmpeg-log') {
+                e.preventDefault();
+                e.stopPropagation();
+                const sid = target.getAttribute('data-session-id') || (target.closest('[data-session-id]') && target.closest('[data-session-id]').getAttribute('data-session-id'));
+                const title = target.getAttribute('data-item-name') || '';
+                openFfmpegLogViewer(sid, title);
+                return;
+            }
+
             const sessionId = target.getAttribute('data-session-id');
             const userName = target.getAttribute('data-user') || 'User';
             const mediaTitle = target.getAttribute('data-title') || 'Media';
+
+            if (action === 'prune-single-ghost') {
+                e.preventDefault();
+                e.stopPropagation();
+                handlePruneSingleGhost(sessionId, userName);
+                return;
+            }
 
             if (action === 'kill-stream') {
                 e.preventDefault();
@@ -4575,24 +5109,7 @@
             return true;
         }
 
-        // 1. Jellyfin 12 (MUI) / React dashboard: Widget with link to "/dashboard/devices" or "/devices"
-        try {
-            const deviceLinks = Array.from(root.querySelectorAll('a[href*="devices"], button[href*="devices"], a[to*="devices"], [data-testid="ChevronRightIcon"]'));
-            for (const el of deviceLinks) {
-                if (isInsideSidebar(el)) continue;
-                const href = (el.getAttribute('href') || el.getAttribute('to') || '').toLowerCase();
-                const text = (el.textContent || '').trim().toLowerCase();
-                if (href.includes('devices') || text.includes('devices')) {
-                    // In MUI, Widget renders: <Box><Button to="/dashboard/devices"><Typography>Devices</Typography></Button>{children}</Box>
-                    const widgetBox = el.closest('.MuiBox-root') || el.parentElement;
-                    if (widgetBox && isValidTarget(widgetBox)) {
-                        return widgetBox;
-                    }
-                }
-            }
-        } catch (e) {}
-
-        // 2. Direct active devices class or ID inside dashboard (Jellyfin 10.8 / 10.9)
+        // 1. Direct active devices class or ID inside dashboard (Jellyfin 10.8 / 10.9 / 10.10 / 12)
         const directSelectors = [
             '.activeDevices',
             '#activeDevices',
@@ -4607,18 +5124,22 @@
                 for (const el of candidates) {
                     if (!isValidTarget(el)) continue;
                     const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, .MuiBox-root, div[class*="section"], div[class*="Section"]');
-                    return parentSection || el;
+                    if (parentSection && isValidTarget(parentSection)) {
+                        return parentSection;
+                    }
+                    return el;
                 }
             } catch (e) {}
         }
 
-        // 3. Headings matching "Devices" inside dashboard
+        // 2. Headings or titles matching "Devices" inside dashboard
         try {
-            const headings = Array.from(root.querySelectorAll('h1, h2, h3, h4, .sectionTitle, .sectionTitleContainer, .MuiTypography-h3, .MuiTypography-h2, .MuiTypography-root'));
+            const headings = Array.from(root.querySelectorAll('h1, h2, h3, h4, .sectionTitle, .sectionTitleContainer, .MuiTypography-h3, .MuiTypography-h2, .MuiTypography-root, a[href*="devices"]'));
             for (const el of headings) {
                 if (isInsideSidebar(el)) continue;
                 const text = (el.textContent || '').trim().toLowerCase();
-                if (text === 'devices' || text.startsWith('devices')) {
+                const href = (el.getAttribute && (el.getAttribute('href') || el.getAttribute('to') || '')) || '';
+                if (text === 'devices' || text.startsWith('devices') || href.includes('devices')) {
                     const parentSection = el.closest('.dashboardSection, .dashboardColumnSection, section, .MuiBox-root, div[class*="section"], div[class*="Section"]');
                     if (parentSection && isValidTarget(parentSection)) {
                         return parentSection;
@@ -4632,6 +5153,22 @@
                         curr = curr.parentElement;
                     }
                     if (isValidTarget(el.parentElement)) return el.parentElement;
+                }
+            }
+        } catch (e) {}
+
+        // 3. Jellyfin 12 (MUI) / React dashboard widgets
+        try {
+            const deviceLinks = Array.from(root.querySelectorAll('a[href*="devices"], button[href*="devices"], a[to*="devices"], [data-testid="ChevronRightIcon"]'));
+            for (const el of deviceLinks) {
+                if (isInsideSidebar(el)) continue;
+                const href = (el.getAttribute('href') || el.getAttribute('to') || '').toLowerCase();
+                const text = (el.textContent || '').trim().toLowerCase();
+                if (href.includes('devices') || text.includes('devices')) {
+                    const widgetBox = el.closest('.MuiBox-root') || el.parentElement;
+                    if (widgetBox && isValidTarget(widgetBox)) {
+                        return widgetBox;
+                    }
                 }
             }
         } catch (e) {}
@@ -4712,6 +5249,10 @@
             defaultDevicesElement = devicesTarget;
             devicesTarget.style.setProperty('display', 'none', 'important');
             devicesTarget.setAttribute('data-playbackcard-replaced', 'true');
+            const allActiveDevices = document.querySelectorAll('.activeDevices, #activeDevices, .dashboardDevices');
+            allActiveDevices.forEach((el) => {
+                if (el.style) el.style.setProperty('display', 'none', 'important');
+            });
             devicesTarget.parentNode.insertBefore(container, devicesTarget);
             attachContainerEvents(container);
             return true;
@@ -4845,5 +5386,5 @@
     checkAndMount();
     setInterval(checkAndMount, 1000);
 
-    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.1 initialized successfully.');
+    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.2 initialized successfully.');
 })();

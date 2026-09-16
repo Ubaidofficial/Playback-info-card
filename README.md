@@ -5,7 +5,7 @@
 <h1 align="center">Playback Info Card for Jellyfin</h1>
 
 <p align="center">
-  <strong>Stop guessing why your server is buffering. Mission-control stream intelligence, deep hardware telemetry, and remote admin controls &mdash; natively inside your Jellyfin dashboard.</strong>
+  <strong>Real-time playback telemetry, hardware transcode diagnostics, and remote session controls &mdash; natively inside your Jellyfin dashboard.</strong>
 </p>
 
 <p align="center">
@@ -16,47 +16,40 @@
   <a href="https://jellyfin.org"><img src="https://img.shields.io/badge/Jellyfin-10.9%2B%20%7C%20v12%2B-blue.svg" alt="Jellyfin" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Release-v0.2.1-00a4dc.svg" alt="Release: v0.2.1" />
-  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Antivirus-ClamAV%20Clean-brightgreen.svg" alt="Antivirus: ClamAV Clean" /></a>
-  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Security-CodeQL%20Passed-brightgreen.svg" alt="Security: CodeQL Passed" /></a>
-  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/AI--Assisted-Human%20Audited-8b5cf6.svg" alt="AI: Human Audited" /></a>
-  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Telemetry-Zero%20(Air--Gap)-blue.svg" alt="Telemetry: Zero" /></a>
+  <img src="https://img.shields.io/badge/Release-v0.2.2-00a4dc.svg" alt="Release: v0.2.2" />
+  <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Antivirus-ClamAV%20Clean-brightgreen.svg" alt="Antivirus: ClamAV Clean" /></a>
+  <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Security-CodeQL%20Passed-brightgreen.svg" alt="Security: CodeQL Passed" /></a>
+  <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Telemetry-Zero%20(Air--Gap)-blue.svg" alt="Telemetry: Zero" /></a>
 </p>
 
 ---
 
-## Why Playback Info Card?
+## Overview
 
-Ever had a family member or friend text you asking why their movie is buffering, leaving you scrambling through server logs trying to figure out what happened?
+Playback Info Card replaces the default Devices list on your Jellyfin Admin Dashboard with an interactive monitoring card. It shows who is watching what, whether media is direct playing or transcoding, which GPU encoder is active, why a transcode was triggered, and how much bandwidth is being consumed in real time.
 
-- *Is the GPU pegged?*
-- *Did Jellyfin decide to transcode 4K HDR down to 1080p on the CPU because of PGS subtitles?*
-- *Is the client Wi-Fi dropping packets, or is the WAN upload saturated?*
-
-**Playback Info Card eliminates the mystery.** It transforms the standard Jellyfin Admin Dashboard into a high-performance flight deck. You get instant, plain-English hardware diagnostics, real-time transcode multipliers and FPS, granular LAN vs. WAN bandwidth tracking, and one-click remote session controls &mdash; all wrapped in an ultra-modern Liquid Glass interface.
-
-**Zero external Docker containers. Zero database locks. Zero bloated background daemons. Just pure native speed.**
+Everything runs natively in your browser using Jellyfin's built-in session APIs. No separate Docker container, no external database, and zero tracking.
 
 ---
 
 ## Screenshots
 
-### Studio Dashboard & Telemetry Matrix
-> Multi-stream flight deck featuring 4K HDR Direct Play, Hardware NVENC Transcoding, and Lossless Hi-Res Audio with real-time bandwidth analytics.
+### Main Dashboard
+> Live session cards displaying 4K HDR Direct Play, Hardware NVENC Transcode, and Lossless Hi-Res Audio with real-time bandwidth analytics.
 
 <p align="center">
   <img src="screenshots/ui-preview.png" alt="Studio UI Preview" width="900" />
 </p>
 
-### Stream Hardware Telemetry Detail
-> High-density diagnostic inspection showing GPU acceleration type, live transcode multiplier, frame rate, container paths, and copyable file paths.
+### Detailed Stream Inspection
+> Individual card breakdown showing player client, resolution, video/audio formats, container changes, network origin, and file paths.
 
 <p align="center">
   <img src="screenshots/card-detail.png" alt="Stream Hardware Telemetry Detail" width="750" />
 </p>
 
-### Mobile-Responsive View
-> Full-featured mobile layout with touch-friendly controls, responsive time stacks, and ergonomic action buttons for administration on the go.
+### Mobile View
+> Clean responsive layout with touch-friendly player controls and compact progress stacks for mobile browsers.
 
 <p align="center">
   <img src="screenshots/mobile-view.png" alt="Mobile-Responsive View" width="380" />
@@ -64,91 +57,42 @@ Ever had a family member or friend text you asking why their movie is buffering,
 
 ---
 
-## Key Features
+## Features
 
-### 1. Logo-First High-Density Telemetry Matrix
-- **Space-Efficient Two-Column Diagnostic Table**:
-  - `PLAYER`: Consolidated device & client profile (e.g. `Apple TV 4K (Swiftfin)`, `MacBook Pro (Chrome)`, `Pixel 9 Pro (Finamp)`)
-  - `QUALITY`: Original vs. transcoded resolution, bit depth, and target bitrates
-  - `STREAM`: Live play method badge (`DIRECT PLAY`, `DIRECT STREAM`, `TRANSCODE`) with inline **GPU hardware acceleration badges** (`NVENC`, `QSV`, `VTB`, `AMF`, `VAAPI`) and **Transcode Reason Badges** (`Sub Burn-In`, `Video Codec`, `Audio Codec`, `Bitrate Limit`, `Container Remux`)
-  - `CONTAINER`: Container transformation pipeline with **Source Tag Badges** (`REMUX`, `BLURAY`, `WEB-DL`, `HDTV`, `DVD`) parsed directly from source headers
-  - `VIDEO`: Codec, bit-depth, and frame rate with cinema badges (`4K UHD`, `Dolby Vision`, `HDR10+`, `HDR10`, `HLG`, `SDR`, and `HDR ➔ SDR Tone Mapped`)
-  - `AUDIO`: Codec and bit rate with **Surround Channel Badges** (`7.1`, `5.1`, `2.0 Stereo`) and audiophile format badges (`Dolby Atmos`, `Dolby TrueHD`, `DTS:X`, `DTS-HD MA`, `Hi-Res FLAC`, `Opus`, `AAC`)
-  - `SUBTITLE`: Active subtitle track and format with inline `[CC]` Closed Caption badge and burn-in diagnostic alerts
-  - `LOCATION`: Network origin with connection badge (`LAN`, `WAN`, `CELLULAR`), client IP, and **Stream Health Indicator** (`LAN Optimal`, `Remote Direct`, `Smooth (2.5x)`, `Throttling`)
-  - `BANDWIDTH`: Real-time session bandwidth throughput with live pulse beacon
-  - `FILE`: Click-to-copy source media path with file size and instant "Copied!" feedback
-- **Hardware Acceleration Detection**: Automatic identification of NVENC, Intel QuickSync (QSV), VAAPI, Apple VideoToolbox, AMD AMF, or CPU software encoding with signature brand color pills.
-- **Live Transcode Performance & FPS**: Real-time FPS metrics and transcode speed multiplier (`2.5x @ 60 FPS`) with automatic low-speed stutter alarms if speed falls below `1.0x`.
+### Real-Time Playback Telemetry
+* **Stream Diagnostics**: Identifies Direct Play, Direct Stream, and Transcode states instantly.
+* **Hardware Acceleration Badges**: Detects NVIDIA NVENC, Intel QuickSync (QSV), Apple VideoToolbox, AMD AMF, and VAAPI with performance stats (`60 fps · 2.5x speed`).
+* **Dedicated Transcode Reason Row**: Displays why Jellyfin is transcoding (`Sub Burn-In`, `Video Codec`, `Audio Codec`, `Bitrate Limit`, `Container Remux`, or `Resolution Limit`).
+* **Cinema & Audio Badges**: Automatic detection of 4K UHD, Dolby Vision, HDR10+, HDR10, HLG, SDR Tone Mapping, Dolby Atmos, TrueHD, DTS:X, DTS-HD MA, and Hi-Res FLAC.
+* **Source Quality Tags**: Identifies release source (`REMUX`, `BLURAY`, `WEB-DL`, `HDTV`, `DVD`) from media file metadata.
 
-### 2. 25 Official Vector Brand Badges (100% Offline)
-- Crisp, high-fidelity multi-color vector SVGs embedded directly into the interface:
-  - **Browsers**: Apple Safari, Google Chrome, Mozilla Firefox, Microsoft Edge, Brave, Opera GX, Vivaldi
-  - **Jellyfin Community Clients**: Streamyfin, Finamp, Findroid, Feishin, Swiftfin, Jellyfin Web
-  - **TV & Ecosystems**: Apple TV, Apple iOS/macOS, Google Android, Nvidia Shield TV, Google Chromecast, Amazon Fire TV, Roku
-  - **Consoles & Home Theater**: Kodi, Infuse, Sony PlayStation, Microsoft Xbox, LG webOS, Samsung Tizen
-- **100% Local**: No external CDN calls, no tracking pixels, zero latency &mdash; fully operational in air-gapped homelabs.
+### 1-Click Live FFmpeg Transcode Log Viewer
+* **In-Dashboard Terminal**: Click the **FFmpeg Log** button on any transcode session to view live FFmpeg output in an overlay modal.
+* **Live Stream Metrics**: Automatically parses current transcode FPS, speed multiplier, bitrate, and buffer size from the log stream.
+* **Log Controls**: Syntax highlighting (errors in red, warnings in amber, progress in green), live 3-second auto-refresh, errors-only filter, and a 1-click **Copy Log** button.
 
-### 3. Live Bandwidth Visualizer & Interactive Sparkline
-- **Real-Time Bandwidth Sparkline**: Rolling bandwidth trendline showing server throughput over time. Hover over any point to activate the interactive hairline cursor and reveal a frosted glass tooltip detailing exact throughput, LAN vs. WAN split, and peak velocity.
-- **LAN vs. WAN Segmented Counter**: Instant breakdown of internal home network traffic versus outbound WAN upload utilization.
-- **Smart Multi-Stream Sorting**: Sort concurrent streams on the fly by:
-  - `Default`: Server session order
-  - `Bandwidth`: Highest bitrate stream first
-  - `Transcodes`: Active transcoding sessions pinned to the top
-  - `Progress`: Longest duration / highest percentage watched
-  - `User A-Z`: Alphabetical by user account name
-- **Configurable Polling Engine**: 1-click toolbar pill (`⏱ 3s`) cycling between `1s` (Real-time), `3s` (Balanced default), `5s` (Eco), and `10s` (Low-power); restarts the polling loop dynamically without reloading the page.
-- **Privacy Mode (`[O] Privacy`)**: One-click toggle that masks user account names and IP addresses for stream-safe screenshots and screen shares.
-- **Instant Stream Filter Pills**: Filter sessions by `All`, `Transcode`, `WAN`, or `Paused`.
+### Ghost & Zombie Session Pruner
+* **Automatic Detection**: Flags sessions that have been paused with no position change for over 15 minutes or abandoned socket connections consuming server RAM.
+* **One-Click Prune**: Click **Prune Ghosts** in the toolbar to terminate idle sessions and reclaim server memory.
 
-### 4. Frosted Glass Time HUD Capsule
-- Floating glass capsule with `backdrop-filter: blur(14px)` and specular border bevel.
-- **Dual Time Mode**: Displays expected completion time (`ETA 10:45 PM`) or paused elapsed duration (`Paused 04:12`).
-- **Interactive Duration Toggle**: Click to toggle between ETA and `Elapsed / Total` (`34:10 / 56:00 (61%)`).
-- **Smooth 1-Second Ticker**: Smoothly advances progress bar and time counters between 3-second server polling cycles.
-- **Dual-Layer Progress Bar**: Visualizes current playback position alongside the transcode buffer fill.
-
-### 5. Remote Session Command
-- **Remote Play / Pause**: Freeze or resume client playback with one click.
-- **Remote Mute / Unmute**: Remotely mute or unmute client audio.
-- **Direct Client Messaging**: Send pop-up alerts to users' screens before scheduled server maintenance.
-- **One-Click Stream Termination**: Instantly kill bandwidth-hogging or unauthorized sessions.
-
-### 6. Liquid Glass Obsidian Design System
-- Deep obsidian base (`#080a0f`) with physical glass refraction, meniscus border bevels, and subtle specular optics.
-- Zero cartoon emojis, zero generic dashboard clutter &mdash; engineered like high-end aerospace instrumentation.
-- Responsive on all screen sizes &mdash; from multi-monitor ultrawide displays down to mobile phones with tactile touch-action zones.
-
-### 7. Engineered for Performance
-- **Zero Memory Leaks**: Full integration with Jellyfin Web's Single Page Application lifecycle (`viewshow`, `viewhide`, `viewdestroy`).
-- **State Hashing**: Prevents redundant DOM re-renders to maintain 60 FPS smooth scrolling.
-- **Zero Server Overhead**: 100% in-memory client telemetry querying standard `ApiClient.getSessions()`. Zero disk I/O, zero database locks.
-- **Standalone Compatibility**: Graceful fallback guards ensuring 0 console errors when run standalone or as an installed plugin.
+### Bandwidth Monitoring & Session Management
+* **LAN vs. WAN Breakdown**: Real-time traffic split showing local home network bandwidth versus outbound internet upload.
+* **Interactive Sparkline**: Rolling bandwidth trendline with interactive scrub tooltips.
+* **Remote Session Controls**: Play/pause, mute/unmute, send on-screen messages to clients, or terminate streams with one click.
+* **Admin Privacy Mode**: 1-click toggle (`[O] Privacy`) to mask usernames and IP addresses for screen shares or screenshots.
+* **25 Offline Client Badges**: Embedded vector SVG logos for Chrome, Safari, Firefox, Apple TV, Swiftfin, Finamp, Streamyfin, Android TV, and more. 100% offline with zero CDN dependencies.
 
 ---
 
-## 🛡️ Security, Trust & AI Disclosure
+## 🔒 Security & Privacy Guarantees
 
-We believe self-hosters and sysadmins deserve complete transparency. Your media server holds private data and resources, and you should never have to guess what code is executing on it.
+We believe self-hosters deserve total transparency about the code running on their servers:
 
-### 🤖 AI-Assisted, Human-Audited
-This project was developed with the assistance of modern AI developer tools (used to accelerate CSS styling, SVG vector assets, and telemetry parsing logic).
-
-However, **we do not ship unverified or unreviewed code**:
-- **100% Human Architected & Audited**: Every line of C# and JavaScript has been manually reviewed, architected, and defensively hardened by human developers.
-- **Inspectable in Under 5 Minutes**: The entire plugin contains only **two source files**:
-  - [`Plugin.cs`](Plugin.cs): ~70 lines of clean C# serving embedded assets via Jellyfin's `IHasWebPages`.
-  - [`Web/playbackcard.js`](Web/playbackcard.js): Vanilla JavaScript with **zero npm dependencies**, zero external script tags, and zero build obfuscation.
-- **Automated QA Coverage**: Includes a 68-point automated test suite verifying state parsing, sanitization, and UI rendering.
-
-### 🔒 Verifiable Security Guarantees
-- **Zero External Network Requests (100% Air-Gap Safe)**: The plugin contains NO external `fetch`, `XMLHttpRequest`, CDNs, or third-party web sockets. It never connects to any external server and transmits **zero telemetry**.
-- **Zero Server Host Footprint**: The plugin does not read, write, or execute files on the server host. All telemetry queries use Jellyfin's internal in-memory session cache.
-- **Strict XSS & DOM Sanitization**: All incoming session metadata (usernames, media titles, client names, file paths) is escaped with `escapeHtml` to prevent Stored XSS. Inline CSS and URLs are strictly sanitized.
-- **Continuous Antivirus Scanning (ClamAV in CI)**: Every release binary is automatically scanned for viruses and malware with ClamAV during the GitHub Actions build process before packaging.
-- **GitHub CodeQL Analysis**: Automated static application security testing (SAST) continuously scans every commit and pull request for vulnerabilities (OWASP Top 10, CWE).
-- **Cryptographic Hashes**: Every release publishes `SHA256SUMS.txt` and `MD5SUMS.txt` so you can verify artifact integrity bit-for-bit.
+* **Zero External Network Requests (100% Air-Gap Safe)**: The plugin makes no external network calls, loads no third-party CDNs, and includes zero tracking or telemetry.
+* **In-Memory Only**: Queries the standard internal `ApiClient.getSessions()` endpoint. No host disk writes, no external databases, and no database locks.
+* **XSS Sanitization**: All incoming session metadata (usernames, media titles, client devices) is escaped with strict HTML entity encoding.
+* **Automated CI Security**: Every release binary is automatically scanned by ClamAV and analyzed by GitHub CodeQL static analysis before publication.
+* **Small & Auditable**: The codebase consists of clean C# plugin wrappers ([`Plugin.cs`](Plugin.cs)) and vanilla JavaScript ([`Web/playbackcard.js`](Web/playbackcard.js)) with **zero npm dependencies**.
 
 *Read our complete [Security Policy & Verification Guide](SECURITY.md).*
 
