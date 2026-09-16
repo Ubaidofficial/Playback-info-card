@@ -1,5 +1,5 @@
 /**
- * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.2
+ * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.3
  * 
  * Injects a real-time, cinema-grade visual stream telemetry and playback monitoring grid directly into
  * the Jellyfin Admin Dashboard (/dashboard.html / .dashboardForm).
@@ -5402,5 +5402,5 @@
     checkAndMount();
     setInterval(checkAndMount, 1000);
 
-    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.2 initialized successfully.');
+    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.3 initialized successfully.');
 })();

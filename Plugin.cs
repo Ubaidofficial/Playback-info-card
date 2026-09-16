@@ -23,6 +23,44 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        TryDiskInjection(applicationPaths);
+    }
+
+    private static void TryDiskInjection(IApplicationPaths applicationPaths)
+    {
+        try
+        {
+            var webPath = (applicationPaths as MediaBrowser.Controller.Configuration.IServerApplicationPaths)?.WebPath;
+            var candidates = new List<string>();
+            if (!string.IsNullOrEmpty(webPath))
+            {
+                candidates.Add(System.IO.Path.Combine(webPath, "index.html"));
+            }
+
+            candidates.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "jellyfin-web", "index.html"));
+            candidates.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "web", "index.html"));
+            candidates.Add("/usr/share/jellyfin/web/index.html");
+            candidates.Add("/jellyfin/jellyfin-web/index.html");
+
+            foreach (var candidate in candidates)
+            {
+                if (System.IO.File.Exists(candidate))
+                {
+                    var content = System.IO.File.ReadAllText(candidate);
+                    if (!content.Contains("playbackcard.js", StringComparison.OrdinalIgnoreCase) &&
+                        content.Contains("</body>", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var updated = content.Replace("</body>", "<script plugin=\"PlaybackCard\" version=\"0.2.3.0\" src=\"/web/configurationpage?name=playbackcard.js\" defer></script>\n</body>", StringComparison.OrdinalIgnoreCase);
+                        System.IO.File.WriteAllText(candidate, updated);
+                    }
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            // Silently ignore disk write permission errors; in-memory middleware handles injection seamlessly
+        }
     }
 
     /// <summary>
