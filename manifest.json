@@ -9,19 +9,11 @@
     "versions": [
       {
         "version": "0.2.0.0",
-        "changelog": "Release v0.2.0: Logo-First High-Density Spec Matrix, Multi-Stream Smart Sorting, Live Bandwidth Scrubber & Interactive Telemetry, Remote Session Controls",
+        "changelog": "Release v0.2.0",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.0/jellyfin-plugin-playbackcard.zip",
-        "checksum": "",
-        "timestamp": "2026-09-15T21:00:00Z"
-      },
-      {
-        "version": "0.1.0.0",
-        "changelog": "Release v0.1.0",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.1.0/jellyfin-plugin-playbackcard.zip",
-        "checksum": "aeaaa593e7762d10f784cb85dc7142a1",
-        "timestamp": "2026-09-14T22:46:41Z"
+        "checksum": "76ed1aed9ba091db879514176f959766",
+        "timestamp": "2026-09-16T00:39:55Z"
       }
     ]
   }
