@@ -16,7 +16,7 @@
   <a href="https://jellyfin.org"><img src="https://img.shields.io/badge/Jellyfin-10.9%2B%20%7C%20v12%2B-blue.svg" alt="Jellyfin" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Release-v0.2.3-00a4dc.svg" alt="Release: v0.2.3" />
+  <img src="https://img.shields.io/badge/Release-v0.2.4-00a4dc.svg" alt="Release: v0.2.4" />
   <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Antivirus-ClamAV%20Clean-brightgreen.svg" alt="Antivirus: ClamAV Clean" /></a>
   <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Security-CodeQL%20Passed-brightgreen.svg" alt="Security: CodeQL Passed" /></a>
   <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Telemetry-Zero%20(Air--Gap)-blue.svg" alt="Telemetry: Zero" /></a>

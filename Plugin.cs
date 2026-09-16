@@ -40,6 +40,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
             candidates.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "jellyfin-web", "index.html"));
             candidates.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "web", "index.html"));
+            candidates.Add(@"C:\Program Files\Jellyfin\Server\jellyfin-web\index.html");
+            candidates.Add(@"C:\Program Files\Jellyfin\Server\web\index.html");
             candidates.Add("/usr/share/jellyfin/web/index.html");
             candidates.Add("/jellyfin/jellyfin-web/index.html");
 
@@ -51,7 +53,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                     if (!content.Contains("playbackcard.js", StringComparison.OrdinalIgnoreCase) &&
                         content.Contains("</body>", StringComparison.OrdinalIgnoreCase))
                     {
-                        var updated = content.Replace("</body>", "<script plugin=\"PlaybackCard\" version=\"0.2.3.0\" src=\"/web/configurationpage?name=playbackcard.js\" defer></script>\n</body>", StringComparison.OrdinalIgnoreCase);
+                        var updated = content.Replace("</body>", "<script plugin=\"PlaybackCard\" version=\"0.2.4.0\" src=\"configurationpage?name=playbackcard.js\" defer></script>\n</body>", StringComparison.OrdinalIgnoreCase);
                         System.IO.File.WriteAllText(candidate, updated);
                     }
                     break;
