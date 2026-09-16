@@ -1313,6 +1313,57 @@
         }
     }
 
+    // Sensitive data detection pattern: blocks sensitive keys, query strings, private IPs, and absolute paths
+    var SENSITIVE_PATTERN = /(RemoteEndPoint|ipAddress|endpoint|\bLAN\b|\bWAN\b|\bCELLULAR\b|\bWIFI\b|geolocation|api_key|token|authorization|cookie|password|file\s*path|username|media\s*title|\b192\.168\.\d{1,3}\.\d{1,3}\b|\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\b172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\b|\b127\.0\.0\.1\b|[?&][a-zA-Z0-9_]+=[^&\s]+|\/Users\/|\/home\/|[A-Za-z]:\\)/i;
+
+    var ALLOWED_REPORT_KEYS = [
+        'pluginVersion',
+        'jellyfinVersion',
+        'webVersion',
+        'route',
+        'pageLoaded',
+        'sessionsApi',
+        'lastSuccessfulPoll',
+        'pollingState',
+        'artwork',
+        'ignoredSessionCount',
+        'renderErrors'
+    ];
+
+    function validateDiagnosticReport(report) {
+        if (!report || typeof report !== 'object') return false;
+
+        // Verify allow-listed keys only
+        var keys = Object.keys(report);
+        if (keys.length !== ALLOWED_REPORT_KEYS.length) return false;
+        for (var i = 0; i < keys.length; i++) {
+            if (ALLOWED_REPORT_KEYS.indexOf(keys[i]) === -1) {
+                return false;
+            }
+        }
+
+        // Validate values strictly
+        if (report.pluginVersion !== PLUGIN_VERSION) return false;
+        if (typeof report.pageLoaded !== 'boolean') return false;
+        if (report.sessionsApi !== 'ok' && report.sessionsApi !== 'error' && report.sessionsApi !== 'timeout') return false;
+        if (report.pollingState !== 'active' && report.pollingState !== 'stopped' && report.pollingState !== 'stalled') return false;
+        if (report.artwork !== 'loaded' && report.artwork !== 'fallback' && report.artwork !== 'error') return false;
+        if (typeof report.ignoredSessionCount !== 'number' || !isFinite(report.ignoredSessionCount) || report.ignoredSessionCount < 0) return false;
+        if (typeof report.renderErrors !== 'number' || !isFinite(report.renderErrors) || report.renderErrors < 0) return false;
+
+        // Route must be a clean relative path without query strings or private hostnames
+        if (typeof report.route !== 'string' || report.route.indexOf('?') !== -1 || report.route.indexOf('&') !== -1 || report.route.indexOf('//') !== -1) {
+            return false;
+        }
+
+        // Relative poll time format check
+        if (typeof report.lastSuccessfulPoll !== 'string' || !/^(?:None|Just now|\d+[smh] ago|redacted-or-available)$/.test(report.lastSuccessfulPoll)) {
+            return false;
+        }
+
+        return true;
+    }
+
     function buildDiagnosticReport() {
         var now = Date.now();
         var successRelative = diagState.lastSuccessTime ? formatRelativeTime(now - diagState.lastSuccessTime) : 'redacted-or-available';
@@ -1348,6 +1399,17 @@
         var feedbackEl = page ? page.querySelector('#diagnosticsFeedback') : null;
         try {
             var report = buildDiagnosticReport();
+
+            // Validate allow-listed keys and structured values
+            if (!validateDiagnosticReport(report)) {
+                if (feedbackEl) {
+                    feedbackEl.className = 'diagnosticsFeedback error';
+                    feedbackEl.textContent = 'Diagnostic report validation failed; copy blocked.';
+                    feedbackEl.style.display = 'block';
+                }
+                return false;
+            }
+
             var reportJson = JSON.stringify(report, null, 2);
 
             // Strict privacy redaction test
@@ -1661,6 +1723,7 @@
         extractTranscoderEngine: extractTranscoderEngine,
         renderSessionCard: renderSessionCard,
         buildDiagnosticReport: buildDiagnosticReport,
+        validateDiagnosticReport: validateDiagnosticReport,
         checkSensitiveData: checkSensitiveData,
         copyDiagnosticReport: copyDiagnosticReport,
         startPolling: startPolling,

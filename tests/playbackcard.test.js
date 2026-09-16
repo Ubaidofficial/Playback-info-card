@@ -243,6 +243,32 @@ describe('Playback Info Card v0.2.3.1 Test Suite', () => {
             const copyResult = controller.copyDiagnosticReport(null);
             assert.equal(copyResult, false);
         });
+
+        it('validates allow-listed keys and rejects unexpected or malicious fields', () => {
+            const validReport = controller.buildDiagnosticReport();
+            assert.equal(controller.validateDiagnosticReport(validReport), true);
+
+            // Report with extra unauthorized property
+            const extraPropReport = { ...validReport, unauthorizedToken: 'secret' };
+            assert.equal(controller.validateDiagnosticReport(extraPropReport), false);
+
+            // Report with missing required property
+            const missingPropReport = { ...validReport };
+            delete missingPropReport.pluginVersion;
+            assert.equal(controller.validateDiagnosticReport(missingPropReport), false);
+
+            // Report with route containing query string or token
+            const queryRouteReport = { ...validReport, route: '/playbackcard?api_key=123' };
+            assert.equal(controller.validateDiagnosticReport(queryRouteReport), false);
+
+            // Report with route containing full URL
+            const urlRouteReport = { ...validReport, route: 'https://evil.com//playbackcard' };
+            assert.equal(controller.validateDiagnosticReport(urlRouteReport), false);
+
+            // Report with invalid sessionsApi status
+            const invalidApiReport = { ...validReport, sessionsApi: 'hacked' };
+            assert.equal(controller.validateDiagnosticReport(invalidApiReport), false);
+        });
     });
 
     describe('9. GitHub Issue Link Generation', () => {
