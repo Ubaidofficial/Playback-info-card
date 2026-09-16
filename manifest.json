@@ -8,12 +8,12 @@
     "category": "General",
     "versions": [
       {
-        "version": "0.2.2.0",
-        "changelog": "Release v0.2.2",
+        "version": "0.2.3.0",
+        "changelog": "Release v0.2.3",
         "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.2/jellyfin-plugin-playbackcard.zip",
-        "checksum": "51f6561e0a104aaf5244c6cf9fe85fd0",
-        "timestamp": "2026-09-16T08:02:19Z"
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3/jellyfin-plugin-playbackcard.zip",
+        "checksum": "98f4003069da35fb619546402ca6b871",
+        "timestamp": "2026-09-16T08:20:42Z"
       }
     ]
   }
