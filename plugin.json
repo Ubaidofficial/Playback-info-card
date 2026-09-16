@@ -2,7 +2,7 @@
   "guid": "b7e6f831-2794-4d82-8419-7c48ef2e2a39",
   "name": "Playback Info Card",
   "version": "0.2.0.0",
-  "description": "Real-time, Tautulli-inspired visual monitoring grid injected directly into the Jellyfin Admin Dashboard.",
+  "description": "Real-time, cinema-grade visual stream telemetry and playback monitoring grid injected directly into the Jellyfin Admin Dashboard.",
   "overview": "Transient live monitoring displaying real-time session telemetry, direct play vs transcode status, transcode reasons, stream bandwidth, and ETA.",
   "owner": "Ubaidofficial",
   "category": "General",

@@ -44,7 +44,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Gets the plugin description.
     /// </summary>
     public override string Description =>
-        "Real-time, Tautulli-inspired visual monitoring grid injected directly into the Jellyfin Admin Dashboard.";
+        "Real-time, cinema-grade visual stream telemetry and playback monitoring grid injected directly into the Jellyfin Admin Dashboard.";
 
     /// <summary>
     /// Serves embedded web assets to the Jellyfin Web client interface.

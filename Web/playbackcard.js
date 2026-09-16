@@ -1,7 +1,7 @@
 /**
  * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.0
  * 
- * Injects a real-time, Tautulli & Jellywatch-inspired visual monitoring grid directly into
+ * Injects a real-time, cinema-grade visual stream telemetry and playback monitoring grid directly into
  * the Jellyfin Admin Dashboard (/dashboard.html / .dashboardForm).
  * 
  * Enhanced Features:

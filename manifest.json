@@ -2,14 +2,14 @@
   {
     "guid": "b7e6f831-2794-4d82-8419-7c48ef2e2a39",
     "name": "Playback Info Card",
-    "description": "Real-time, Tautulli-inspired visual monitoring grid injected directly into the Jellyfin Admin Dashboard.",
+    "description": "Real-time, cinema-grade visual stream telemetry and playback monitoring grid injected directly into the Jellyfin Admin Dashboard.",
     "overview": "Transient live monitoring displaying real-time session telemetry, direct play vs transcode status, transcode reasons, stream bandwidth, and ETA.",
     "owner": "Ubaidofficial",
     "category": "General",
     "versions": [
       {
         "version": "0.2.0.0",
-        "changelog": "Release v0.2.0: Multi-View Watch Statistics Drawer, Fluid 1s Progress Interpolation, Stream Guard Admin Exemption, Remote Playback Controls (Mute/Unmute), Native Config Page",
+        "changelog": "Release v0.2.0: Logo-First High-Density Spec Matrix, Multi-Stream Smart Sorting, Live Bandwidth Scrubber & Interactive Telemetry, Remote Session Controls",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.0/jellyfin-plugin-playbackcard.zip",
         "checksum": "",
