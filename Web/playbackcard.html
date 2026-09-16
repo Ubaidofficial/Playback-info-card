@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Playback Monitor</title>
+</head>
+<body>
+    <div data-role="page" class="page type-interior pluginConfigurationPage playbackMonitorPage" data-require="emby-button">
+        <div data-role="content">
+            <div class="content-primary">
+                <!-- Header with Title, Mode Toggle, and Cadence -->
+                <div class="playbackMonitorHeader">
+                    <div class="playbackMonitorTitleGroup">
+                        <div class="playbackMonitorTitleRow">
+                            <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
+                            <span class="playbackMonitorVersionBadge">v0.2.3.1</span>
+                        </div>
+                        <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
+                    </div>
+                    <div class="playbackMonitorControls">
+                        <div class="playbackModeToggle" role="group" aria-label="Display density">
+                            <button type="button" id="btnModeCompact" class="modeBtn active" title="Compact badge view">Compact</button>
+                            <button type="button" id="btnModeExtended" class="modeBtn" title="Detailed stream &amp; transcode view">Extended</button>
+                        </div>
+                        <div class="playbackMonitorCadence">Refreshes every 3s</div>
+                    </div>
+                </div>
+
+                <!-- Status & Sessions Container -->
+                <div id="playbackCardContainer" class="playbackMonitorContainer">
+                    <div id="playbackStatusMsg" class="playbackMonitorStatusMsg" role="status" aria-live="polite" style="display: none;"></div>
+                    <div id="playbackEmptyState" class="playbackMonitorEmptyState" style="display: none;">
+                        <svg class="emptyIcon" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"></polygon>
+                        </svg>
+                        <p class="emptyTitle">No Active Playback Sessions</p>
+                        <p class="emptySubtitle">When users stream media from this Jellyfin server, session telemetry will appear here.</p>
+                    </div>
+                    <div id="playbackSessionsGrid" class="playbackMonitorGrid"></div>
+                </div>
+
+                <!-- Diagnostics Section (Local & Offline) -->
+                <div id="playbackDiagnosticsSection" class="playbackDiagnosticsCard">
+                    <div class="diagnosticsHeader">
+                        <div class="diagnosticsTitleGroup">
+                            <h3 class="diagnosticsTitle">
+                                <svg class="diagIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                </svg>
+                                System Diagnostics
+                            </h3>
+                            <span class="diagnosticsNotice">Local &amp; Offline &bull; No Telemetry</span>
+                        </div>
+                        <div class="diagnosticsActions">
+                            <button type="button" id="btnCopyDiagnostics" class="btnDiagAction">
+                                <svg class="btnIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy diagnostic report
+                            </button>
+                            <a id="linkReportIssue" href="https://github.com/Ubaidofficial/Playback-info-card/issues/new/choose" target="_blank" rel="noopener noreferrer" class="btnDiagAction linkAction">
+                                <svg class="btnIcon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                Report issue on GitHub
+                            </a>
+                        </div>
+                    </div>
+
+                    <div id="diagnosticsFeedback" class="diagnosticsFeedback" style="display: none;"></div>
+
+                    <div class="diagnosticsGrid">
+                        <div class="diagItem">
+                            <span class="diagLabel">Plugin Version</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.3.1</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Server Version</span>
+                            <span id="diagServerVersion" class="diagValue">Checking&hellip;</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Web Client</span>
+                            <span id="diagWebVersion" class="diagValue">Checking&hellip;</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Current Route</span>
+                            <span id="diagRoute" class="diagValue">/playbackcard</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Sessions API</span>
+                            <span id="diagSessionsApi" class="diagValue status-waiting">Waiting for sessions</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Polling State</span>
+                            <span id="diagPollingState" class="diagValue">active</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Last Successful Poll</span>
+                            <span id="diagLastSuccessPoll" class="diagValue">None</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Artwork Status</span>
+                            <span id="diagArtwork" class="diagValue">Loaded: 0, Fallback: 0, Errors: 0</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Ignored Sessions</span>
+                            <span id="diagIgnoredCount" class="diagValue">0</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Render Errors</span>
+                            <span id="diagRenderErrors" class="diagValue">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <style>
+/* Base Page & Layout */
+.playbackMonitorPage {
+    box-sizing: border-box;
+}
+
+.playbackMonitorPage .playbackMonitorContainer {
+    width: 100%;
+    margin-top: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #e2e8f0;
+}
+
+/* Header */
+.playbackMonitorPage .playbackMonitorHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+
+.playbackMonitorPage .playbackMonitorTitleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.playbackMonitorPage .playbackMonitorTitleRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.playbackMonitorPage .playbackMonitorTitle {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #f8fafc;
+    line-height: 1.25;
+}
+
+.playbackMonitorPage .playbackMonitorVersionBadge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    background: rgba(0, 164, 220, 0.18);
+    border: 1px solid rgba(0, 164, 220, 0.4);
+    color: #38bdf8;
+    letter-spacing: 0.02em;
+}
+
+.playbackMonitorPage .playbackMonitorDescription {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+.playbackMonitorPage .playbackMonitorControls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* Density Toggle */
+.playbackMonitorPage .playbackModeToggle {
+    display: inline-flex;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.playbackMonitorPage .modeBtn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.3rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.playbackMonitorPage .modeBtn:hover {
+    color: #f1f5f9;
+}
+
+.playbackMonitorPage .modeBtn.active {
+    background: #00a4dc;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.playbackMonitorPage .playbackMonitorCadence {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    padding: 0.35rem 0.65rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+/* Status & Alerts */
+.playbackMonitorPage .playbackMonitorStatusMsg {
+    margin-bottom: 1.25rem;
+    padding: 0.85rem 1.15rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.playbackMonitorPage .playbackMonitorStatusMsg.loading {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+}
+
+.playbackMonitorPage .playbackMonitorStatusMsg.error {
+    background-color: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+}
+
+/* Empty State */
+.playbackMonitorPage .playbackMonitorEmptyState {
+    text-align: center;
+    padding: 3.5rem 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    margin: 1.25rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.playbackMonitorPage .playbackMonitorEmptyState .emptyIcon {
+    color: #64748b;
+    stroke-width: 1.25;
+}
+
+.playbackMonitorPage .playbackMonitorEmptyState .emptyTitle {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.playbackMonitorPage .playbackMonitorEmptyState .emptySubtitle {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #94a3b8;
+    max-width: 480px;
+    line-height: 1.4;
+}
+
+/* Sessions Grid */
+.playbackMonitorPage .playbackMonitorGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.25rem;
+    margin-top: 0.5rem;
+}
+
+/* Session Card */
+.playbackMonitorPage .playback-card {
+    position: relative;
+    background: #141a24;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    min-width: 0;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.playbackMonitorPage .playback-card:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* Subtle Blurred Backdrop */
+.playbackMonitorPage .playback-card-backdrop {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.12;
+    filter: blur(24px);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.playbackMonitorPage .playback-card-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.85rem;
+    height: 100%;
+}
+
+/* Card Header: User, Client, Platform Icon, State Badge */
+.playbackMonitorPage .playback-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 0.65rem;
+}
+
+.playbackMonitorPage .playback-card-user-group {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.playbackMonitorPage .playback-platform-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.playbackMonitorPage .playback-card-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.playbackMonitorPage .playback-card-user {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #f1f5f9;
+    line-height: 1.25;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.playbackMonitorPage .playback-card-client {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    line-height: 1.25;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.playbackMonitorPage .playback-badge-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+/* Badges */
+.playbackMonitorPage .playback-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.playbackMonitorPage .playback-badge.direct-play {
+    background-color: rgba(34, 197, 94, 0.16);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #4ade80;
+}
+
+.playbackMonitorPage .playback-badge.direct-stream {
+    background-color: rgba(56, 189, 248, 0.16);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+}
+
+.playbackMonitorPage .playback-badge.remux {
+    background-color: rgba(168, 85, 247, 0.16);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    color: #c084fc;
+}
+
+.playbackMonitorPage .playback-badge.transcode {
+    background-color: rgba(239, 68, 68, 0.16);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #f87171;
+}
+
+.playbackMonitorPage .playback-badge.paused {
+    background-color: rgba(245, 158, 11, 0.16);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+}
+
+.playbackMonitorPage .badge-icon {
+    width: 11px;
+    height: 11px;
+    fill: currentColor;
+}
+
+/* Card Main Area: Poster + Metadata */
+.playbackMonitorPage .playback-card-main {
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.playbackMonitorPage .playback-poster-wrap {
+    width: 60px;
+    height: 90px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #0f141d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playbackMonitorPage .playback-poster {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.playbackMonitorPage .playback-poster-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: #475569;
+}
+
+.playbackMonitorPage .playback-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.playbackMonitorPage .playback-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.3;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.playbackMonitorPage .playback-card-subtitle {
+    font-size: 0.83rem;
+    color: #94a3b8;
+    line-height: 1.35;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* Stream Pill Badges */
+.playbackMonitorPage .playback-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+}
+
+.playbackMonitorPage .playback-pill {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #cbd5e1;
+    white-space: nowrap;
+}
+
+.playbackMonitorPage .playback-pill.res {
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.25);
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.playbackMonitorPage .playback-pill.hdr {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.25);
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.playbackMonitorPage .playback-pill.audio {
+    color: #a855f7;
+    border-color: rgba(168, 85, 247, 0.25);
+    background: rgba(168, 85, 247, 0.08);
+}
+
+.playbackMonitorPage .playback-pill.sub {
+    color: #10b981;
+    border-color: rgba(168, 85, 247, 0.25);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+/* Progress Bar */
+.playbackMonitorPage .playback-card-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+    min-width: 0;
+}
+
+.playbackMonitorPage .playback-progress-bar-track {
+    width: 100%;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.playbackMonitorPage .playback-progress-bar-fill {
+    height: 100%;
+    background: #00a4dc;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.playbackMonitorPage .playback-progress-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Transcode Details (Extended View) */
+.playbackMonitorPage .playback-card-transcode-details {
+    margin-top: 0.35rem;
+    padding: 0.6rem 0.8rem;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.76rem;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.playbackMonitorPage .playback-transcode-meta {
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.playbackMonitorPage .playback-transcode-reasons {
+    color: #fca5a5;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* Diagnostics Card */
+.playbackMonitorPage .playbackDiagnosticsCard {
+    margin-top: 2rem;
+    padding: 1.25rem;
+    background: #111620;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+
+.playbackMonitorPage .diagnosticsHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.playbackMonitorPage .diagnosticsTitleGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.playbackMonitorPage .diagnosticsTitle {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.playbackMonitorPage .diagnosticsTitle .diagIcon {
+    color: #38bdf8;
+}
+
+.playbackMonitorPage .diagnosticsNotice {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.playbackMonitorPage .diagnosticsActions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.playbackMonitorPage .btnDiagAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 5px;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.playbackMonitorPage .btnDiagAction:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+}
+
+.playbackMonitorPage .btnDiagAction.linkAction {
+    background: rgba(0, 164, 220, 0.15);
+    border-color: rgba(0, 164, 220, 0.35);
+    color: #38bdf8;
+}
+
+.playbackMonitorPage .btnDiagAction.linkAction:hover {
+    background: rgba(0, 164, 220, 0.25);
+    color: #7dd3fc;
+}
+
+.playbackMonitorPage .diagnosticsFeedback {
+    margin-bottom: 0.85rem;
+    padding: 0.5rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.playbackMonitorPage .diagnosticsFeedback.success {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
+.playbackMonitorPage .diagnosticsFeedback.error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+}
+
+.playbackMonitorPage .diagnosticsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.playbackMonitorPage .diagItem {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.playbackMonitorPage .diagLabel {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.playbackMonitorPage .diagValue {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    word-break: break-word;
+}
+
+.playbackMonitorPage .diagValue.status-ok {
+    color: #4ade80;
+}
+
+.playbackMonitorPage .diagValue.status-waiting {
+    color: #fbbf24;
+}
+
+.playbackMonitorPage .diagValue.status-error {
+    color: #f87171;
+}
+
+/* Mobile & Responsive */
+@media (max-width: 640px) {
+    .playbackMonitorPage .playbackMonitorHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .playbackMonitorPage .playbackMonitorControls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .playbackMonitorPage .playbackMonitorGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .playbackMonitorPage .diagnosticsHeader {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .playbackMonitorPage .diagnosticsActions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+        </style>
+
+        <script type="text/javascript">
+(function (global) {
+    'use strict';
+
+    if (typeof window !== 'undefined' && window.__playbackInfoCardMonitorController && typeof window.__playbackInfoCardMonitorController.dispose === 'function') {
+        window.__playbackInfoCardMonitorController.dispose();
+    }
+
+    var PLUGIN_VERSION = '0.2.3.1';
+    var POLL_INTERVAL_MS = 3000;
+    var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
+
+    var pollTimer = null;
+    var activePage = null;
+    var currentGeneration = 0;
+    var isDisposed = false;
+    var displayMode = 'compact'; // 'compact' or 'extended'
+
+    // Local Diagnostics Tracking State (air-gapped & offline)
+    var diagState = {
+        pluginVersion: PLUGIN_VERSION,
+        jellyfinVersion: 'Unavailable',
+        webVersion: 'Available',
+        route: (typeof window !== 'undefined' && window.location) ? (window.location.hash || window.location.pathname || '/playbackcard') : '/playbackcard',
+        pageLoaded: true,
+        webResourcesLoaded: true,
+        sessionsApiStatus: 'Waiting for sessions', // 'OK', 'Waiting for sessions', 'Sessions unavailable', 'Timeout'
+        pollingState: 'active', // 'active', 'stopped', 'stalled'
+        lastSuccessTime: null,
+        lastFailureTime: null,
+        lastErrorCategory: 'OK', // 'OK', 'Waiting for sessions', 'Sessions unavailable', 'Artwork unavailable', 'Polling stalled', 'Invalid session data', 'Page resource error'
+        httpStatusCategory: '2xx OK',
+        artworkLoadedCount: 0,
+        artworkFallbackCount: 0,
+        artworkErrorCount: 0,
+        ignoredSessionCount: 0,
+        renderErrors: 0
+    };
+
+    // Sensitive data detection pattern
+    var SENSITIVE_PATTERN = /(RemoteEndPoint|ipAddress|endpoint|\bLAN\b|\bWAN\b|\bCELLULAR\b|\bWIFI\b|geolocation|api_key|token|authorization|cookie|password|file\s*path|username|media\s*title|\b192\.168\.\d{1,3}\.\d{1,3}\b|\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\b172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\b)/i;
+
+    function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatTicks(ticks) {
+        if (typeof ticks !== 'number' || !isFinite(ticks) || ticks <= 0) {
+            return '0:00';
+        }
+        var totalSeconds = Math.floor(ticks / 10000000);
+        var hours = Math.floor(totalSeconds / 3600);
+        var minutes = Math.floor((totalSeconds % 3600) / 60);
+        var seconds = totalSeconds % 60;
+        var paddedSeconds = seconds < 10 ? '0' + seconds : String(seconds);
+
+        if (hours > 0) {
+            var paddedMinutes = minutes < 10 ? '0' + minutes : String(minutes);
+            return hours + ':' + paddedMinutes + ':' + paddedSeconds;
+        }
+        return minutes + ':' + paddedSeconds;
+    }
+
+    function formatRelativeTime(diffMs) {
+        if (diffMs == null || !isFinite(diffMs)) return 'None';
+        if (diffMs < 4000) return 'Just now';
+        var sec = Math.floor(diffMs / 1000);
+        if (sec < 60) return sec + 's ago';
+        var min = Math.floor(sec / 60);
+        if (min < 60) return min + 'm ago';
+        var hr = Math.floor(min / 60);
+        return hr + 'h ago';
+    }
+
+    function getPlatformIconSvg(clientName, deviceName) {
+        var str = ((clientName || '') + ' ' + (deviceName || '')).toLowerCase();
+        if (str.indexOf('android') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-4.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.85 2.23 12.95 2 12 2c-.96 0-1.86.23-2.66.63L7.85 1.14c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.31 1.31C6.97 4.26 6 6.01 6 8h12c0-1.99-.97-3.75-2.47-4.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"/></svg>';
+        }
+        if (str.indexOf('apple') !== -1 || str.indexOf('ios') !== -1 || str.indexOf('iphone') !== -1 || str.indexOf('ipad') !== -1 || str.indexOf('mac') !== -1 || str.indexOf('tvos') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.54c.64-.78 1.08-1.86.96-2.94-1 .04-2.13.66-2.8 1.45-.58.67-1.1 1.76-.96 2.82 1.11.09 2.16-.55 2.8-1.33z"/></svg>';
+        }
+        if (str.indexOf('windows') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><path d="M3 5.48l7.39-1.01v7.14H3V5.48zm0 13.04l7.39 1.01v-7.14H3v6.13zm8.39 1.15L21 21v-8.39h-9.61v7.06zM21 3l-9.61 1.32v7.29H21V3z"/></svg>';
+        }
+        if (str.indexOf('roku') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><path d="M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm2 3v6h3v-2h2l1.5 2H15l-1.8-2.3c1.1-.5 1.8-1.5 1.8-2.7 0-1.7-1.3-3-3-3H6zm3 1.5h2c.8 0 1.5.4 1.5 1s-.7 1-1.5 1H9v-2z"/></svg>';
+        }
+        if (str.indexOf('lg') !== -1 || str.indexOf('webos') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="13" rx="2"/><path d="M8 21h8m-4-3v3"/></svg>';
+        }
+        if (str.indexOf('samsung') !== -1 || str.indexOf('tizen') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="18" x2="12" y2="21"/></svg>';
+        }
+        if (str.indexOf('chrome') !== -1 || str.indexOf('firefox') !== -1 || str.indexOf('edge') !== -1 || str.indexOf('safari') !== -1 || str.indexOf('browser') !== -1 || str.indexOf('web') !== -1) {
+            return '<svg class="badge-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="21.17" y1="8" x2="12" y2="8"/><line x1="3.95" y1="6.06" x2="8.54" y2="14"/><line x1="10.88" y1="21.94" x2="15.46" y2="14"/></svg>';
+        }
+        // Generic screen icon
+        return '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
+    }
+
+    function extractResolutionPill(width, height) {
+        var w = typeof width === 'number' ? width : 0;
+        var h = typeof height === 'number' ? height : 0;
+        if (w >= 3800 || h >= 2100) return '4K';
+        if (w >= 2500 || h >= 1400) return '1440p';
+        if (w >= 1900 || h >= 1000) return '1080p';
+        if (w >= 1200 || h >= 700) return '720p';
+        if (h > 0 || w > 0) return 'SD';
+        return '';
+    }
+
+    function extractDynamicRangePill(videoStream) {
+        if (!videoStream) return '';
+        var vRange = (videoStream.VideoRange || videoStream.VideoRangeType || '').toUpperCase();
+        if (vRange.indexOf('DOVI') !== -1 || vRange.indexOf('DOLBY') !== -1) return 'Dolby Vision';
+        if (vRange.indexOf('HDR10+') !== -1 || vRange.indexOf('HDR10PLUS') !== -1) return 'HDR10+';
+        if (vRange.indexOf('HDR') !== -1) return 'HDR';
+        return '';
+    }
+
+    function extractAudioBadges(audioStream) {
+        if (!audioStream) return [];
+        var badges = [];
+        var title = (audioStream.DisplayTitle || audioStream.Title || '').toLowerCase();
+        var profile = (audioStream.Profile || '').toLowerCase();
+        if (title.indexOf('atmos') !== -1 || profile.indexOf('atmos') !== -1) {
+            badges.push('Atmos');
+        }
+        var channels = audioStream.Channels;
+        if (channels === 8) badges.push('7.1');
+        else if (channels === 6) badges.push('5.1');
+        else if (channels === 2) badges.push('Stereo');
+        else if (channels === 1) badges.push('Mono');
+
+        var codec = (audioStream.Codec || '').toUpperCase();
+        if (codec) {
+            if (codec === 'EAC3') codec = 'E-AC3';
+            else if (codec === 'TRUEHD') codec = 'TrueHD';
+            badges.push(codec);
+        }
+        return badges;
+    }
+
+    function extractSubtitleBadge(session, item) {
+        var playState = session.PlayState;
+        if (!playState || playState.SubtitleStreamIndex == null || playState.SubtitleStreamIndex < 0) {
+            return null;
+        }
+        var streams = item.MediaStreams || [];
+        var subIndex = playState.SubtitleStreamIndex;
+        var sub = streams[subIndex];
+        if (!sub) {
+            return 'CC';
+        }
+        var title = sub.DisplayTitle || sub.Language || 'CC';
+        var isCc = /cc|closed caption/i.test(sub.DisplayTitle || '');
+        var prefix = isCc ? 'CC' : 'Sub';
+        var lang = sub.Language ? sub.Language.toUpperCase() : '';
+        return lang ? (prefix + ': ' + lang) : prefix;
+    }
+
+    function extractTranscoderEngine(hardwareType) {
+        if (!hardwareType) return 'Software (CPU)';
+        var hw = String(hardwareType).toLowerCase();
+        if (hw.indexOf('nvenc') !== -1) return 'NVENC';
+        if (hw.indexOf('qsv') !== -1) return 'QSV';
+        if (hw.indexOf('vaapi') !== -1) return 'VAAPI';
+        if (hw.indexOf('amf') !== -1) return 'AMF';
+        if (hw.indexOf('videotoolbox') !== -1) return 'VideoToolbox';
+        return hw.toUpperCase();
+    }
+
+    function getApiClient() {
+        if (typeof window !== 'undefined') {
+            if (typeof window.ApiClient !== 'undefined' && window.ApiClient) {
+                return window.ApiClient;
+            }
+            if (typeof window.ConnectionManager !== 'undefined' && window.ConnectionManager && typeof window.ConnectionManager.getApiClient === 'function') {
+                return window.ConnectionManager.getApiClient();
+            }
+        }
+        return null;
+    }
+
+    function checkAdminAccess() {
+        var apiClient = getApiClient();
+        if (!apiClient || typeof apiClient.getCurrentUser !== 'function') {
+            return Promise.resolve(false);
+        }
+        try {
+            var userResult = apiClient.getCurrentUser();
+            return Promise.resolve(userResult).then(function (user) {
+                if (user && user.Policy && user.Policy.IsAdministrator === true) {
+                    return true;
+                }
+                return false;
+            }).catch(function (err) {
+                console.error('[PlaybackCard] Failed to verify administrator privileges:', err);
+                return false;
+            });
+        } catch (err) {
+            console.error('[PlaybackCard] Synchronous error verifying administrator privileges:', err);
+            return Promise.resolve(false);
+        }
+    }
+
+    function getElements(page) {
+        if (!page) return null;
+        var statusEl = page.querySelector('#playbackStatusMsg');
+        var emptyEl = page.querySelector('#playbackEmptyState');
+        var gridEl = page.querySelector('#playbackSessionsGrid');
+        if (!statusEl || !emptyEl || !gridEl) return null;
+        return {
+            statusEl: statusEl,
+            emptyEl: emptyEl,
+            gridEl: gridEl
+        };
+    }
+
+    function isStateValid(page, capturedGen) {
+        return !isDisposed && activePage === page && currentGeneration === capturedGen;
+    }
+
+    function renderSessionCard(session) {
+        try {
+            if (!session || typeof session !== 'object') {
+                diagState.ignoredSessionCount++;
+                return '';
+            }
+
+            var user = escapeHtml(session.UserName || 'Unknown User');
+            var client = escapeHtml(session.Client || 'Unknown Client');
+            var device = escapeHtml(session.DeviceName || '');
+            var clientDevice = client + (device ? ' &mdash; ' + device : '');
+            if (session.ApplicationVersion) {
+                clientDevice += ' (v' + escapeHtml(session.ApplicationVersion) + ')';
+            }
+
+            var platformIconSvg = getPlatformIconSvg(session.Client, session.DeviceName);
+
+            var item = session.NowPlayingItem || {};
+            var title = escapeHtml(item.Name || 'Unknown Media');
+            var subtitle = '';
+            if (item.SeriesName) {
+                subtitle = escapeHtml(item.SeriesName);
+                if (item.SeasonName) {
+                    subtitle += ' &bull; ' + escapeHtml(item.SeasonName);
+                }
+                if (item.IndexNumber != null) {
+                    subtitle += ' &bull; Ep ' + escapeHtml(item.IndexNumber);
+                }
+            } else if (item.ProductionYear) {
+                subtitle = escapeHtml(String(item.ProductionYear));
+            }
+
+            var playState = session.PlayState || {};
+            var isPaused = Boolean(playState.IsPaused);
+            var playMethod = playState.PlayMethod || 'DirectPlay';
+
+            var tInfo = session.TranscodingInfo;
+            var isRemux = Boolean(tInfo && tInfo.IsVideoDirect && (!tInfo.IsAudioDirect || (tInfo.Container && item.Container && tInfo.Container.toLowerCase() !== item.Container.toLowerCase())));
+
+            var badgeClass = 'direct-play';
+            var badgeText = 'Direct Play';
+            var stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+
+            if (isPaused) {
+                badgeClass = 'paused';
+                badgeText = 'Paused';
+                stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+            } else if (isRemux) {
+                badgeClass = 'remux';
+                badgeText = 'Remux';
+            } else if (playMethod === 'DirectStream') {
+                badgeClass = 'direct-stream';
+                badgeText = 'Direct Stream';
+            } else if (playMethod === 'Transcode' || tInfo) {
+                badgeClass = 'transcode';
+                badgeText = 'Transcode';
+            }
+
+            // Media Streams extraction
+            var mediaStreams = item.MediaStreams || [];
+            var videoStream = null;
+            var audioStream = null;
+            for (var i = 0; i < mediaStreams.length; i++) {
+                if (!videoStream && mediaStreams[i].Type === 'Video') {
+                    videoStream = mediaStreams[i];
+                }
+                if (!audioStream && mediaStreams[i].Type === 'Audio') {
+                    audioStream = mediaStreams[i];
+                }
+            }
+
+            // Pills (Stream details)
+            var pills = [];
+            var resPill = extractResolutionPill(item.Width || (videoStream && videoStream.Width), item.Height || (videoStream && videoStream.Height));
+            if (resPill) pills.push({ text: resPill, cls: 'res' });
+
+            var hdrPill = extractDynamicRangePill(videoStream);
+            if (hdrPill) pills.push({ text: hdrPill, cls: 'hdr' });
+
+            var vCodec = (videoStream && videoStream.Codec ? videoStream.Codec.toUpperCase() : '');
+            if (vCodec) {
+                if (vCodec === 'H264') vCodec = 'H.264';
+                else if (vCodec === 'HEVC') vCodec = 'HEVC';
+                pills.push({ text: vCodec, cls: '' });
+            }
+
+            if (videoStream && videoStream.BitDepth) {
+                pills.push({ text: videoStream.BitDepth + '-bit', cls: '' });
+            }
+
+            var audioBadges = extractAudioBadges(audioStream);
+            for (var a = 0; a < audioBadges.length; a++) {
+                pills.push({ text: audioBadges[a], cls: 'audio' });
+            }
+
+            var subBadge = extractSubtitleBadge(session, item);
+            if (subBadge) {
+                pills.push({ text: subBadge, cls: 'sub' });
+            }
+
+            // Compact mode cap: limit visible pills in compact mode
+            var renderedPills = pills;
+            if (displayMode === 'compact' && pills.length > 5) {
+                renderedPills = pills.slice(0, 5);
+            }
+
+            var pillHtml = renderedPills.map(function (p) {
+                return '<span class="playback-pill ' + p.cls + '">' + escapeHtml(p.text) + '</span>';
+            }).join('');
+
+            // Progress
+            var positionTicks = (typeof playState.PositionTicks === 'number' && isFinite(playState.PositionTicks) && playState.PositionTicks > 0)
+                ? playState.PositionTicks
+                : 0;
+            var runtimeTicks = (typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks) && item.RunTimeTicks > 0)
+                ? item.RunTimeTicks
+                : 0;
+            var percent = 0;
+            if (runtimeTicks > 0) {
+                percent = Math.min(100, Math.max(0, (positionTicks / runtimeTicks) * 100));
+            }
+
+            // Transcode details
+            var transcodeHtml = '';
+            if (tInfo && typeof tInfo === 'object') {
+                var metaParts = [];
+                var engine = extractTranscoderEngine(tInfo.HardwareAccelerationType);
+                metaParts.push('Engine: ' + escapeHtml(engine));
+
+                if (tInfo.VideoCodec) metaParts.push('Video: ' + escapeHtml(tInfo.VideoCodec.toUpperCase()));
+                if (tInfo.AudioCodec) metaParts.push('Audio: ' + escapeHtml(tInfo.AudioCodec.toUpperCase()));
+                if (tInfo.Container) {
+                    var cConversion = item.Container
+                        ? (escapeHtml(item.Container.toUpperCase()) + ' &rarr; ' + escapeHtml(tInfo.Container.toUpperCase()))
+                        : escapeHtml(tInfo.Container.toUpperCase());
+                    metaParts.push('Container: ' + cConversion);
+                }
+                if (typeof tInfo.Framerate === 'number' && isFinite(tInfo.Framerate) && tInfo.Framerate > 0) {
+                    metaParts.push(Math.round(tInfo.Framerate) + ' fps');
+                }
+                if (typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
+                    var mbps = (tInfo.Bitrate / 1000000).toFixed(1);
+                    metaParts.push('Bitrate: ' + mbps + ' Mbps');
+                }
+
+                var reasonsHtml = '';
+                if (Array.isArray(tInfo.TranscodeReasons) && tInfo.TranscodeReasons.length > 0) {
+                    var validReasons = tInfo.TranscodeReasons.filter(function (r) {
+                        return r != null;
+                    }).map(escapeHtml);
+                    if (validReasons.length > 0) {
+                        reasonsHtml = '<div class="playback-transcode-reasons">Reasons: ' + validReasons.join(', ') + '</div>';
+                    }
+                }
+
+                if (metaParts.length > 0 || reasonsHtml) {
+                    transcodeHtml = '<div class="playback-card-transcode-details">' +
+                        (metaParts.length > 0 ? '<div class="playback-transcode-meta">' + metaParts.join(' &bull; ') + '</div>' : '') +
+                        reasonsHtml +
+                    '</div>';
+                }
+            }
+
+            // Poster & Backdrop handling
+            var apiClient = getApiClient();
+            var posterUrl = '';
+            var backdropUrl = '';
+            if (apiClient && typeof apiClient.getImageUrl === 'function' && item.Id) {
+                if (item.PrimaryImageTag) {
+                    posterUrl = apiClient.getImageUrl(item.Id, { type: 'Primary', tag: item.PrimaryImageTag, maxWidth: 200 });
+                }
+                if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
+                    backdropUrl = apiClient.getImageUrl(item.Id, { type: 'Backdrop', tag: item.BackdropImageTags[0], maxWidth: 600 });
+                }
+            }
+
+            var backdropStyle = backdropUrl ? ' style="background-image: url(\'' + escapeHtml(backdropUrl) + '\');"' : '';
+            var posterHtml = '';
+            if (posterUrl) {
+                posterHtml = '<img class="playback-poster" src="' + escapeHtml(posterUrl) + '" alt="' + title + '" onload="window.__playbackCardImgLoad && window.__playbackCardImgLoad(true)" onerror="window.__playbackCardImgLoad && window.__playbackCardImgLoad(false, this)" />';
+            } else {
+                diagState.artworkFallbackCount++;
+                posterHtml = '<div class="playback-poster-fallback"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg></div>';
+            }
+
+            return '<div class="playback-card" data-session-id="' + escapeHtml(session.Id || '') + '">' +
+                '<div class="playback-card-backdrop"' + backdropStyle + '></div>' +
+                '<div class="playback-card-inner">' +
+                    '<div class="playback-card-header">' +
+                        '<div class="playback-card-user-group">' +
+                            '<span class="playback-platform-icon" title="' + client + '">' + platformIconSvg + '</span>' +
+                            '<div class="playback-card-user-info">' +
+                                '<div class="playback-card-user">' + user + '</div>' +
+                                '<div class="playback-card-client">' + clientDevice + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="playback-badge-group">' +
+                            '<span class="playback-badge ' + badgeClass + '">' + stateIcon + ' ' + badgeText + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="playback-card-main">' +
+                        '<div class="playback-poster-wrap">' + posterHtml + '</div>' +
+                        '<div class="playback-card-body">' +
+                            '<div class="playback-card-title">' + title + '</div>' +
+                            (subtitle ? '<div class="playback-card-subtitle">' + subtitle + '</div>' : '') +
+                            (pillHtml ? '<div class="playback-pill-row">' + pillHtml + '</div>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="playback-card-progress">' +
+                        '<div class="playback-progress-bar-track">' +
+                            '<div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div>' +
+                        '</div>' +
+                        '<div class="playback-progress-times">' +
+                            '<span>' + formatTicks(positionTicks) + '</span>' +
+                            '<span>' + formatTicks(runtimeTicks) + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    transcodeHtml +
+                '</div>' +
+            '</div>';
+        } catch (cardErr) {
+            console.error('[PlaybackCard] Render error for session:', cardErr);
+            diagState.renderErrors++;
+            return '<div class="playback-card error-card"><div class="playback-card-inner"><p style="color:#fca5a5;margin:0;font-size:0.85rem;">Failed to render playback card.</p></div></div>';
+        }
+    }
+
+    // Window image callback
+    if (typeof window !== 'undefined') {
+        window.__playbackCardImgLoad = function (success, imgEl) {
+            if (success) {
+                diagState.artworkLoadedCount++;
+            } else {
+                diagState.artworkErrorCount++;
+                if (imgEl && imgEl.parentNode) {
+                    imgEl.parentNode.innerHTML = '<div class="playback-poster-fallback"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>';
+                }
+            }
+            updateDiagnosticsDisplay();
+        };
+    }
+
+    function updateDiagnosticsDisplay() {
+        if (!activePage) return;
+        try {
+            var now = Date.now();
+            var successRelative = diagState.lastSuccessTime ? formatRelativeTime(now - diagState.lastSuccessTime) : 'None';
+            var failureRelative = diagState.lastFailureTime ? formatRelativeTime(now - diagState.lastFailureTime) : 'None';
+
+            // Check stale poll condition: active polling but no update in > 2 intervals
+            if (diagState.pollingState === 'active' && diagState.lastSuccessTime && (now - diagState.lastSuccessTime > STALE_THRESHOLD_MS)) {
+                diagState.pollingState = 'stalled';
+                diagState.lastErrorCategory = 'Polling stalled';
+            } else if (diagState.pollingState === 'stalled' && diagState.lastSuccessTime && (now - diagState.lastSuccessTime <= STALE_THRESHOLD_MS)) {
+                diagState.pollingState = 'active';
+            }
+
+            var elPlugin = activePage.querySelector('#diagPluginVersion');
+            var elServer = activePage.querySelector('#diagServerVersion');
+            var elWeb = activePage.querySelector('#diagWebVersion');
+            var elRoute = activePage.querySelector('#diagRoute');
+            var elSessionsApi = activePage.querySelector('#diagSessionsApi');
+            var elPollingState = activePage.querySelector('#diagPollingState');
+            var elLastSuccess = activePage.querySelector('#diagLastSuccessPoll');
+            var elArtwork = activePage.querySelector('#diagArtwork');
+            var elIgnored = activePage.querySelector('#diagIgnoredCount');
+            var elRenderErrors = activePage.querySelector('#diagRenderErrors');
+
+            if (elPlugin) elPlugin.textContent = diagState.pluginVersion;
+            if (elServer) elServer.textContent = diagState.jellyfinVersion;
+            if (elWeb) elWeb.textContent = diagState.webVersion;
+            if (elRoute) elRoute.textContent = diagState.route;
+            if (elSessionsApi) {
+                elSessionsApi.textContent = diagState.sessionsApiStatus;
+                elSessionsApi.className = 'diagValue ' + (diagState.sessionsApiStatus === 'OK' ? 'status-ok' : (diagState.sessionsApiStatus === 'Waiting for sessions' ? 'status-waiting' : 'status-error'));
+            }
+            if (elPollingState) {
+                elPollingState.textContent = diagState.pollingState;
+                elPollingState.className = 'diagValue ' + (diagState.pollingState === 'active' ? 'status-ok' : (diagState.pollingState === 'stalled' ? 'status-waiting' : 'status-error'));
+            }
+            if (elLastSuccess) elLastSuccess.textContent = successRelative;
+            if (elArtwork) {
+                elArtwork.textContent = 'Loaded: ' + diagState.artworkLoadedCount + ', Fallback: ' + diagState.artworkFallbackCount + ', Errors: ' + diagState.artworkErrorCount;
+            }
+            if (elIgnored) elIgnored.textContent = String(diagState.ignoredSessionCount);
+            if (elRenderErrors) elRenderErrors.textContent = String(diagState.renderErrors);
+        } catch (e) {
+            console.error('[PlaybackCard] Error updating diagnostics view:', e);
+        }
+    }
+
+    function buildDiagnosticReport() {
+        var now = Date.now();
+        var successRelative = diagState.lastSuccessTime ? formatRelativeTime(now - diagState.lastSuccessTime) : 'redacted-or-available';
+
+        var artworkStatus = 'loaded';
+        if (diagState.artworkErrorCount > 0) artworkStatus = 'error';
+        else if (diagState.artworkFallbackCount > 0 && diagState.artworkLoadedCount === 0) artworkStatus = 'fallback';
+
+        var sessionsStatus = 'ok';
+        if (diagState.sessionsApiStatus === 'Sessions unavailable') sessionsStatus = 'error';
+        else if (diagState.sessionsApiStatus === 'Timeout') sessionsStatus = 'timeout';
+
+        return {
+            pluginVersion: diagState.pluginVersion,
+            jellyfinVersion: diagState.jellyfinVersion,
+            webVersion: diagState.webVersion,
+            route: diagState.route,
+            pageLoaded: Boolean(diagState.pageLoaded),
+            sessionsApi: sessionsStatus,
+            lastSuccessfulPoll: successRelative,
+            pollingState: diagState.pollingState,
+            artwork: artworkStatus,
+            ignoredSessionCount: diagState.ignoredSessionCount,
+            renderErrors: diagState.renderErrors
+        };
+    }
+
+    function checkSensitiveData(jsonStr) {
+        return SENSITIVE_PATTERN.test(jsonStr);
+    }
+
+    function copyDiagnosticReport(page) {
+        var feedbackEl = page ? page.querySelector('#diagnosticsFeedback') : null;
+        try {
+            var report = buildDiagnosticReport();
+            var reportJson = JSON.stringify(report, null, 2);
+
+            // Strict privacy redaction test
+            if (checkSensitiveData(reportJson)) {
+                if (feedbackEl) {
+                    feedbackEl.className = 'diagnosticsFeedback error';
+                    feedbackEl.textContent = 'Diagnostic report contains sensitive data; copy blocked for privacy.';
+                    feedbackEl.style.display = 'block';
+                }
+                return false;
+            }
+
+            if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(reportJson).then(function () {
+                    if (feedbackEl) {
+                        feedbackEl.className = 'diagnosticsFeedback success';
+                        feedbackEl.textContent = 'Diagnostic report copied to clipboard. Ready to paste in GitHub issues.';
+                        feedbackEl.style.display = 'block';
+                    }
+                }).catch(function (clipErr) {
+                    fallbackCopyText(reportJson, feedbackEl);
+                });
+            } else {
+                fallbackCopyText(reportJson, feedbackEl);
+            }
+            return true;
+        } catch (err) {
+            console.error('[PlaybackCard] Failed to copy diagnostic report:', err);
+            if (feedbackEl) {
+                feedbackEl.className = 'diagnosticsFeedback error';
+                feedbackEl.textContent = 'Could not copy diagnostic report: ' + escapeHtml(err.message);
+                feedbackEl.style.display = 'block';
+            }
+            return false;
+        }
+    }
+
+    function fallbackCopyText(text, feedbackEl) {
+        try {
+            var textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            var successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            if (successful && feedbackEl) {
+                feedbackEl.className = 'diagnosticsFeedback success';
+                feedbackEl.textContent = 'Diagnostic report copied to clipboard.';
+                feedbackEl.style.display = 'block';
+            } else if (feedbackEl) {
+                feedbackEl.className = 'diagnosticsFeedback error';
+                feedbackEl.textContent = 'Clipboard write unavailable in this browser.';
+                feedbackEl.style.display = 'block';
+            }
+        } catch (fallbackErr) {
+            if (feedbackEl) {
+                feedbackEl.className = 'diagnosticsFeedback error';
+                feedbackEl.textContent = 'Clipboard write failed.';
+                feedbackEl.style.display = 'block';
+            }
+        }
+    }
+
+    function fetchSessions(page, capturedGen) {
+        if (!isStateValid(page, capturedGen)) return;
+
+        var elements = getElements(page);
+        if (!elements) return;
+
+        var apiClient = getApiClient();
+        if (!apiClient || typeof apiClient.getSessions !== 'function') {
+            if (!isStateValid(page, capturedGen)) return;
+            diagState.sessionsApiStatus = 'Sessions unavailable';
+            diagState.lastErrorCategory = 'Sessions unavailable';
+            diagState.lastFailureTime = Date.now();
+            updateDiagnosticsDisplay();
+
+            elements.gridEl.innerHTML = '';
+            elements.emptyEl.style.display = 'none';
+            elements.statusEl.textContent = 'Jellyfin API client is unavailable.';
+            elements.statusEl.className = 'playbackMonitorStatusMsg error';
+            elements.statusEl.style.display = 'block';
+            return;
+        }
+
+        // Detect server version if available
+        if (diagState.jellyfinVersion === 'Checking…' || diagState.jellyfinVersion === 'Unavailable') {
+            if (typeof apiClient.serverVersion === 'function') {
+                var sVer = apiClient.serverVersion();
+                if (sVer) diagState.jellyfinVersion = String(sVer);
+            }
+        }
+
+        try {
+            var sessionsPromise = apiClient.getSessions();
+            Promise.resolve(sessionsPromise).then(function (sessions) {
+                if (!isStateValid(page, capturedGen)) return;
+
+                var sessionsArray = Array.isArray(sessions) ? sessions : [];
+                var activeSessions = sessionsArray.filter(function (s) {
+                    return Boolean(s && s.NowPlayingItem);
+                });
+
+                diagState.sessionsApiStatus = 'OK';
+                diagState.lastSuccessTime = Date.now();
+                diagState.pollingState = 'active';
+                diagState.lastErrorCategory = 'OK';
+                updateDiagnosticsDisplay();
+
+                elements.statusEl.style.display = 'none';
+                elements.statusEl.textContent = '';
+                elements.statusEl.className = 'playbackMonitorStatusMsg';
+
+                if (activeSessions.length === 0) {
+                    elements.emptyEl.style.display = 'flex';
+                    elements.gridEl.innerHTML = '';
+                } else {
+                    elements.emptyEl.style.display = 'none';
+                    elements.gridEl.innerHTML = activeSessions.map(renderSessionCard).join('');
+                }
+            }).catch(function (err) {
+                console.error('[PlaybackCard] Failed to fetch sessions:', err);
+                if (!isStateValid(page, capturedGen)) return;
+                diagState.sessionsApiStatus = 'Sessions unavailable';
+                diagState.lastErrorCategory = 'Sessions unavailable';
+                diagState.lastFailureTime = Date.now();
+                updateDiagnosticsDisplay();
+
+                elements.gridEl.innerHTML = '';
+                elements.emptyEl.style.display = 'none';
+                elements.statusEl.textContent = 'Could not load playback sessions.';
+                elements.statusEl.className = 'playbackMonitorStatusMsg error';
+                elements.statusEl.style.display = 'block';
+            });
+        } catch (err) {
+            console.error('[PlaybackCard] Synchronous error calling getSessions:', err);
+            if (!isStateValid(page, capturedGen)) return;
+            diagState.sessionsApiStatus = 'Sessions unavailable';
+            diagState.lastErrorCategory = 'Sessions unavailable';
+            diagState.lastFailureTime = Date.now();
+            updateDiagnosticsDisplay();
+
+            elements.gridEl.innerHTML = '';
+            elements.emptyEl.style.display = 'none';
+            elements.statusEl.textContent = 'Could not load playback sessions.';
+            elements.statusEl.className = 'playbackMonitorStatusMsg error';
+            elements.statusEl.style.display = 'block';
+        }
+    }
+
+    function setupControls(page) {
+        if (!page) return;
+        var btnCompact = page.querySelector('#btnModeCompact');
+        var btnExtended = page.querySelector('#btnModeExtended');
+        var btnCopyDiag = page.querySelector('#btnCopyDiagnostics');
+
+        if (btnCompact && btnExtended) {
+            btnCompact.addEventListener('click', function () {
+                displayMode = 'compact';
+                btnCompact.classList.add('active');
+                btnExtended.classList.remove('active');
+                if (activePage) fetchSessions(activePage, currentGeneration);
+            });
+
+            btnExtended.addEventListener('click', function () {
+                displayMode = 'extended';
+                btnExtended.classList.add('active');
+                btnCompact.classList.remove('active');
+                if (activePage) fetchSessions(activePage, currentGeneration);
+            });
+        }
+
+        if (btnCopyDiag) {
+            btnCopyDiag.addEventListener('click', function () {
+                copyDiagnosticReport(page);
+            });
+        }
+    }
+
+    function startPolling(page) {
+        stopPolling();
+        activePage = page;
+        currentGeneration++;
+        var capturedGen = currentGeneration;
+
+        var elements = getElements(page);
+        if (!elements) return;
+
+        setupControls(page);
+
+        elements.gridEl.innerHTML = '';
+        elements.emptyEl.style.display = 'none';
+        elements.statusEl.textContent = 'Loading playback sessions…';
+        elements.statusEl.className = 'playbackMonitorStatusMsg loading';
+        elements.statusEl.style.display = 'block';
+
+        diagState.pollingState = 'active';
+        updateDiagnosticsDisplay();
+
+        checkAdminAccess().then(function (isAdmin) {
+            if (!isStateValid(page, capturedGen)) {
+                return;
+            }
+
+            if (!isAdmin) {
+                elements.gridEl.innerHTML = '';
+                elements.emptyEl.style.display = 'none';
+                elements.statusEl.textContent = 'Administrator privileges are required to view playback telemetry.';
+                elements.statusEl.className = 'playbackMonitorStatusMsg error';
+                elements.statusEl.style.display = 'block';
+                diagState.pollingState = 'stopped';
+                diagState.lastErrorCategory = 'Administrator privileges required';
+                updateDiagnosticsDisplay();
+                return;
+            }
+
+            fetchSessions(page, capturedGen);
+
+            if (pollTimer != null) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+
+            pollTimer = setInterval(function () {
+                currentGeneration++;
+                fetchSessions(page, currentGeneration);
+            }, POLL_INTERVAL_MS);
+        }).catch(function (err) {
+            console.error('[PlaybackCard] Unexpected error during administrator check:', err);
+            if (!isStateValid(page, capturedGen)) {
+                return;
+            }
+            elements.gridEl.innerHTML = '';
+            elements.emptyEl.style.display = 'none';
+            elements.statusEl.textContent = 'Administrator privileges are required to view playback telemetry.';
+            elements.statusEl.className = 'playbackMonitorStatusMsg error';
+            elements.statusEl.style.display = 'block';
+            diagState.pollingState = 'stopped';
+            updateDiagnosticsDisplay();
+        });
+    }
+
+    function stopPolling() {
+        currentGeneration++;
+        if (pollTimer != null) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+        diagState.pollingState = 'stopped';
+        activePage = null;
+    }
+
+    function onViewShow(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('playbackMonitorPage')) {
+            startPolling(e.target);
+        }
+    }
+
+    function onViewHide(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('playbackMonitorPage')) {
+            stopPolling();
+        }
+    }
+
+    function onViewDestroy(e) {
+        var target = e && e.target;
+        if (target && target.classList && target.classList.contains('playbackMonitorPage')) {
+            if (!activePage || activePage === target) {
+                dispose();
+            }
+        }
+    }
+
+    if (typeof document !== 'undefined') {
+        document.addEventListener('viewshow', onViewShow);
+        document.addEventListener('viewhide', onViewHide);
+        document.addEventListener('viewdestroy', onViewDestroy);
+    }
+
+    function dispose() {
+        if (isDisposed) return;
+        isDisposed = true;
+        stopPolling();
+        if (typeof document !== 'undefined') {
+            document.removeEventListener('viewshow', onViewShow);
+            document.removeEventListener('viewhide', onViewHide);
+            document.removeEventListener('viewdestroy', onViewDestroy);
+        }
+
+        if (typeof window !== 'undefined' &&
+            window.__playbackInfoCardMonitorController &&
+            window.__playbackInfoCardMonitorController.dispose === dispose) {
+            delete window.__playbackInfoCardMonitorController;
+        }
+    }
+
+    var controller = {
+        version: PLUGIN_VERSION,
+        dispose: dispose,
+        diagState: diagState,
+        escapeHtml: escapeHtml,
+        formatTicks: formatTicks,
+        formatRelativeTime: formatRelativeTime,
+        extractResolutionPill: extractResolutionPill,
+        extractDynamicRangePill: extractDynamicRangePill,
+        extractAudioBadges: extractAudioBadges,
+        extractSubtitleBadge: extractSubtitleBadge,
+        extractTranscoderEngine: extractTranscoderEngine,
+        renderSessionCard: renderSessionCard,
+        buildDiagnosticReport: buildDiagnosticReport,
+        checkSensitiveData: checkSensitiveData,
+        copyDiagnosticReport: copyDiagnosticReport,
+        startPolling: startPolling,
+        stopPolling: stopPolling,
+        setDisplayMode: function (mode) { displayMode = mode; }
+    };
+
+    if (typeof window !== 'undefined') {
+        window.__playbackInfoCardMonitorController = controller;
+    }
+
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = controller;
+    }
+})(typeof window !== 'undefined' ? window : globalThis);
+        </script>
+    </div>
+</body>
+</html>

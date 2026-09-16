@@ -1,227 +1,141 @@
-<p align="center">
-  <img src="screenshots/ui-preview.png" alt="Playback Info Card — Studio Preview" width="900" />
-</p>
+# Playback Info Card for Jellyfin
 
-<h1 align="center">Playback Info Card for Jellyfin</h1>
+**Stable Version: v0.2.3.1**
 
-<p align="center">
-  <strong>Real-time playback telemetry, hardware transcode diagnostics, and remote session controls &mdash; natively inside your Jellyfin dashboard.</strong>
-</p>
-
-<p align="center">
-  <code>Jellyfin.Plugin.PlaybackCard</code>
-</p>
-
-<p align="center">
-  <a href="https://jellyfin.org"><img src="https://img.shields.io/badge/Jellyfin-10.9%2B%20%7C%20v12%2B-blue.svg" alt="Jellyfin" /></a>
-  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Release-v0.2.4-00a4dc.svg" alt="Release: v0.2.4" />
-  <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Antivirus-ClamAV%20Clean-brightgreen.svg" alt="Antivirus: ClamAV Clean" /></a>
-  <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Security-CodeQL%20Passed-brightgreen.svg" alt="Security: CodeQL Passed" /></a>
-  <a href="#-security--privacy-guarantees"><img src="https://img.shields.io/badge/Telemetry-Zero%20(Air--Gap)-blue.svg" alt="Telemetry: Zero" /></a>
-</p>
+Real-time, cinema-grade visual stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 
-## Overview
+## What Changed in v0.2.3.1
 
-Playback Info Card replaces the default Devices list on your Jellyfin Admin Dashboard with an interactive monitoring card. It shows who is watching what, whether media is direct playing or transcoding, which GPU encoder is active, why a transcode was triggered, and how much bandwidth is being consumed in real time.
+Version `0.2.3.1` is a complete architectural overhaul focused on server safety, client stability, and administrator privacy.
 
-Everything runs natively in your browser using Jellyfin's built-in session APIs. No separate Docker container, no external database, and zero tracking.
-
----
-
-## Screenshots
-
-### Main Dashboard
-> Live session cards displaying 4K HDR Direct Play, Hardware NVENC Transcode, and Lossless Hi-Res Audio with real-time bandwidth analytics.
-
-<p align="center">
-  <img src="screenshots/ui-preview.png" alt="Studio UI Preview" width="900" />
-</p>
-
-### Detailed Stream Inspection
-> Individual card breakdown showing player client, resolution, video/audio formats, container changes, network origin, and file paths.
-
-<p align="center">
-  <img src="screenshots/card-detail.png" alt="Stream Hardware Telemetry Detail" width="750" />
-</p>
-
-### Mobile View
-> Clean responsive layout with touch-friendly player controls and compact progress stacks for mobile browsers.
-
-<p align="center">
-  <img src="screenshots/mobile-view.png" alt="Mobile-Responsive View" width="380" />
-</p>
+* **Plugin-Owned Web Page**: The monitor is now served via Jellyfin's official `IHasWebPages` interface as a dedicated internal admin page (`Dashboard -> Server -> Playback Monitor`).
+* **Zero Host Injection**: Completely eliminated ASP.NET Core middleware, response-stream HTML rewriting, startup pipeline filters (`IStartupFilter`), and disk file manipulation.
+* **No Network or Location Classification**: Removed all IP address parsing, WAN/LAN/Cellular heuristics, and geolocation inference.
+* **No Remote-Control Actions**: Removed all stream termination, pause, or remote control hooks. The monitor is strictly a read-only telemetry dashboard.
+* **No Custom Server APIs**: Queries Jellyfin's standard, authenticated `/Sessions` API client directly in browser memory.
+* **Built-In Local Diagnostics**: Added a small, administrator-visible diagnostics panel with an automated privacy-redacting **"Copy diagnostic report"** tool.
+* **User-Initiated Issue Reporting**: Added pre-formatted GitHub issue templates with privacy guidelines and confirmation checkboxes.
 
 ---
 
-## Features
+## Where to Find the Monitor
 
-### Real-Time Playback Telemetry
-* **Stream Diagnostics**: Identifies Direct Play, Direct Stream, and Transcode states instantly.
-* **Hardware Acceleration Badges**: Detects NVIDIA NVENC, Intel QuickSync (QSV), Apple VideoToolbox, AMD AMF, and VAAPI with performance stats (`60 fps · 2.5x speed`).
-* **Dedicated Transcode Reason Row**: Displays why Jellyfin is transcoding (`Sub Burn-In`, `Video Codec`, `Audio Codec`, `Bitrate Limit`, `Container Remux`, or `Resolution Limit`).
-* **Cinema & Audio Badges**: Automatic detection of 4K UHD, Dolby Vision, HDR10+, HDR10, HLG, SDR Tone Mapping, Dolby Atmos, TrueHD, DTS:X, DTS-HD MA, and Hi-Res FLAC.
-* **Source Quality Tags**: Identifies release source (`REMUX`, `BLURAY`, `WEB-DL`, `HDTV`, `DVD`) from media file metadata.
+In earlier releases (`0.2.3.0` and prior), the plugin injected cards directly into the default Jellyfin Dashboard "Devices" section.
 
-### 1-Click Live FFmpeg Transcode Log Viewer
-* **In-Dashboard Terminal**: Click the **FFmpeg Log** button on any transcode session to view live FFmpeg output in an overlay modal.
-* **Live Stream Metrics**: Automatically parses current transcode FPS, speed multiplier, bitrate, and buffer size from the log stream.
-* **Log Controls**: Syntax highlighting (errors in red, warnings in amber, progress in green), live 3-second auto-refresh, errors-only filter, and a 1-click **Copy Log** button.
+In `0.2.3.1`, the monitor has moved to a dedicated, plugin-owned page:
 
-### Ghost & Zombie Session Pruner
-* **Automatic Detection**: Flags sessions that have been paused with no position change for over 15 minutes or abandoned socket connections consuming server RAM.
-* **One-Click Prune**: Click **Prune Ghosts** in the toolbar to terminate idle sessions and reclaim server memory.
+1. Log into **Jellyfin Web** as an **Administrator**.
+2. Open the **Dashboard** (Settings &rarr; Dashboard).
+3. In the left navigation sidebar under the **Server** section, click **Playback Monitor**.
 
-### Bandwidth Monitoring & Session Management
-* **LAN vs. WAN Breakdown**: Real-time traffic split showing local home network bandwidth versus outbound internet upload.
-* **Interactive Sparkline**: Rolling bandwidth trendline with interactive scrub tooltips.
-* **Remote Session Controls**: Play/pause, mute/unmute, send on-screen messages to clients, or terminate streams with one click.
-* **Admin Privacy Mode**: 1-click toggle (`[O] Privacy`) to mask usernames and IP addresses for screen shares or screenshots.
-* **25 Offline Client Badges**: Embedded vector SVG logos for Chrome, Safari, Firefox, Apple TV, Swiftfin, Finamp, Streamyfin, Android TV, and more. 100% offline with zero CDN dependencies.
+Direct URL route: `/web/#/configurationpage?name=playbackcard`
 
 ---
 
-## 🔒 Security & Privacy Guarantees
+## Features & UI Overview
 
-We believe self-hosters deserve total transparency about the code running on their servers:
-
-* **Zero External Network Requests (100% Air-Gap Safe)**: The plugin makes no external network calls, loads no third-party CDNs, and includes zero tracking or telemetry.
-* **In-Memory Only**: Queries the standard internal `ApiClient.getSessions()` endpoint. No host disk writes, no external databases, and no database locks.
-* **XSS Sanitization**: All incoming session metadata (usernames, media titles, client devices) is escaped with strict HTML entity encoding.
-* **Automated CI Security**: Every release binary is automatically scanned by ClamAV and analyzed by GitHub CodeQL static analysis before publication.
-* **Small & Auditable**: The codebase consists of clean C# plugin wrappers ([`Plugin.cs`](Plugin.cs)) and vanilla JavaScript ([`Web/playbackcard.js`](Web/playbackcard.js)) with **zero npm dependencies**.
-
-*Read our complete [Security Policy & Verification Guide](SECURITY.md).*
-
----
-
-## Installation
-
-### Prerequisites
-- [Jellyfin Media Server](https://jellyfin.org/downloads/) **10.9+** or **v12+**
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (only for building from source)
+* **Compact & Extended Modes**: Toggle between a clean, badge-capped compact grid and an expanded telemetry breakdown.
+* **Stream Telemetry**:
+  - Playback status: Playing &bull; Paused &bull; Direct Play &bull; Direct Stream &bull; Remux &bull; Transcode
+  - Resolution: 4K &bull; 1440p &bull; 1080p &bull; 720p &bull; SD
+  - Dynamic Range: HDR &bull; HDR10+ &bull; Dolby Vision &bull; SDR
+  - Video Codecs: HEVC &bull; AV1 &bull; VP9 &bull; H.264 &bull; MPEG2
+  - Bit Depth: 10-bit &bull; 8-bit
+  - Audio: Atmos &bull; 7.1 &bull; 5.1 &bull; Stereo &bull; Audio Codecs (TrueHD, E-AC3, AC3, DTS, FLAC, AAC)
+  - Active Subtitles &amp; Closed Captions: Language and subtitle stream type
+  - Framerate (FPS) &amp; Stream Bitrate
+* **Transcoding Engine Details**: In extended mode, view active hardware acceleration engine (`QSV`, `NVENC`, `VAAPI`, `AMF`, `VideoToolbox`, or `Software CPU`), container conversion, and transcode reasons reported by the server.
+* **Artwork & Visuals**: Poster artwork and subtle blurred backdrop with automatic error fallback.
+* **Platform Icons**: Self-contained inline SVGs for Android, Apple, Windows, Linux, Roku, LG webOS, Samsung Tizen, Chrome/Web, and Fire TV.
 
 ---
 
-### Method 1: Plugin Repository (Recommended)
+## Privacy & Diagnostics Policy
 
-Install directly from the Jellyfin Web UI with automatic updates:
+### 100% Offline & Air-Gapped
+* **Zero External Calls**: The monitor executes entirely within browser memory and queries only the local Jellyfin server via authenticated `ApiClient.getSessions()`.
+* **Zero Telemetry**: No tracking, no Google Analytics, no Sentry, no remote beacons, and no automated uploads.
 
-1. Open your Jellyfin Web interface and navigate to **Dashboard** &#10132; **Plugins** &#10132; **Repositories**
-2. Click the **+** button to add a new repository
-3. Enter the following:
-   - **Repository Name**: `Playback Info Card`
-   - **Repository URL**:
-     ```
-     https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json
-     ```
-4. Click **Save**
-5. Switch to the **Catalog** tab under Plugins
-6. Find **Playback Info Card**, click **Install**, and select the latest version
-7. **Restart** your Jellyfin Server
+### Safe Diagnostics & Redacted Reports
+The diagnostics card at the bottom of the monitor displays:
+* Plugin version (`0.2.3.1`)
+* Jellyfin server and web client versions (if available)
+* Current monitor route
+* Sessions API health category (`OK`, `Waiting for sessions`, `Sessions unavailable`)
+* Polling status (`active`, `stopped`, `stalled` when interval exceeds threshold)
+* Artwork loaded, fallback, and error counts
+* Malformed session and client render error counts
 
-The playback card will automatically appear at the top of your Admin Dashboard whenever streams are active.
+### Redacted Copy Tool
+Clicking **Copy diagnostic report** produces a clean JSON structure:
+```json
+{
+  "pluginVersion": "0.2.3.1",
+  "jellyfinVersion": "10.9.11",
+  "webVersion": "Available",
+  "route": "/playbackcard",
+  "pageLoaded": true,
+  "sessionsApi": "ok",
+  "lastSuccessfulPoll": "3s ago",
+  "pollingState": "active",
+  "artwork": "loaded",
+  "ignoredSessionCount": 0,
+  "renderErrors": 0
+}
+```
+Before copying, an automated redaction check scans for sensitive keywords (`RemoteEndPoint`, `ipAddress`, `token`, `password`, `cookie`, `media title`, `username`, IP regex). If any sensitive pattern is detected, the copy action is immediately blocked with a warning.
 
 ---
 
-### Method 2: Manual Installation (Release ZIP)
+## Client Compatibility
 
-1. Download `jellyfin-plugin-playbackcard.zip` from the [Latest Release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest)
-2. Locate your Jellyfin plugins directory:
-   - **Linux**: `/var/lib/jellyfin/plugins`
-   - **Windows**: `%ProgramData%\Jellyfin\Server\plugins`
-   - **macOS**: `~/.local/share/jellyfin/plugins`
-   - **Docker**: `/config/plugins` (mapped volume)
-3. Create a folder and extract:
+* **Jellyfin Web (Desktop & Mobile)**: Fully supported modern browser interface.
+* **Native Client Apps (Android TV, Apple TV, Roku, iOS, Infuse)**: Native client playback sessions are reported by the server and will appear on the Web Playback Monitor. However, native client apps do not render internal Web plugin pages.
+
+---
+
+## Migration from v0.2.3.0
+
+1. **Uninstall Legacy Injection**: If you previously installed `0.2.3.0`, replace the plugin DLL and `plugin.json` in your server's `plugins/PlaybackCard/` directory with `0.2.3.1`.
+2. **Remove Host Modifications**: If you previously inserted `<script>` tags into `index.html` or used custom CSS tweaks for earlier versions, remove them. Version `0.2.3.1` requires zero file modifications.
+3. **Restart Jellyfin**: Restart the server to initialize the updated assembly.
+4. **Access the New Location**: Open Jellyfin Web &rarr; Dashboard &rarr; Server &rarr; **Playback Monitor**.
+
+---
+
+## Rollback Instructions
+
+If you need to revert to `0.2.3.0` for any reason:
+
+1. Stop Jellyfin Server:
    ```bash
-   mkdir -p /var/lib/jellyfin/plugins/PlaybackCard
-   unzip jellyfin-plugin-playbackcard.zip -d /var/lib/jellyfin/plugins/PlaybackCard
+   sudo systemctl stop jellyfin
    ```
-4. Verify the folder contains:
-   - `Jellyfin.Plugin.PlaybackCard.dll`
-   - `plugin.json`
-5. **Restart** your Jellyfin server
+2. Download the preserved `0.2.3.0` release package:
+   ```bash
+   curl -L -O https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3/jellyfin-plugin-playbackcard.zip
+   ```
+3. Extract into your plugins directory:
+   ```bash
+   unzip -o jellyfin-plugin-playbackcard.zip -d /var/lib/jellyfin/plugins/PlaybackCard/
+   ```
+4. Restart Jellyfin Server:
+   ```bash
+   sudo systemctl start jellyfin
+   ```
+The previous `0.2.3.0` release artifact and repository manifest entry remain preserved for immediate rollback.
 
 ---
 
-### Method 3: Build from Source
+## Known Limitations
 
-```bash
-git clone https://github.com/Ubaidofficial/Playback-info-card.git
-cd Playback-info-card
-dotnet build -c Release
-```
-
-Copy the compiled DLL from `bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll` along with `plugin.json` into your Jellyfin `plugins/PlaybackCard/` directory and restart the server.
-
----
-
-## Project Structure
-
-```
-Playback-info-card/
-  JellyfinPlaybackCard.csproj       .NET 8 SDK project with embedded web resources
-  Plugin.cs                         Plugin entry point (IHasWebPages & disk patch fallback)
-  PlaybackCardMiddleware.cs         ASP.NET Core middleware for dynamic in-memory HTML injection
-  PlaybackCardServiceRegistrator.cs Service registrator registering IStartupFilter
-  PlaybackCardStartupFilter.cs      ASP.NET Core startup pipeline filter
-  PluginConfiguration.cs            Plugin configuration model
-  manifest.json                     Jellyfin plugin catalog manifest
-  plugin.json                       Plugin metadata
-  Web/
-    playbackcard.js                 Client-side engine: DOM renderer, state machine, API poller
-    playbackcard.css                Liquid Glass theme stylesheet and responsive layout tokens
-  screenshots/                      High-resolution README preview images
-  SECURITY.md                       Security policy, AI disclosure, and verification guide
-  LICENSE                           MIT License
-```
-
----
-
-## Compatibility
-
-| Platform    | Status             | Notes                                                                                                   |
-|-------------|--------------------|---------------------------------------------------------------------------------------------------------|
-| **Jellyfin** | Fully Supported   | Native plugin with automated ASP.NET Core middleware injection. Tested on 10.9+ and v12.               |
-| **Emby**     | Adaptable         | Emby shares historical roots but uses a proprietary SDK. The vanilla JS engine can be adapted as a userscript. |
-
----
-
-## How It Works
-
-The plugin registers an ASP.NET Core `IStartupFilter` via Jellyfin's `IPluginServiceRegistrator`, dynamically injecting `playbackcard.js` into the web client's `index.html` response stream in-memory. The script:
-
-1. **Detects** the dashboard page via URL matching (`/dashboard.html` or SPA routes)
-2. **Replaces** the default Devices section with zero layout shift
-3. **Injects** a self-contained CSS stylesheet with all Liquid Glass design tokens
-4. **Polls** `ApiClient.getSessions()` every 3 seconds (or your configured interval)
-5. **Renders** session cards with full telemetry into the dashboard
-6. **Manages** its own lifecycle via `viewshow`/`viewhide`/`viewdestroy` events to prevent memory leaks
-
-All telemetry is transient and in-memory. The plugin writes **zero data** to disk or databases.
-
----
-
-## Contributing
-
-Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes
-4. Push and open a Pull Request
+* Polling frequency is 3 seconds while the monitor page is actively viewed; background tabs pause polling to conserve server resources.
+* Native TV and mobile apps report session telemetry to Jellyfin, but the monitor UI itself can only be viewed in web browsers.
 
 ---
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
-
----
-
-<p align="center">
-  Built with &hearts; for the Jellyfin community
-</p>

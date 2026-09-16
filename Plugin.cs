@@ -10,7 +10,7 @@ namespace Jellyfin.Plugin.PlaybackCard;
 
 /// <summary>
 /// Core entry point for the Playback Info Card plugin.
-/// Implements <see cref="BasePlugin{TConfiguration}"/> and <see cref="IHasWebPages"/> to serve embedded client scripts.
+/// Implements <see cref="BasePlugin{TConfiguration}"/> and <see cref="IHasWebPages"/> to serve one embedded, plugin-owned monitor page.
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
@@ -23,49 +23,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
-        TryDiskInjection(applicationPaths);
     }
-
-#pragma warning disable CA1031
-    private static void TryDiskInjection(IApplicationPaths applicationPaths)
-    {
-        try
-        {
-            var webPath = applicationPaths?.GetType().GetProperty("WebPath")?.GetValue(applicationPaths) as string;
-            var candidates = new List<string>();
-            if (!string.IsNullOrEmpty(webPath))
-            {
-                candidates.Add(System.IO.Path.Combine(webPath, "index.html"));
-            }
-
-            candidates.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "jellyfin-web", "index.html"));
-            candidates.Add(System.IO.Path.Combine(AppContext.BaseDirectory, "web", "index.html"));
-            candidates.Add(@"C:\Program Files\Jellyfin\Server\jellyfin-web\index.html");
-            candidates.Add(@"C:\Program Files\Jellyfin\Server\web\index.html");
-            candidates.Add("/usr/share/jellyfin/web/index.html");
-            candidates.Add("/jellyfin/jellyfin-web/index.html");
-
-            foreach (var candidate in candidates)
-            {
-                if (System.IO.File.Exists(candidate))
-                {
-                    var content = System.IO.File.ReadAllText(candidate);
-                    if (!content.Contains("playbackcard.js", StringComparison.OrdinalIgnoreCase) &&
-                        content.Contains("</body>", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var updated = content.Replace("</body>", "<script plugin=\"PlaybackCard\" version=\"0.2.4.0\" src=\"configurationpage?name=playbackcard.js\" defer></script>\n</body>", StringComparison.OrdinalIgnoreCase);
-                        System.IO.File.WriteAllText(candidate, updated);
-                    }
-                    break;
-                }
-            }
-        }
-        catch
-        {
-            // Silently ignore disk write permission errors; in-memory middleware handles injection seamlessly
-        }
-    }
-#pragma warning restore CA1031
 
     /// <summary>
     /// Gets the current plugin instance.
@@ -86,10 +44,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Gets the plugin description.
     /// </summary>
     public override string Description =>
-        "Real-time, cinema-grade visual stream telemetry and playback monitoring grid injected directly into the Jellyfin Admin Dashboard.";
+        "Admin playback session monitor displaying active streams, play state, and real-time transcode telemetry.";
 
     /// <summary>
-    /// Serves embedded web assets to the Jellyfin Web client interface.
+    /// Serves one embedded, plugin-owned monitor page to the Jellyfin Web client interface.
     /// </summary>
     /// <returns>A collection of <see cref="PluginPageInfo"/> objects representing client resources.</returns>
     public IEnumerable<PluginPageInfo> GetPages()
@@ -98,27 +56,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         {
             new PluginPageInfo
             {
-                Name = "playbackcard.js",
-                EmbeddedResourcePath = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}.Web.playbackcard.js",
-                    GetType().Namespace)
-            },
-            new PluginPageInfo
-            {
-                Name = "playbackcard.css",
-                EmbeddedResourcePath = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}.Web.playbackcard.css",
-                    GetType().Namespace)
-            },
-            new PluginPageInfo
-            {
                 Name = "playbackcard",
+                DisplayName = "Playback Monitor",
                 EmbeddedResourcePath = string.Format(
                     CultureInfo.InvariantCulture,
-                    "{0}.Web.configPage.html",
-                    GetType().Namespace)
+                    "{0}.Web.playbackcard.html",
+                    GetType().Namespace),
+                EnableInMainMenu = true,
+                MenuSection = "server",
+                MenuIcon = "play_circle"
             }
         };
     }

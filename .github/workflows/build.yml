@@ -2,7 +2,7 @@ name: Build and Package Plugin
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'release/**' ]
     tags:
       - 'v*'
   pull_request:
@@ -67,7 +67,11 @@ jobs:
       run: |
         TAG_NAME="${GITHUB_REF#refs/tags/}"
         RAW_VER="${TAG_NAME#v}"
-        VERSION="${RAW_VER}.0"
+        if [[ "$RAW_VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          VERSION="${RAW_VER}.0"
+        else
+          VERSION="${RAW_VER}"
+        fi
         CHECKSUM=$(md5sum jellyfin-plugin-playbackcard.zip | awk '{print $1}')
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -77,8 +81,8 @@ jobs:
             {
               guid: 'b7e6f831-2794-4d82-8419-7c48ef2e2a39',
               name: 'Playback Info Card',
-              description: 'Real-time, cinema-grade visual stream telemetry and playback monitoring grid injected directly into the Jellyfin Admin Dashboard.',
-              overview: 'Transient live monitoring displaying real-time session telemetry, direct play vs transcode status, transcode reasons, stream bandwidth, and ETA.',
+              description: 'Admin playback session monitor displaying active streams, play state, and real-time transcode telemetry.',
+              overview: 'Admin playback session monitor displaying active streams, play state, and real-time transcode telemetry.',
               owner: 'Ubaidofficial',
               category: 'General',
               imageUrl: 'https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png',

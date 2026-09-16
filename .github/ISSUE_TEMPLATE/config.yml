@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security & Vulnerability Reporting
+    url: https://github.com/Ubaidofficial/Playback-info-card/security/advisories/new
+    about: Please report potential security vulnerabilities privately.
+  - name: Documentation & Migration Guide
+    url: https://github.com/Ubaidofficial/Playback-info-card#readme
+    about: Read the v0.2.3.1 migration instructions and architectural details.
