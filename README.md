@@ -163,17 +163,20 @@ Copy the compiled DLL from `bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll`
 
 ```
 Playback-info-card/
-  JellyfinPlaybackCard.csproj    .NET 8 SDK project with embedded web resources
-  Plugin.cs                      Plugin entry point (IHasWebPages)
-  PluginConfiguration.cs         Configuration (BasePluginConfiguration)
-  manifest.json                  Jellyfin plugin catalog manifest
-  plugin.json                    Plugin metadata
+  JellyfinPlaybackCard.csproj       .NET 8 SDK project with embedded web resources
+  Plugin.cs                         Plugin entry point (IHasWebPages & disk patch fallback)
+  PlaybackCardMiddleware.cs         ASP.NET Core middleware for dynamic in-memory HTML injection
+  PlaybackCardServiceRegistrator.cs Service registrator registering IStartupFilter
+  PlaybackCardStartupFilter.cs      ASP.NET Core startup pipeline filter
+  PluginConfiguration.cs            Plugin configuration model
+  manifest.json                     Jellyfin plugin catalog manifest
+  plugin.json                       Plugin metadata
   Web/
-    playbackcard.js              Client-side engine: DOM renderer, state machine, API poller
-    playbackcard.css             Liquid Glass theme stylesheet and responsive layout tokens
-  screenshots/                   High-resolution README preview images
-  SECURITY.md                    Security policy, AI disclosure, and verification guide
-  LICENSE                        MIT License
+    playbackcard.js                 Client-side engine: DOM renderer, state machine, API poller
+    playbackcard.css                Liquid Glass theme stylesheet and responsive layout tokens
+  screenshots/                      High-resolution README preview images
+  SECURITY.md                       Security policy, AI disclosure, and verification guide
+  LICENSE                           MIT License
 ```
 
 ---
@@ -182,20 +185,21 @@ Playback-info-card/
 
 | Platform    | Status             | Notes                                                                                                   |
 |-------------|--------------------|---------------------------------------------------------------------------------------------------------|
-| **Jellyfin** | Fully Supported   | Native plugin via `IHasWebPages`. Tested on 10.9+ and v12.                                              |
+| **Jellyfin** | Fully Supported   | Native plugin with automated ASP.NET Core middleware injection. Tested on 10.9+ and v12.               |
 | **Emby**     | Adaptable         | Emby shares historical roots but uses a proprietary SDK. The vanilla JS engine can be adapted as a userscript. |
 
 ---
 
 ## How It Works
 
-The plugin registers itself as an `IHasWebPages` provider, injecting `playbackcard.js` into the Jellyfin Web admin dashboard. The script:
+The plugin registers an ASP.NET Core `IStartupFilter` via Jellyfin's `IPluginServiceRegistrator`, dynamically injecting `playbackcard.js` into the web client's `index.html` response stream in-memory. The script:
 
 1. **Detects** the dashboard page via URL matching (`/dashboard.html` or SPA routes)
-2. **Injects** a CSS stylesheet with all Liquid Glass design tokens
-3. **Polls** `ApiClient.getSessions()` every 3 seconds (or your configured interval)
-4. **Renders** session cards with full telemetry into a container above `.dashboardForm`
-5. **Manages** its own lifecycle via `viewshow`/`viewhide`/`viewdestroy` events to prevent memory leaks
+2. **Replaces** the default Devices section with zero layout shift
+3. **Injects** a self-contained CSS stylesheet with all Liquid Glass design tokens
+4. **Polls** `ApiClient.getSessions()` every 3 seconds (or your configured interval)
+5. **Renders** session cards with full telemetry into the dashboard
+6. **Manages** its own lifecycle via `viewshow`/`viewhide`/`viewdestroy` events to prevent memory leaks
 
 All telemetry is transient and in-memory. The plugin writes **zero data** to disk or databases.
 
