@@ -185,7 +185,7 @@ The playback card will automatically appear at the top of your Admin Dashboard w
 
 ### Method 2: Manual Installation (Release ZIP)
 
-1. Download `Playback-info-card.zip` from the [Latest Release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest)
+1. Download `jellyfin-plugin-playbackcard.zip` from the [Latest Release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest)
 2. Locate your Jellyfin plugins directory:
    - **Linux**: `/var/lib/jellyfin/plugins`
    - **Windows**: `%ProgramData%\Jellyfin\Server\plugins`
@@ -194,7 +194,7 @@ The playback card will automatically appear at the top of your Admin Dashboard w
 3. Create a folder and extract:
    ```bash
    mkdir -p /var/lib/jellyfin/plugins/PlaybackCard
-   unzip Playback-info-card.zip -d /var/lib/jellyfin/plugins/PlaybackCard
+   unzip jellyfin-plugin-playbackcard.zip -d /var/lib/jellyfin/plugins/PlaybackCard
    ```
 4. Verify the folder contains:
    - `Jellyfin.Plugin.PlaybackCard.dll`

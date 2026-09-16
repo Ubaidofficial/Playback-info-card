@@ -224,7 +224,7 @@
                 -webkit-font-smoothing: antialiased;
             }
 
-            /* Activity Banner - Void Obsidian & Moonfin Liquid Glass */
+            /* Activity Banner - Void Obsidian & Liquid Glass */
             .tautulli-activity-banner {
                 display: flex;
                 align-items: center;
@@ -436,7 +436,7 @@
                 transition: transform 0.08s ease;
             }
 
-            /* Moonfin Glass Noise Grain Texture (3% opacity physical texture) */
+            /* Glass Noise Grain Texture (3% opacity physical texture) */
             .tautulli-card::before {
                 content: '';
                 position: absolute;
@@ -471,7 +471,7 @@
                 opacity: 1;
             }
 
-            /* Moonfin Dynamic Ambient Glass Layer */
+            /* Dynamic Ambient Glass Layer */
             .tautulli-card-ambient-bg {
                 position: absolute;
                 top: -25%;
@@ -486,7 +486,7 @@
                 z-index: 0;
             }
 
-            /* Right-Side Fanart Backdrop with Multi-stop Frosted Liquid Glass Vignette Mask (Moonfin + Void) */
+            /* Right-Side Fanart Backdrop with Multi-stop Frosted Liquid Glass Vignette Mask (Void Obsidian) */
             .tautulli-card-fanart-backdrop {
                 position: absolute;
                 top: 0;
@@ -758,7 +758,7 @@
                 transform: scale(1.04);
                 filter: brightness(1.08);
             }
-            /* Moonfin Holographic Shimmer Sweep on Poster Hover */
+            /* Holographic Shimmer Sweep on Poster Hover */
             .tautulli-poster-wrapper::after {
                 content: '';
                 position: absolute;
@@ -802,7 +802,7 @@
                 fill: #475569;
             }
 
-            /* Authentic Tautulli Spec Grid (2-Column Key-Value) */
+            /* High-Density Spec Grid (2-Column Key-Value) */
             .tautulli-spec-table {
                 flex: 1;
                 display: flex;
@@ -1355,7 +1355,7 @@
             }
 
 
-            /* LAN/WAN/CELLULAR Connection Pill (Moonfin-style) */
+            /* LAN/WAN/CELLULAR Connection Pill (High-density style) */
             .tautulli-net-pill {
                 display: inline-block;
                 font-size: 8px;
@@ -2450,7 +2450,7 @@
     }
 
     /**
-     * Returns an SVG icon and signature brand color for client / device badges (Tautulli style).
+     * Returns an SVG icon and signature brand color for client / device badges (High-density style).
      */
     function getPlatformBadge(client, deviceName) {
         const combined = `${client || ''} ${deviceName || ''}`.toLowerCase();
@@ -2760,7 +2760,7 @@
     }
 
     /**
-     * Interactive Action: Stop / Kill Stream (Jellywatch & Tautulli flagship feature)
+     * Interactive Action: Stop / Kill Stream (Session management feature)
      */
     async function handleKillStream(sessionId, userName, mediaTitle) {
         if (!window.ApiClient || !sessionId) return;
@@ -2787,7 +2787,7 @@
     }
 
     /**
-     * Interactive Action: Send On-Screen Message to Player (Jellywatch feature)
+     * Interactive Action: Send On-Screen Message to Player (Session messaging feature)
      */
     async function handleSendMessage(sessionId, userName, defaultMsg) {
         if (!window.ApiClient || !sessionId) return;
@@ -2860,7 +2860,7 @@
 
 
     /**
-     * Maps raw Jellyfin session data into Tautulli/Jellywatch card view model.
+     * Maps raw Jellyfin session data into stream card view model.
      */
     function mapSessionToCardModel(session, index) {
         const item = session.NowPlayingItem || {};
@@ -2881,7 +2881,7 @@
         const sourceBitrate = mediaSource.Bitrate || item.Bitrate || item.TotalBitrate || 0;
         const origContainer = (mediaSource.Container || item.Container || 'MKV').toUpperCase();
 
-        // Determine Play Method with Tautulli precision
+        // Determine Play Method with precision
         let playMethod = playState.PlayMethod || (transcodeInfo ? 'Transcode' : 'DirectPlay');
         let isDirectPlay = playMethod === 'DirectPlay';
         let isDirectStream = playMethod === 'DirectStream' || (transcodeInfo != null && transcodeInfo.IsVideoDirect === true && transcodeInfo.IsAudioDirect === true);
@@ -2928,7 +2928,7 @@
             ? mediaStreams.find((s) => s.Type === 'Subtitle' && s.Index === playState.SubtitleStreamIndex) || null
             : (isSubtitleBurnIn ? mediaStreams.find((s) => s.Type === 'Subtitle') || null : null);
 
-        // Container display (Tautulli style)
+        // Container display (High-density style)
         const targetContainer = (transcodeInfo && transcodeInfo.Container ? transcodeInfo.Container.toUpperCase() : (isTranscode ? 'MP4' : origContainer));
         let containerDisplay = `Direct Play (${origContainer})`;
         if (isTranscode && transcodeInfo) {
@@ -3140,7 +3140,7 @@
             audioDisplayWithoutBadges = `Direct Stream (${cleanAudioDesc})`;
         }
 
-        // Subtitles (Explicit 'None' if unselected, exactly matching Tautulli)
+        // Subtitles (Explicit 'None' if unselected, when unselected)
         let subtitleDisplay = 'None';
         let subChip = null;
         let subtitleBadgesHtml = '';
@@ -3211,14 +3211,14 @@
             }
         }
 
-        // Tautulli Quality String (Original vs Transcoded quality)
+        // Quality String (Original vs Transcoded quality)
         let qualityDisplay = `Original (${formatBitrate(sourceBitrate || currentBitrate)})`;
         if (isTranscode && transcodeInfo && transcodeInfo.IsVideoDirect === false) {
             const targetRes = transcodeInfo.Height ? resolveResolutionInfo(transcodeInfo.Width, transcodeInfo.Height).short : origVideoRes;
             qualityDisplay = `${targetRes} (${formatBitrate(currentBitrate)})`;
         }
 
-        // Tautulli Stream String, Tooltip & CSS Class
+        // Stream String, Tooltip & CSS Class
         let streamDisplay = 'Direct Play';
         let streamClass = 'directplay';
         let streamTooltip = 'Direct Play: Native hardware playback without server conversion';
@@ -3275,7 +3275,7 @@
             : `${fileSizeDisplay ? fileSizeDisplay + ' · ' : ''}${origContainer}`;
         const bandwidthDisplay = formatBitrate(currentBitrate);
 
-        // Connection & Location Type (CELLULAR vs WAN vs LAN, matching Tautulli)
+        // Connection & Location Type (CELLULAR vs WAN vs LAN, precision format)
         const rawIp = session.RemoteEndPoint || '127.0.0.1';
         const isLan = isLanIp(rawIp);
         let cleanIp = rawIp.trim();
@@ -3410,7 +3410,7 @@
             audioChannelsBadge = 'Stereo';
         }
 
-        // Tautulli-Inspired SyncPlay Watch Party Group
+        // SyncPlay Watch Party Group
         const syncPlayGroupId = session.SyncPlayGroupId || session.GroupId || (session.SyncPlay && session.SyncPlay.GroupId) || null;
 
         const model = {
@@ -3529,7 +3529,7 @@
     }
 
     /**
-     * Renders an individual session card element HTML string aligned 1:1 with Tautulli.
+     * Renders an individual session card element HTML string with full telemetry metrics.
      */
     function renderSessionCard(card) {
         // Poster image or clean SVG fallback
@@ -3614,7 +3614,7 @@
                 ${card.posterUrl ? `<div class="tautulli-card-ambient-bg" style="background-image: url('${safeCssUrl(card.posterUrl)}');"></div>` : ''}
                 ${card.backdropUrl ? `<div class="tautulli-card-fanart-backdrop" style="background-image: url('${safeCssUrl(card.backdropUrl)}');"></div>` : ''}
 
-                <!-- Card Body: Poster + Authentic Tautulli Spec Grid + Floating Time Stack -->
+                <!-- Card Body: Poster + High-Density Spec Grid + Floating Time Stack -->
                 <div class="tautulli-card-body">
                     <!-- Left Poster Artwork -->
                     <a href="${detailHref}" class="tautulli-poster-wrapper${card.isPaused ? ' tautulli-poster-paused' : ''}" title="View details: ${escapeHtml(card.primaryTitle)}">
@@ -3817,7 +3817,7 @@
             `;
         }
 
-        // Aggregate statistics for the Tautulli Activity Banner
+        // Aggregate statistics for the Activity Banner
         const totalStreams = cards.length;
         const directPlayCount = cards.filter((c) => c.isDirectPlay).length;
         const directStreamCount = cards.filter((c) => c.isDirectStream).length;
@@ -3857,7 +3857,7 @@
 
         const breakdownStr = breakdownParts.length > 0 ? `(${breakdownParts.join(', ')})` : '';
 
-        // Bandwidth detail string (matching Tautulli activity header)
+        // Bandwidth detail string (precision format activity header)
         let bandwidthDetail = formatBitrate(totalBandwidth);
         if (totalBandwidth > 0) {
             if (wanBandwidth > 0 && lanBandwidth > 0) {
@@ -4204,7 +4204,7 @@
 
             const cards = activeSessions.map((s, idx) => mapSessionToCardModel(s, idx));
 
-            // Tautulli Feature 4: SyncPlay watch party group clustering
+            // SyncPlay watch party group clustering
             const syncPlayGroupMap = new Map();
             cards.forEach((c) => {
                 if (c.syncPlayGroupId) {

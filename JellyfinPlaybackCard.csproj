@@ -11,6 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <NoWarn>$(NoWarn);CA1724;CA1056</NoWarn>
   </PropertyGroup>
 
   <!-- Jellyfin Server Dependencies -->

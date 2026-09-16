@@ -37,7 +37,7 @@
                 -webkit-font-smoothing: antialiased;
             }
 
-            /* Activity Banner - Void Obsidian & Moonfin Liquid Glass */
+            /* Activity Banner - Void Obsidian & Liquid Glass */
             .tautulli-activity-banner {
                 display: flex;
                 align-items: center;
@@ -249,7 +249,7 @@
                 transition: transform 0.08s ease;
             }
 
-            /* Moonfin Glass Noise Grain Texture (3% opacity physical texture) */
+            /* Glass Noise Grain Texture (3% opacity physical texture) */
             .tautulli-card::before {
                 content: '';
                 position: absolute;
@@ -284,7 +284,7 @@
                 opacity: 1;
             }
 
-            /* Moonfin Dynamic Ambient Glass Layer */
+            /* Dynamic Ambient Glass Layer */
             .tautulli-card-ambient-bg {
                 position: absolute;
                 top: -25%;
@@ -299,7 +299,7 @@
                 z-index: 0;
             }
 
-            /* Right-Side Fanart Backdrop with Multi-stop Frosted Liquid Glass Vignette Mask (Moonfin + Void) */
+            /* Right-Side Fanart Backdrop with Multi-stop Frosted Liquid Glass Vignette Mask (Void Obsidian) */
             .tautulli-card-fanart-backdrop {
                 position: absolute;
                 top: 0;
@@ -571,7 +571,7 @@
                 transform: scale(1.04);
                 filter: brightness(1.08);
             }
-            /* Moonfin Holographic Shimmer Sweep on Poster Hover */
+            /* Holographic Shimmer Sweep on Poster Hover */
             .tautulli-poster-wrapper::after {
                 content: '';
                 position: absolute;
@@ -615,7 +615,7 @@
                 fill: #475569;
             }
 
-            /* Authentic Tautulli Spec Grid (2-Column Key-Value) */
+            /* High-Density Spec Grid (2-Column Key-Value) */
             .tautulli-spec-table {
                 flex: 1;
                 display: flex;
@@ -1168,7 +1168,7 @@
             }
 
 
-            /* LAN/WAN/CELLULAR Connection Pill (Moonfin-style) */
+            /* LAN/WAN/CELLULAR Connection Pill (High-density style) */
             .tautulli-net-pill {
                 display: inline-block;
                 font-size: 8px;
