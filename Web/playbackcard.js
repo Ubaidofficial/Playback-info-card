@@ -1,5 +1,5 @@
 /**
- * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.0
+ * Jellyfin Playback Info Card (Jellyfin.Plugin.PlaybackCard) - v0.2.1
  * 
  * Injects a real-time, cinema-grade visual stream telemetry and playback monitoring grid directly into
  * the Jellyfin Admin Dashboard (/dashboard.html / .dashboardForm).
@@ -2367,8 +2367,18 @@
         hlg: `<span class="tautulli-tech-badge tautulli-tech-hlg" title="Hybrid Log-Gamma">HLG</span>`,
         atmos: `<span class="tautulli-tech-badge tautulli-tech-atmos" title="Dolby Atmos Spatial Audio"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="#fff" d="M0 0h3.2c2.2 0 4 1.8 4 4s-1.8 4-4 4H0V0zm9.6 0H16v8h-3.2c-2.2 0-4-1.8-4-4s1.8-4 4-4zM2 2v4h1.2c1.1 0 2-.9 2-2s-.9-2-2-2H2zm10.8 0c-1.1 0-2 .9-2 2s.9 2 2 2H14V2h-1.2z"/></svg>ATMOS</span>`,
         dolby: `<span class="tautulli-tech-badge tautulli-tech-dolby" title="Dolby Audio"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="currentColor" d="M0 0h3.2c2.2 0 4 1.8 4 4s-1.8 4-4 4H0V0zm9.6 0H16v8h-3.2c-2.2 0-4-1.8-4-4s1.8-4 4-4zM2 2v4h1.2c1.1 0 2-.9 2-2s-.9-2-2-2H2zm10.8 0c-1.1 0-2 .9-2 2s.9 2 2 2H14V2h-1.2z"/></svg>AUDIO</span>`,
+        truehd: `<span class="tautulli-tech-badge tautulli-tech-truehd" title="Dolby TrueHD Lossless Audio"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="#fff" d="M0 0h3.2c2.2 0 4 1.8 4 4s-1.8 4-4 4H0V0zm9.6 0H16v8h-3.2c-2.2 0-4-1.8-4-4s1.8-4 4-4zM2 2v4h1.2c1.1 0 2-.9 2-2s-.9-2-2-2H2zm10.8 0c-1.1 0-2 .9-2 2s.9 2 2 2H14V2h-1.2z"/></svg>TRUEHD</span>`,
         dts: `<span class="tautulli-tech-badge tautulli-tech-dts" title="DTS-HD Master Audio">DTS-HD</span>`,
+        dtsx: `<span class="tautulli-tech-badge tautulli-tech-dtsx" title="DTS:X Object-Based Audio">DTS:X</span>`,
+        flac: `<span class="tautulli-tech-badge tautulli-tech-flac" title="FLAC Lossless Audio"><svg viewBox="0 0 10 10" width="8" height="8" style="vertical-align:-1px;margin-right:2px"><path fill="#eab308" d="M2 1h6v1H3v2h4v1H3v4H2V1z"/></svg>FLAC</span>`,
+        opus: `<span class="tautulli-tech-badge tautulli-tech-opus" title="Opus Audio">OPUS</span>`,
+        aac: `<span class="tautulli-tech-badge tautulli-tech-aac" title="AAC Audio">AAC</span>`,
         hires: `<span class="tautulli-tech-badge tautulli-tech-hires" title="Hi-Res Audiophile Lossless">HI-RES</span>`,
+        sdr: `<span class="tautulli-tech-badge tautulli-tech-sdr" title="Standard Dynamic Range (Rec. 709)">SDR</span>`,
+        tonemap: `<span class="tautulli-tech-badge tautulli-tech-tonemap" title="Tone Mapped (HDR ➔ SDR Tone Mapping Active)"><svg viewBox="0 0 12 10" width="9" height="8" style="vertical-align:-1px;margin-right:2px"><path fill="#ec4899" d="M1 5l3-3v2h4V2l3 3-3 3V6H4v2L1 5z"/></svg>TONE MAPPED</span>`,
+        channel71: `<span class="tautulli-tech-badge tautulli-tech-channel" title="7.1 Eight-Channel Surround"><svg viewBox="0 0 14 10" width="10" height="8" style="vertical-align:-1px;margin-right:2px"><circle cx="2" cy="2" r="1.1" fill="#38bdf8"/><circle cx="7" cy="1.2" r="1.1" fill="#38bdf8"/><circle cx="12" cy="2" r="1.1" fill="#38bdf8"/><circle cx="1.5" cy="5.2" r="1.1" fill="#38bdf8"/><circle cx="12.5" cy="5.2" r="1.1" fill="#38bdf8"/><circle cx="3.5" cy="8.5" r="1.1" fill="#38bdf8"/><circle cx="10.5" cy="8.5" r="1.1" fill="#38bdf8"/></svg>7.1</span>`,
+        channel51: `<span class="tautulli-tech-badge tautulli-tech-channel" title="5.1 Six-Channel Surround"><svg viewBox="0 0 14 10" width="10" height="8" style="vertical-align:-1px;margin-right:2px"><circle cx="2" cy="2.2" r="1.1" fill="#38bdf8"/><circle cx="7" cy="1.5" r="1.1" fill="#38bdf8"/><circle cx="12" cy="2.2" r="1.1" fill="#38bdf8"/><circle cx="3.5" cy="8.2" r="1.1" fill="#38bdf8"/><circle cx="10.5" cy="8.2" r="1.1" fill="#38bdf8"/></svg>5.1</span>`,
+        channel20: `<span class="tautulli-tech-badge tautulli-tech-channel" title="2.0 Stereo Audio"><svg viewBox="0 0 12 10" width="9" height="8" style="vertical-align:-1px;margin-right:2px"><circle cx="2.5" cy="5" r="1.4" fill="#94a3b8"/><circle cx="9.5" cy="5" r="1.4" fill="#94a3b8"/></svg>2.0</span>`,
         cc: `<span class="tautulli-tech-badge tautulli-tech-sub" title="Closed Captions"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><text x="8" y="8.5" font-size="7" font-weight="900" font-family="system-ui,-apple-system,sans-serif" text-anchor="middle" fill="currentColor">CC</text></svg>CC</span>`
     };
 
@@ -2381,6 +2391,95 @@
         if (lower.includes('amf') || lower.includes('amd')) return TECH_BADGES.amf;
         if (lower.includes('vaapi')) return TECH_BADGES.vaapi;
         return `<span class="tautulli-tech-badge tautulli-tech-vaapi">${escapeHtml(hwAccelBadge.replace('HW: ', ''))}</span>`;
+    }
+
+    /**
+     * Transcode Reason Badges (Subtitle Burn-In, Codec, Bitrate Limit, Container)
+     */
+    function getTranscodeReasonBadgesHtml(reasons) {
+        if (!reasons || !Array.isArray(reasons) || reasons.length === 0) return '';
+        const badges = [];
+        const seen = new Set();
+
+        reasons.forEach((r) => {
+            const lower = r.toLowerCase();
+            if (lower.includes('subtitle') && !seen.has('sub')) {
+                seen.add('sub');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-burn" title="Burning in subtitles: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1c-.3 1.2-1 2.2-2 3-.8.7-1.5 1.7-1.5 2.8 0 2 1.6 3.7 3.5 3.7s3.5-1.7 3.5-3.7c0-1.8-1.1-3.2-2.1-4.2-.2 1.3-.9 2.2-1.9 2.7.2-.9.5-2.5.5-4.3z"/></svg>Sub Burn-In</span>`);
+            } else if (lower.includes('videocodec') && !seen.has('vcodec')) {
+                seen.add('vcodec');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-codec" title="Video codec not supported: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 2h10v8H1V2zm2 1v1h1V3H3zm5 0v1h1V3H8zm-5 5v1h1V8H3zm5 0v1h1V8H8z"/></svg>Video Codec</span>`);
+            } else if (lower.includes('audiocodec') && !seen.has('acodec')) {
+                seen.add('acodec');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-audio" title="Audio codec not supported: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M1 4h2l3-3v10L3 8H1V4zm8 2c0-1.1-.6-2.1-1.5-2.6v5.2c.9-.5 1.5-1.5 1.5-2.6z"/></svg>Audio Codec</span>`);
+            } else if ((lower.includes('bitrate') || lower.includes('resolution')) && !seen.has('rate')) {
+                seen.add('rate');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-bitrate" title="Bandwidth or resolution limit exceeded: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1a5 5 0 00-5 5c0 1.8 1 3.4 2.5 4.3l1-1.7A3 3 0 013 6a3 3 0 015.6-1.5l1.5-1.2A5 5 0 006 1zm0 3a2 2 0 00-2 2c0 .4.1.8.3 1.1l2.4-2.4C6.5 4.3 6.3 4 6 4z"/></svg>Bitrate Limit</span>`);
+            } else if (lower.includes('container') && !seen.has('container')) {
+                seen.add('container');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-container" title="Container remux required: ${escapeHtml(r)}"><svg viewBox="0 0 12 12" width="9" height="9"><path fill="currentColor" d="M6 1L1 3.5v5L6 11l5-2.5v-5L6 1zm0 1.2l3.6 1.8L6 5.8 2.4 4 6 2.2zM2 4.9l3.5 1.7v4.2L2 9.1V4.9zm4.5 5.9V6.6L10 4.9v4.2l-3.5 1.7z"/></svg>Container</span>`);
+            } else if (lower.includes('directplayerror') && !seen.has('dperror')) {
+                seen.add('dperror');
+                badges.push(`<span class="tautulli-reason-pill tautulli-reason-error" title="Direct play error: ${escapeHtml(r)}">Play Error</span>`);
+            }
+        });
+
+        return badges.join('');
+    }
+
+    /**
+     * Stream Health & Buffer Indicator
+     */
+    function getStreamHealthBadgeHtml(isDirectPlay, isDirectStream, isTranscode, isLan, transcodeSpeedMultiplier, isPaused, hwAccelBadge) {
+        if (isPaused) {
+            return `<span class="tautulli-health-badge health-paused" title="Playback paused"><span class="tautulli-health-dot dot-gray"></span>Paused</span>`;
+        }
+        if (isDirectPlay || isDirectStream) {
+            if (isLan) {
+                return `<span class="tautulli-health-badge health-optimal" title="Direct Play over LAN (Pristine, zero overhead)"><span class="tautulli-health-dot dot-green"></span>LAN Optimal</span>`;
+            }
+            return `<span class="tautulli-health-badge health-direct" title="Direct Play Remote Stream"><span class="tautulli-health-dot dot-cyan"></span>Remote Direct</span>`;
+        }
+        if (isTranscode) {
+            const speed = parseFloat(transcodeSpeedMultiplier);
+            if (!isNaN(speed) && speed > 0) {
+                if (speed >= 1.2) {
+                    return `<span class="tautulli-health-badge health-fast" title="Encoding buffer healthy (${speed}x speed)"><span class="tautulli-health-dot dot-green"></span>Smooth (${speed}x)</span>`;
+                } else if (speed >= 1.0) {
+                    return `<span class="tautulli-health-badge health-warn" title="Encoding in real-time (${speed}x speed)"><span class="tautulli-health-dot dot-amber"></span>Real-time (${speed}x)</span>`;
+                } else {
+                    return `<span class="tautulli-health-badge health-crit" title="Warning: Transcoder falling behind playback (${speed}x speed)! Client may buffer."><span class="tautulli-health-dot dot-red"></span>Throttling (${speed}x)</span>`;
+                }
+            }
+            if (hwAccelBadge) {
+                return `<span class="tautulli-health-badge health-fast" title="Hardware acceleration active"><span class="tautulli-health-dot dot-green"></span>HW Active</span>`;
+            }
+            return `<span class="tautulli-health-badge health-warn" title="Software transcoding active"><span class="tautulli-health-dot dot-amber"></span>Transcode</span>`;
+        }
+        return '';
+    }
+
+    /**
+     * Source Tag Extractor (Remux, BluRay, WEB-DL, HDTV, DVD)
+     */
+    function resolveSourceTag(filePath, itemName, mediaSourceName) {
+        const combined = `${filePath || ''} ${itemName || ''} ${mediaSourceName || ''}`.toUpperCase();
+        if (/\bREMUX\b/.test(combined)) {
+            return `<span class="tautulli-source-badge tautulli-source-remux" title="Lossless Disc Remux"><svg viewBox="0 0 12 12" width="9" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="#f59e0b" d="M6 1a5 5 0 100 10A5 5 0 006 1zm0 2a3 3 0 110 6 3 3 0 010-6zm0 2a1 1 0 100 2 1 1 0 000-2z"/></svg>REMUX</span>`;
+        }
+        if (/\b(BLURAY|BLU-RAY|BDRIP|BRRIP)\b/.test(combined)) {
+            return `<span class="tautulli-source-badge tautulli-source-bluray" title="Blu-ray Disc Source"><svg viewBox="0 0 12 12" width="9" height="9" style="vertical-align:-1px;margin-right:2px"><circle cx="6" cy="6" r="5" fill="none" stroke="#38bdf8" stroke-width="1.2"/><circle cx="6" cy="6" r="2" fill="#38bdf8"/></svg>BLURAY</span>`;
+        }
+        if (/\b(WEB-DL|WEBDL|WEBRIP|WEB-RIP)\b/.test(combined)) {
+            return `<span class="tautulli-source-badge tautulli-source-web" title="Lossless Web Stream Rip"><svg viewBox="0 0 12 12" width="9" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="#c084fc" d="M9.5 5A3.5 3.5 0 003 6.1 2.5 2.5 0 003.5 11h6a2.5 2.5 0 000-5c-.1 0-.3 0-.4.1-.3-.6-.6-1-1.1-1.1z"/></svg>WEB-DL</span>`;
+        }
+        if (/\b(HDTV|PDTV|DSR)\b/.test(combined)) {
+            return `<span class="tautulli-source-badge tautulli-source-hdtv" title="Broadcast HDTV Recording">HDTV</span>`;
+        }
+        if (/\b(DVD|DVDRIP)\b/.test(combined)) {
+            return `<span class="tautulli-source-badge tautulli-source-dvd" title="DVD Video">DVD</span>`;
+        }
+        return '';
     }
 
 
@@ -2866,6 +2965,7 @@
         const item = session.NowPlayingItem || {};
         const playState = session.PlayState || {};
         const transcodeInfo = session.TranscodingInfo || null;
+        const isAudioItem = item.Type === 'Audio';
 
         // Extract MediaSource details (file size, path, source container, source bitrate)
         const mediaSource = (item.MediaSources && item.MediaSources[0]) || {};
@@ -3017,13 +3117,18 @@
             videoDisplay = `Direct Stream (${sourceVideoDesc})`;
         }
 
-        // Logo-First Video Badges (4K UHD, Dolby Vision, HDR10, HLG)
+        // Logo-First Video Badges (4K UHD, Dolby Vision, HDR10, HLG, SDR, Tone Mapped)
         const videoBadges = [];
         if (origVideoRes === '4K') videoBadges.push(TECH_BADGES.uhd4k);
         if (hdrName === 'Dolby Vision') videoBadges.push(TECH_BADGES.dovi);
         else if (hdrName === 'HDR10+') videoBadges.push(TECH_BADGES.hdr10plus);
         else if (hdrName === 'HDR10') videoBadges.push(TECH_BADGES.hdr10);
         else if (hdrName === 'HLG') videoBadges.push(TECH_BADGES.hlg);
+        else if (!isHdr && origVideoRes !== '4K' && !isAudioItem) videoBadges.push(TECH_BADGES.sdr);
+
+        if (isToneMapped) {
+            videoBadges.push(TECH_BADGES.tonemap);
+        }
         const videoBadgesHtml = videoBadges.join('');
 
         const cleanSourceParts = [origVideoRes !== '4K' ? origVideoRes : '', origVideoCodec, videoBitDepth].filter(Boolean).join(' ') || origVideoCodec;
@@ -3086,7 +3191,6 @@
         }
 
         // Audio item & Hi-Res Audiophile Detection
-        const isAudioItem = item.Type === 'Audio';
         const sampleRateHz = audioStream.SampleRate || 0;
         const bitDepthBits = audioStream.BitDepth || 0;
         const isHiResAudio = Boolean(isAudioItem && (
@@ -3102,16 +3206,34 @@
             hiResBadgeText = `Hi-Res ${[srStr, bdStr, origAudioCodec].filter(Boolean).join(' ')}`.trim();
         }
 
-        // Logo-First Audio Badges (Dolby Atmos, Dolby Audio, DTS, Hi-Res)
+        // Logo-First Audio Badges (Channels, Dolby Atmos, TrueHD, DTS:X, DTS, FLAC, Hi-Res, Dolby, AAC, Opus)
         const audioBadges = [];
+        if (audioStream.Channels === 8 || origChannels === '7.1') {
+            audioBadges.push(TECH_BADGES.channel71);
+        } else if (audioStream.Channels === 6 || origChannels === '5.1') {
+            audioBadges.push(TECH_BADGES.channel51);
+        } else if (audioStream.Channels === 2 || origChannels === 'Stereo') {
+            audioBadges.push(TECH_BADGES.channel20);
+        }
+
         if (isAtmos) {
             audioBadges.push(TECH_BADGES.atmos);
+        } else if (origAudioCodec.includes('TRUEHD')) {
+            audioBadges.push(TECH_BADGES.truehd);
+        } else if (origAudioCodec.includes('DTS:X') || audioTitleUpper.includes('DTS:X')) {
+            audioBadges.push(TECH_BADGES.dtsx);
         } else if (origAudioCodec.includes('DTS')) {
             audioBadges.push(TECH_BADGES.dts);
+        } else if (origAudioCodec === 'FLAC') {
+            audioBadges.push(TECH_BADGES.flac);
         } else if (isHiResAudio) {
             audioBadges.push(TECH_BADGES.hires);
-        } else if (origAudioCodec.includes('EAC3') || origAudioCodec.includes('AC3') || origAudioCodec.includes('TRUEHD') || origAudioCodec.includes('DOLBY')) {
+        } else if (origAudioCodec.includes('EAC3') || origAudioCodec.includes('AC3') || origAudioCodec.includes('DOLBY')) {
             audioBadges.push(TECH_BADGES.dolby);
+        } else if (origAudioCodec === 'OPUS') {
+            audioBadges.push(TECH_BADGES.opus);
+        } else if (origAudioCodec === 'AAC') {
+            audioBadges.push(TECH_BADGES.aac);
         }
         const audioBadgesHtml = audioBadges.join('');
 
@@ -3304,11 +3426,19 @@
 
         let locationDisplay = `${connectionBadge}: ${isPrivacyMode ? '[Protected]' : cleanIp}`;
 
-        // Transcode Reasons (filter out duplicate subtitle notice if burn-in badge is already shown)
-        let transcodeReasons = (transcodeInfo && transcodeInfo.TranscodeReasons) || [];
+        // Transcode Reasons
+        const rawTranscodeReasons = (transcodeInfo && transcodeInfo.TranscodeReasons) || [];
+        const transcodeReasonsHtml = isTranscode ? getTranscodeReasonBadgesHtml(rawTranscodeReasons) : '';
+        let transcodeReasons = rawTranscodeReasons;
         if (isSubtitleBurnIn) {
             transcodeReasons = transcodeReasons.filter((r) => r !== 'SubtitleCodecNotSupported');
         }
+
+        // Stream Health & Buffer Indicator
+        const streamHealthHtml = getStreamHealthBadgeHtml(isDirectPlay, isDirectStream, isTranscode, isLan, transcodeSpeedMultiplier, playState.IsPaused, hwAccelBadge);
+
+        // Source Tag Badge (Remux, BluRay, WEB-DL, HDTV, DVD)
+        const sourceTagHtml = resolveSourceTag(filePath, item.Name, mediaSource.Name);
 
         // Detect Live TV / Infinite Stream
         const isLiveStream = Boolean(
@@ -3441,6 +3571,9 @@
             isDirectPlay,
             isDirectStream,
             isTranscode,
+            transcodeReasonsHtml,
+            streamHealthHtml,
+            sourceTagHtml,
             isThrottled: Boolean(transcodeInfo && transcodeInfo.IsThrottled),
             hwAccelBadge,
             isSwTranscode,
@@ -3640,11 +3773,11 @@
                         <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">STREAM</span>
-                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${card.streamDisplayHtml || escapeHtml(card.streamDisplay)}</span>
+                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${card.streamDisplayHtml || escapeHtml(card.streamDisplay)}${card.transcodeReasonsHtml || ''}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">CONTAINER</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.containerDisplay)}">${escapeHtml(card.containerChip)}</span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.containerDisplay)}">${card.sourceTagHtml || ''}${escapeHtml(card.containerChip)}</span>
                         </div>
                         ${!card.isAudioItem ? `
                         <div class="tautulli-spec-row">
@@ -3663,7 +3796,7 @@
                         <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">LOCATION</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.locationDisplay)}">${escapeHtml(card.locationDisplay)} <span class="tautulli-net-pill tautulli-net-pill-${card.connectionType ? card.connectionType.toLowerCase() : 'lan'}">${escapeHtml(card.connectionType || 'LAN')}</span></span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.locationDisplay)}">${escapeHtml(card.locationDisplay)} <span class="tautulli-net-pill tautulli-net-pill-${card.connectionType ? card.connectionType.toLowerCase() : 'lan'}">${escapeHtml(card.connectionType || 'LAN')}</span>${card.streamHealthHtml || ''}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">BANDWIDTH</span>
@@ -4712,5 +4845,5 @@
     checkAndMount();
     setInterval(checkAndMount, 1000);
 
-    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.0 initialized successfully.');
+    console.info('[PlaybackCard] Jellyfin Playback Info Card v0.2.1 initialized successfully.');
 })();

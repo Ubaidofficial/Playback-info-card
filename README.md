@@ -16,7 +16,7 @@
   <a href="https://jellyfin.org"><img src="https://img.shields.io/badge/Jellyfin-10.9%2B%20%7C%20v12%2B-blue.svg" alt="Jellyfin" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Release-v0.2.0-00a4dc.svg" alt="Release: v0.2.0" />
+  <img src="https://img.shields.io/badge/Release-v0.2.1-00a4dc.svg" alt="Release: v0.2.1" />
   <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Antivirus-ClamAV%20Clean-brightgreen.svg" alt="Antivirus: ClamAV Clean" /></a>
   <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Security-CodeQL%20Passed-brightgreen.svg" alt="Security: CodeQL Passed" /></a>
   <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/AI--Assisted-Human%20Audited-8b5cf6.svg" alt="AI: Human Audited" /></a>
@@ -69,13 +69,13 @@ Ever had a family member or friend text you asking why their movie is buffering,
 ### 1. Logo-First High-Density Telemetry Matrix
 - **Space-Efficient Two-Column Diagnostic Table**:
   - `PLAYER`: Consolidated device & client profile (e.g. `Apple TV 4K (Swiftfin)`, `MacBook Pro (Chrome)`, `Pixel 9 Pro (Finamp)`)
-  - `QUALITY`: Original vs. transcoded resolution and target bitrates
-  - `STREAM`: Live play method badge (`DIRECT PLAY`, `DIRECT STREAM`, `TRANSCODE`) with inline **GPU hardware acceleration badges** (`NVENC`, `QSV`, `VTB`, `AMF`, `VAAPI`)
-  - `CONTAINER`: Media container transformation pipeline (e.g. `MKV ➔ MP4` or `Direct Play MKV`)
-  - `VIDEO`: Codec, bit-depth, and frame rate with inline cinema badges (`4K UHD`, `Dolby Vision`, `HDR10`, `HLG`)
-  - `AUDIO`: Codec, spatial channels (`5.1`, `7.1`), sample rate (`48kHz`, `96kHz`) with inline sound badges (`Dolby Atmos`, `Dolby Audio`, `DTS-HD`, `Hi-Res FLAC`)
+  - `QUALITY`: Original vs. transcoded resolution, bit depth, and target bitrates
+  - `STREAM`: Live play method badge (`DIRECT PLAY`, `DIRECT STREAM`, `TRANSCODE`) with inline **GPU hardware acceleration badges** (`NVENC`, `QSV`, `VTB`, `AMF`, `VAAPI`) and **Transcode Reason Badges** (`Sub Burn-In`, `Video Codec`, `Audio Codec`, `Bitrate Limit`, `Container Remux`)
+  - `CONTAINER`: Container transformation pipeline with **Source Tag Badges** (`REMUX`, `BLURAY`, `WEB-DL`, `HDTV`, `DVD`) parsed directly from source headers
+  - `VIDEO`: Codec, bit-depth, and frame rate with cinema badges (`4K UHD`, `Dolby Vision`, `HDR10+`, `HDR10`, `HLG`, `SDR`, and `HDR ➔ SDR Tone Mapped`)
+  - `AUDIO`: Codec and bit rate with **Surround Channel Badges** (`7.1`, `5.1`, `2.0 Stereo`) and audiophile format badges (`Dolby Atmos`, `Dolby TrueHD`, `DTS:X`, `DTS-HD MA`, `Hi-Res FLAC`, `Opus`, `AAC`)
   - `SUBTITLE`: Active subtitle track and format with inline `[CC]` Closed Caption badge and burn-in diagnostic alerts
-  - `LOCATION`: Network origin with connection badge (`LAN`, `WAN`, `CELLULAR`) and client IP
+  - `LOCATION`: Network origin with connection badge (`LAN`, `WAN`, `CELLULAR`), client IP, and **Stream Health Indicator** (`LAN Optimal`, `Remote Direct`, `Smooth (2.5x)`, `Throttling`)
   - `BANDWIDTH`: Real-time session bandwidth throughput with live pulse beacon
   - `FILE`: Click-to-copy source media path with file size and instant "Copied!" feedback
 - **Hardware Acceleration Detection**: Automatic identification of NVENC, Intel QuickSync (QSV), VAAPI, Apple VideoToolbox, AMD AMF, or CPU software encoding with signature brand color pills.

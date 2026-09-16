@@ -1291,6 +1291,227 @@
                 border: 1px solid rgba(255, 255, 255, 0.24);
                 padding: 1px 4px;
             }
+            .tautulli-tech-hdr10plus {
+                background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(168, 85, 247, 0.2));
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.45);
+                box-shadow: 0 0 6px rgba(245, 158, 11, 0.2);
+            }
+            .tautulli-tech-sdr {
+                background: rgba(148, 163, 184, 0.12);
+                color: #cbd5e1;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+            }
+            .tautulli-tech-tonemap {
+                background: rgba(236, 72, 153, 0.16);
+                color: #f472b6;
+                border: 1px solid rgba(236, 72, 153, 0.45);
+                box-shadow: 0 0 8px rgba(236, 72, 153, 0.25);
+            }
+            .tautulli-tech-channel {
+                background: rgba(56, 189, 248, 0.14);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.35);
+                font-feature-settings: "tnum";
+                font-variant-numeric: tabular-nums;
+            }
+            .tautulli-tech-truehd {
+                background: rgba(0, 0, 0, 0.82);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
+            }
+            .tautulli-tech-dtsx {
+                background: rgba(239, 68, 68, 0.18);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.45);
+            }
+            .tautulli-tech-flac {
+                background: rgba(234, 179, 8, 0.16);
+                color: #facc15;
+                border: 1px solid rgba(234, 179, 8, 0.42);
+                box-shadow: 0 0 6px rgba(234, 179, 8, 0.2);
+            }
+            .tautulli-tech-opus {
+                background: rgba(16, 185, 129, 0.15);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.38);
+            }
+            .tautulli-tech-aac {
+                background: rgba(148, 163, 184, 0.12);
+                color: #94a3b8;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+            }
+
+            /* Transcode Reason Badges */
+            .tautulli-reason-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 8px;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                padding: 1px 5px;
+                border-radius: 3px;
+                margin-left: 4px;
+                vertical-align: middle;
+                line-height: 1.3;
+                flex-shrink: 0;
+            }
+            .tautulli-reason-burn {
+                background: rgba(249, 115, 22, 0.18);
+                color: #fb923c;
+                border: 1px solid rgba(249, 115, 22, 0.45);
+                box-shadow: 0 0 6px rgba(249, 115, 22, 0.25);
+            }
+            .tautulli-reason-codec {
+                background: rgba(168, 85, 247, 0.16);
+                color: #c084fc;
+                border: 1px solid rgba(168, 85, 247, 0.38);
+            }
+            .tautulli-reason-audio {
+                background: rgba(56, 189, 248, 0.16);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.38);
+            }
+            .tautulli-reason-bitrate {
+                background: rgba(239, 68, 68, 0.16);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.4);
+            }
+            .tautulli-reason-container {
+                background: rgba(148, 163, 184, 0.16);
+                color: #cbd5e1;
+                border: 1px solid rgba(148, 163, 184, 0.35);
+            }
+            .tautulli-reason-error {
+                background: rgba(239, 68, 68, 0.2);
+                color: #ef4444;
+                border: 1px solid rgba(239, 68, 68, 0.5);
+            }
+
+            /* Stream & Playback Health Indicator */
+            .tautulli-health-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                font-size: 8.5px;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+                padding: 1px 6px;
+                border-radius: 9999px;
+                margin-left: 5px;
+                vertical-align: middle;
+                line-height: 1.3;
+                flex-shrink: 0;
+            }
+            .tautulli-health-dot {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                display: inline-block;
+                flex-shrink: 0;
+            }
+            .tautulli-health-badge.health-optimal {
+                background: rgba(34, 197, 94, 0.12);
+                color: #4ade80;
+                border: 1px solid rgba(34, 197, 94, 0.32);
+            }
+            .tautulli-health-badge.health-direct {
+                background: rgba(56, 189, 248, 0.12);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.32);
+            }
+            .tautulli-health-badge.health-fast {
+                background: rgba(34, 197, 94, 0.14);
+                color: #4ade80;
+                border: 1px solid rgba(34, 197, 94, 0.36);
+                box-shadow: 0 0 6px rgba(34, 197, 94, 0.2);
+            }
+            .tautulli-health-badge.health-warn {
+                background: rgba(245, 158, 11, 0.15);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.38);
+            }
+            .tautulli-health-badge.health-crit {
+                background: rgba(239, 68, 68, 0.18);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.45);
+                box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+            }
+            .tautulli-health-badge.health-paused {
+                background: rgba(148, 163, 184, 0.12);
+                color: #94a3b8;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+            }
+            .tautulli-health-dot.dot-green {
+                background: #22c55e;
+                box-shadow: 0 0 5px #22c55e;
+            }
+            .tautulli-health-dot.dot-cyan {
+                background: #38bdf8;
+                box-shadow: 0 0 5px #38bdf8;
+            }
+            .tautulli-health-dot.dot-amber {
+                background: #f59e0b;
+                box-shadow: 0 0 5px #f59e0b;
+            }
+            .tautulli-health-dot.dot-red {
+                background: #ef4444;
+                box-shadow: 0 0 6px #ef4444;
+                animation: tautulli-dot-blink 1s infinite alternate;
+            }
+            .tautulli-health-dot.dot-gray {
+                background: #64748b;
+            }
+            @keyframes tautulli-dot-blink {
+                0% { opacity: 0.4; }
+                100% { opacity: 1; }
+            }
+
+            /* Source Tag Badges (Remux, BluRay, WEB-DL, HDTV) */
+            .tautulli-source-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 8.5px;
+                font-weight: 800;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                padding: 1px 5px;
+                border-radius: 3px;
+                vertical-align: middle;
+                margin-right: 4px;
+                line-height: 1.3;
+                flex-shrink: 0;
+            }
+            .tautulli-source-remux {
+                background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.3));
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.45);
+                box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+            }
+            .tautulli-source-bluray {
+                background: rgba(14, 165, 233, 0.18);
+                color: #38bdf8;
+                border: 1px solid rgba(14, 165, 233, 0.42);
+            }
+            .tautulli-source-web {
+                background: rgba(168, 85, 247, 0.16);
+                color: #c084fc;
+                border: 1px solid rgba(168, 85, 247, 0.38);
+            }
+            .tautulli-source-hdtv {
+                background: rgba(16, 185, 129, 0.15);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.35);
+            }
+            .tautulli-source-dvd {
+                background: rgba(148, 163, 184, 0.15);
+                color: #cbd5e1;
+                border: 1px solid rgba(148, 163, 184, 0.3);
+            }
 
             /* Spec Row Hover Highlight */
             .tautulli-spec-row:hover {
