@@ -64,6 +64,14 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             },
             new PluginPageInfo
             {
+                Name = "playbackcard.css",
+                EmbeddedResourcePath = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}.Web.playbackcard.css",
+                    GetType().Namespace)
+            },
+            new PluginPageInfo
+            {
                 Name = "playbackcard",
                 EmbeddedResourcePath = string.Format(
                     CultureInfo.InvariantCulture,

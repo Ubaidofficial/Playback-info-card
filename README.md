@@ -225,7 +225,8 @@ Playback-info-card/
   manifest.json                  Jellyfin plugin catalog manifest
   plugin.json                    Plugin metadata
   Web/
-    playbackcard.js              Client-side engine: CSS, DOM renderer, API poller
+    playbackcard.js              Client-side engine: DOM renderer, state machine, API poller
+    playbackcard.css             Liquid Glass theme stylesheet and responsive layout tokens
   screenshots/                   High-resolution README preview images
   SECURITY.md                    Security policy, AI disclosure, and verification guide
   LICENSE                        MIT License

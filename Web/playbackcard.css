@@ -1,0 +1,1970 @@
+/* Playback Info Card - Liquid Glass Theme Stylesheet */
+
+:root {
+                /* Playback Card Accent Token */
+                --jpc-accent: #00a4dc;
+                /* Liquid Glass Physics & Elevation Tokens (LiquidGlass-UI, GlinUI, OpenGlass) */
+                --lg-ease: cubic-bezier(0.16, 1, 0.3, 1);
+                --lg-duration: 0.24s;
+                --lg-specular-top: inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
+                --lg-specular-left: inset 1px 0 0 0 rgba(255, 255, 255, 0.08);
+                --lg-specular-bottom: inset 0 -1px 0 0 rgba(255, 255, 255, 0.03);
+                /* Nikdelvin Chromatic Aberration Dispersion Tokens */
+                --lg-dispersion-cyan: inset 1px 0 0 0 rgba(56, 189, 248, 0.12);
+                --lg-dispersion-magenta: inset -1px 0 0 0 rgba(244, 114, 182, 0.08);
+                /* Sanjaynela Apple iOS Lens Refraction Highlight */
+                --lg-lens-highlight: radial-gradient(ellipse 70% 50% at 12% 0%, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 70%);
+                --lg-depth-shadow: 0 24px 52px -8px rgba(0, 0, 0, 0.88), 0 8px 24px -4px rgba(0, 0, 0, 0.6);
+                --lg-card-bg: linear-gradient(155deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(9, 10, 16, 0.72) 100%), #090a10;
+                --lg-card-border: 1px solid rgba(255, 255, 255, 0.18);
+                --lg-chip-bg: rgba(255, 255, 255, 0.04);
+                --lg-chip-border: 1px solid rgba(255, 255, 255, 0.08);
+                --lg-control-bg: rgba(255, 255, 255, 0.06);
+                --lg-control-border: 1px solid rgba(255, 255, 255, 0.12);
+                /* GlassFin (KBH-Reeper) Specular Light Sweep & Accent Tokens */
+                --gf-hover-v: linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.08) 55%, transparent);
+                --gf-active-accent: var(--jpc-accent, rgba(0, 164, 220, 0.85));
+            }
+
+            /* Container & Activity Banner */
+            #jellyfin-playback-card-container {
+                width: 100%;
+                margin: 22px 0 28px 0;
+                padding: 0;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                box-sizing: border-box;
+                color: #e2e8f0;
+                -webkit-font-smoothing: antialiased;
+            }
+
+            /* Activity Banner - Void Obsidian & Moonfin Liquid Glass */
+            .tautulli-activity-banner {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 12px;
+                padding: 12px 18px;
+                margin-bottom: 20px;
+                background: linear-gradient(155deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.01) 100%), #0d0f17;
+                backdrop-filter: blur(28px) saturate(180%) contrast(105%);
+                -webkit-backdrop-filter: blur(28px) saturate(180%) contrast(105%);
+                border: 1px solid rgba(255, 255, 255, 0.09);
+                border-radius: 14px;
+                box-shadow: var(--lg-specular-top), var(--lg-specular-left), 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            }
+
+            .tautulli-activity-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .tautulli-activity-title {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                color: #ffffff;
+                text-transform: uppercase;
+            }
+
+            .tautulli-activity-pulse {
+                width: 8px;
+                height: 8px;
+                background: #2ecc71;
+                border-radius: 50%;
+                box-shadow: 0 0 10px #2ecc71, 0 0 4px #ffffff;
+                animation: tautulli-pulse 2s infinite ease-in-out;
+            }
+
+            @keyframes tautulli-pulse {
+                0%, 100% { transform: scale(1); opacity: 0.85; }
+                50% { transform: scale(1.35); opacity: 1; }
+            }
+
+            .tautulli-activity-stats {
+                font-size: 12px;
+                color: #94a3b8;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            .tautulli-activity-stat-highlight {
+                color: #ffffff;
+                font-weight: 600;
+            }
+
+            .tautulli-bandwidth-visual {
+                display: inline-flex;
+                width: 68px;
+                height: 6px;
+                border-radius: 9999px;
+                background: rgba(255, 255, 255, 0.08);
+                overflow: hidden;
+                vertical-align: middle;
+                margin-left: 6px;
+                box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+            }
+
+            .tautulli-bandwidth-bar-lan {
+                background: linear-gradient(90deg, #10b981, #34d399);
+                height: 100%;
+                transition: width 0.35s ease;
+            }
+
+            .tautulli-bandwidth-bar-wan {
+                background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                height: 100%;
+                transition: width 0.35s ease;
+            }
+
+            .tautulli-activity-tools {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .tautulli-tool-btn {
+                background: var(--lg-control-bg);
+                border: var(--lg-control-border);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+                color: #cbd5e1;
+                border-radius: 8px;
+                padding: 5px 11px;
+                font-size: 11px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                transition: all var(--lg-duration) var(--lg-ease);
+            }
+
+            .tautulli-tool-btn:hover {
+                background: rgba(255, 255, 255, 0.15);
+                border-color: rgba(255, 255, 255, 0.25);
+                color: #ffffff;
+                transform: translateY(-1px) scale(1.02);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.35);
+            }
+
+            .tautulli-tool-btn:active {
+                transform: scale(0.96);
+                transition: transform 0.08s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .tautulli-tool-btn.active {
+                background: rgba(0, 164, 220, 0.25);
+                border-color: rgba(0, 164, 220, 0.55);
+                color: #00c9ff;
+                box-shadow: 0 0 14px rgba(0, 164, 220, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            .tautulli-filter-group {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                background: rgba(0, 0, 0, 0.4);
+                padding: 3px;
+                border-radius: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+            }
+
+            .tautulli-filter-pill {
+                background: transparent;
+                border: none;
+                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 3.5px 9px;
+                border-radius: 7px;
+                cursor: pointer;
+                transition: all var(--lg-duration) ease;
+            }
+
+            .tautulli-filter-pill:hover {
+                color: #ffffff;
+                background: rgba(255, 255, 255, 0.08);
+            }
+
+            .tautulli-filter-pill.active {
+                background: rgba(56, 189, 248, 0.2);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.45);
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            /* Responsive Session Grid */
+            .tautulli-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+                gap: 20px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            /* Session Card - 2026 Executive Studio Canvas with Liquid Glass Physics & Lens Highlight */
+            .tautulli-card {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                border-radius: 18px;
+                overflow: hidden;
+                background: var(--lg-lens-highlight), var(--lg-card-bg);
+                backdrop-filter: blur(32px) saturate(185%) contrast(105%);
+                -webkit-backdrop-filter: blur(32px) saturate(185%) contrast(105%);
+                border: var(--lg-card-border);
+                box-shadow: 
+                    var(--lg-specular-top),
+                    var(--lg-specular-left),
+                    var(--lg-dispersion-cyan),
+                    var(--lg-dispersion-magenta),
+                    var(--lg-specular-bottom),
+                    var(--lg-depth-shadow);
+                transition: transform var(--lg-duration) var(--lg-ease), box-shadow var(--lg-duration) var(--lg-ease), border-color var(--lg-duration) ease;
+            }
+
+            .tautulli-card:hover {
+                transform: translateY(-2px);
+                border-color: rgba(56, 189, 248, 0.4);
+                box-shadow: 
+                    inset 0 1px 0 0 rgba(255, 255, 255, 0.32),
+                    inset 1px 0 0 0 rgba(255, 255, 255, 0.16),
+                    var(--lg-dispersion-cyan),
+                    var(--lg-dispersion-magenta),
+                    0 28px 64px -10px rgba(0, 0, 0, 0.94),
+                    0 0 24px -4px rgba(56, 189, 248, 0.22);
+            }
+
+            .tautulli-card:active {
+                transform: scale(0.99);
+                transition: transform 0.08s ease;
+            }
+
+            /* Moonfin Glass Noise Grain Texture (3% opacity physical texture) */
+            .tautulli-card::before {
+                content: '';
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                z-index: 3;
+                border-radius: 18px;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+                background-size: 180px 180px;
+                opacity: 0.028;
+                mix-blend-mode: overlay;
+            }
+
+            /* GlassFin Specular Vertical Light Sweep on Hover */
+            .tautulli-card::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                pointer-events: none;
+                z-index: 2;
+                background: var(--gf-hover-v);
+                transform: translateY(-100%);
+                transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
+                opacity: 0;
+            }
+
+            .tautulli-card:hover::after {
+                transform: translateY(100%);
+                opacity: 1;
+            }
+
+            /* Moonfin Dynamic Ambient Glass Layer */
+            .tautulli-card-ambient-bg {
+                position: absolute;
+                top: -25%;
+                left: -25%;
+                width: 150%;
+                height: 150%;
+                background-size: cover;
+                background-position: center;
+                filter: blur(50px) saturate(180%) brightness(0.2);
+                opacity: 0.45;
+                pointer-events: none;
+                z-index: 0;
+            }
+
+            /* Right-Side Fanart Backdrop with Multi-stop Frosted Liquid Glass Vignette Mask (Moonfin + Void) */
+            .tautulli-card-fanart-backdrop {
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 75%;
+                height: 100%;
+                background-size: cover;
+                background-position: center right;
+                opacity: 0.40;
+                filter: blur(8px) saturate(125%) brightness(0.65);
+                pointer-events: none;
+                z-index: 0;
+                mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.96) 65%, black 100%);
+                -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.6) 30%, rgba(0, 0, 0, 0.96) 65%, black 100%);
+            }
+
+            /* Card Header: User & Client Strip */
+            .tautulli-card-header {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 10px 15px;
+                background: rgba(9, 10, 16, 0.68);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                backdrop-filter: blur(20px) saturate(160%);
+                -webkit-backdrop-filter: blur(20px) saturate(160%);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+            }
+
+            .tautulli-user-strip {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+                overflow: hidden;
+            }
+
+            .tautulli-user-avatar-link {
+                text-decoration: none;
+                flex-shrink: 0;
+            }
+
+            .tautulli-user-avatar {
+                width: 26px;
+                height: 26px;
+                min-width: 26px;
+                border-radius: 50%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                font-weight: 700;
+                color: #ffffff;
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                border: 1px solid rgba(255, 255, 255, 0.16);
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 8px rgba(0, 0, 0, 0.5);
+            }
+
+            .tautulli-user-avatar img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+            .tautulli-user-meta {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-user-name {
+                font-size: 12.5px;
+                font-weight: 700;
+                color: #ffffff;
+                text-decoration: none;
+                letter-spacing: -0.01em;
+                transition: color 0.2s ease;
+            }
+
+            .tautulli-user-name:hover {
+                color: #00c9ff;
+            }
+
+            .tautulli-meta-dot {
+                color: rgba(255, 255, 255, 0.28);
+                font-size: 11px;
+            }
+
+            .tautulli-device-text {
+                font-size: 11.5px;
+                font-weight: 500;
+                color: #cbd5e1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-client-badge {
+                font-size: 10px;
+                font-family: monospace;
+                color: #94a3b8;
+                background: rgba(255, 255, 255, 0.05);
+                padding: 1.5px 6px;
+                border-radius: 5px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            .tautulli-header-controls {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+
+            .tautulli-network-pill {
+                font-size: 10px;
+                font-family: monospace;
+                padding: 2.5px 8px;
+                border-radius: 9999px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-weight: 600;
+            }
+
+            .tautulli-net-lan {
+                background: rgba(16, 185, 129, 0.14);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.3);
+            }
+
+            .tautulli-net-wan {
+                background: rgba(59, 130, 246, 0.14);
+                color: #60a5fa;
+                border: 1px solid rgba(59, 130, 246, 0.3);
+            }
+
+            .tautulli-platform-badge {
+                width: 24px;
+                height: 24px;
+                min-width: 24px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                flex-shrink: 0;
+            }
+
+            .tautulli-platform-badge svg {
+                width: 14px;
+                height: 14px;
+                fill: currentColor;
+            }
+
+            .tautulli-action-cluster {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .tautulli-action-btn {
+                width: 26px;
+                height: 26px;
+                border-radius: 7px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: var(--lg-control-bg);
+                border: var(--lg-control-border);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), 0 2px 6px rgba(0, 0, 0, 0.35);
+                color: #94a3b8;
+                cursor: pointer;
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                transition: all var(--lg-duration) var(--lg-ease);
+            }
+
+            .tautulli-action-btn:hover {
+                background: rgba(255, 255, 255, 0.15);
+                border-color: rgba(255, 255, 255, 0.28);
+                color: #ffffff;
+                transform: translateY(-1px) scale(1.04);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.22), 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            .tautulli-action-btn:active {
+                transform: scale(0.96);
+                transition: transform 0.08s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .tautulli-action-btn-kill:hover {
+                background: rgba(239, 68, 68, 0.22);
+                border-color: rgba(239, 68, 68, 0.55);
+                color: #f87171;
+                box-shadow: 0 0 12px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            .tautulli-action-btn-info:hover {
+                background: rgba(56, 189, 248, 0.2);
+                border-color: rgba(56, 189, 248, 0.5);
+                color: #38bdf8;
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            .tautulli-action-btn-mute:hover {
+                background: rgba(56, 189, 248, 0.2);
+                border-color: rgba(56, 189, 248, 0.5);
+                color: #38bdf8;
+                box-shadow: 0 0 12px rgba(56, 189, 248, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            .tautulli-action-btn-mute.muted {
+                background: rgba(239, 68, 68, 0.2);
+                border-color: rgba(239, 68, 68, 0.5);
+                color: #f87171;
+            }
+
+            .tautulli-action-btn svg {
+                width: 13px;
+                height: 13px;
+                fill: currentColor;
+            }
+
+            /* Card Body: Split Poster & Stream Hierarchy */
+            .tautulli-card-body {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                gap: 12px;
+                padding: 12px 14px;
+                background: transparent;
+                min-height: 158px;
+            }
+
+            .tautulli-poster-wrapper {
+                position: relative;
+                width: 120px;
+                min-width: 120px;
+                max-width: 120px;
+                aspect-ratio: 2 / 3;
+                border-radius: 10px;
+                overflow: hidden;
+                background: rgba(10, 10, 15, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255,255,255,0.08);
+                flex-shrink: 0;
+                cursor: pointer;
+                text-decoration: none;
+            }
+
+            .tautulli-poster-img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.35s ease;
+            }
+
+            .tautulli-poster-wrapper:hover .tautulli-poster-img {
+                transform: scale(1.04);
+                filter: brightness(1.08);
+            }
+            /* Moonfin Holographic Shimmer Sweep on Poster Hover */
+            .tautulli-poster-wrapper::after {
+                content: '';
+                position: absolute;
+                top: 0; left: -75%;
+                width: 50%;
+                height: 100%;
+                background: linear-gradient(
+                    105deg,
+                    transparent 20%,
+                    rgba(255,255,255,0.08) 40%,
+                    rgba(255,255,255,0.22) 50%,
+                    rgba(255,255,255,0.08) 60%,
+                    transparent 80%
+                );
+                transform: skewX(-15deg);
+                pointer-events: none;
+                z-index: 4;
+                opacity: 0;
+                transition: left 0.55s cubic-bezier(0.16,1,0.3,1), opacity 0.25s ease;
+            }
+            .tautulli-poster-wrapper:hover::after {
+                left: 135%;
+                opacity: 1;
+            }
+
+            .tautulli-poster-fallback {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: #64748b;
+                font-size: 10px;
+                text-align: center;
+                height: 100%;
+                gap: 6px;
+            }
+
+            .tautulli-poster-fallback svg {
+                width: 32px;
+                height: 32px;
+                fill: #475569;
+            }
+
+            /* Authentic Tautulli Spec Grid (2-Column Key-Value) */
+            .tautulli-spec-table {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                min-width: 0;
+                padding-right: 42px;
+                position: relative;
+            }
+            /* Readable scrim — soft mask dissolve from left so text is readable yet fanart bleeds through */
+            .tautulli-spec-table::before {
+                content: '';
+                position: absolute;
+                inset: -14px -14px -14px -18px;
+                background: linear-gradient(to right, rgba(5,6,14,0.88) 0%, rgba(5,6,14,0.78) 40%, rgba(5,6,14,0.65) 75%, rgba(5,6,14,0.45) 100%);
+                pointer-events: none;
+                z-index: 0;
+            }
+            /* .tautulli-spec-row z-index set in its own rule below */
+
+            .tautulli-spec-row {
+                display: flex;
+                align-items: baseline;
+                font-size: 11px;
+                line-height: 1.35;
+                min-width: 0;
+                position: relative;
+                z-index: 1;
+                gap: 8px;
+            }
+
+            .tautulli-spec-label {
+                width: 82px;
+                flex-shrink: 0;
+                color: #7e8fa6;
+                font-size: 9.5px;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                user-select: none;
+            }
+
+            .tautulli-spec-value {
+                color: #d4d8e0;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                min-width: 0;
+                flex: 1;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .tautulli-spec-value a {
+                color: inherit;
+                text-decoration: none;
+            }
+
+            .tautulli-spec-value strong {
+                color: #ffffff;
+                font-weight: 600;
+            }
+
+            .tautulli-stream-directplay {
+                color: #4ade80 !important;
+                font-weight: 600;
+            }
+
+            .tautulli-stream-directstream {
+                color: #38bdf8 !important;
+                font-weight: 600;
+            }
+
+            .tautulli-stream-transcode {
+                color: #fb923c !important;
+                font-weight: 600;
+            }
+
+            .tautulli-stream-hw {
+                color: #c084fc !important;
+                font-weight: 600;
+            }
+
+            .tautulli-spec-row-clickable {
+                cursor: pointer;
+                transition: color 0.15s ease;
+                max-width: calc(100% - 112px);
+                overflow: hidden;
+            }
+
+            .tautulli-spec-row-clickable:hover .tautulli-spec-value {
+                text-decoration: underline;
+                color: #38bdf8 !important;
+            }
+
+            .tautulli-time-stack {
+                cursor: pointer;
+                transition: opacity 0.15s ease;
+            }
+
+            .tautulli-time-stack:hover .tautulli-time-eta {
+                opacity: 0.82;
+            }
+
+            /* Platform Corner Badge (Top-Right of Spec Area) — Frosted Glass Tile with Official Brand Logo */
+            .tautulli-platform-corner-badge {
+                position: absolute;
+                top: 10px;
+                right: 12px;
+                width: 28px;
+                height: 28px;
+                border-radius: 7px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(15, 18, 28, 0.72);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+                z-index: 3;
+                border: 1px solid rgba(255, 255, 255, 0.14);
+                overflow: hidden;
+            }
+
+            .tautulli-platform-corner-badge svg {
+                width: 18px;
+                height: 18px;
+                display: block;
+            }
+
+            /* Bottom-Right Floating Time Stack (in Card Body) — Frosted Glass HUD Capsule */
+            .tautulli-time-stack {
+                position: absolute;
+                bottom: 10px;
+                right: 12px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 2px;
+                padding: 4px 8px;
+                background: rgba(10, 12, 20, 0.65);
+                backdrop-filter: blur(14px);
+                -webkit-backdrop-filter: blur(14px);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 7px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+                z-index: 3;
+                pointer-events: auto;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .tautulli-time-stack:hover {
+                background: rgba(15, 18, 30, 0.88);
+                border-color: rgba(229, 160, 13, 0.45);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 10px rgba(229, 160, 13, 0.25);
+            }
+
+            .tautulli-time-progress {
+                color: #94a3b8;
+                font-family: monospace;
+                font-size: 10.5px;
+                font-variant-numeric: tabular-nums;
+                line-height: 1.2;
+            }
+
+            .tautulli-time-eta {
+                font-size: 11px;
+                font-weight: 700;
+                color: #e5a00d;
+                letter-spacing: 0.02em;
+                font-family: monospace;
+                font-variant-numeric: tabular-nums;
+                line-height: 1.2;
+            }
+
+            .tautulli-time-paused {
+                color: #fbbf24;
+                font-weight: 700;
+                text-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+            }
+
+            /* Timeline Bar: Pill Progress Bar between Card Body and Meta Bar */
+            .tautulli-card-timeline {
+                position: relative;
+                z-index: 2;
+                width: 100%;
+                height: 4px;
+                background: rgba(255, 255, 255, 0.07);
+                overflow: hidden;
+                box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-buffer {
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                background: rgba(255, 255, 255, 0.22);
+                transition: width 0.35s ease;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill {
+                position: relative;
+                height: 100%;
+                background: #e5a00d;
+                box-shadow: 0 0 8px rgba(229, 160, 13, 0.5);
+                transition: width 1s linear;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.directplay {
+                background: #22c55e;
+                box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.directstream {
+                background: #38bdf8;
+                box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.hw {
+                background: #a855f7;
+                box-shadow: 0 0 8px rgba(168, 85, 247, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.transcode {
+                background: #f97316;
+                box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.paused {
+                background: #94a3b8;
+                box-shadow: 0 0 8px rgba(148, 163, 184, 0.4);
+                transition: none;
+            }
+
+            .tautulli-card-timeline .tautulli-progress-fill.live {
+                background: #ef4444 !important;
+                box-shadow: 0 0 8px rgba(239, 68, 68, 0.6) !important;
+                transition: none;
+            }
+
+            /* Card Meta Bar: 2-Line Left (Play/Title/Rating + Type/Subline) + Right User/Actions */
+            .tautulli-card-meta-bar {
+                position: relative;
+                z-index: 1;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 8px 14px;
+                background: rgba(5, 6, 12, 0.55);
+                backdrop-filter: blur(24px) saturate(180%);
+                -webkit-backdrop-filter: blur(24px) saturate(180%);
+                border-top: 1px solid rgba(255, 255, 255, 0.07);
+                box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+            }
+
+            .tautulli-meta-left {
+                display: flex;
+                flex-direction: column;
+                gap: 2px;
+                min-width: 0;
+                flex: 1;
+            }
+
+            .tautulli-meta-line-1 {
+                display: flex;
+                align-items: center;
+                gap: 7px;
+                min-width: 0;
+            }
+
+            .tautulli-meta-line-2 {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                min-width: 0;
+                color: #94a3b8;
+                font-size: 11px;
+                font-weight: 500;
+            }
+
+            .tautulli-meta-play-btn {
+                background: none;
+                border: none;
+                padding: 0;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: transform 0.15s cubic-bezier(0.16,1,0.3,1), opacity 0.15s ease;
+                color: #e5a00d;
+                flex-shrink: 0;
+                transition: transform 0.15s ease, color 0.15s ease;
+            }
+
+            .tautulli-meta-play-btn:hover {
+                transform: scale(1.18);
+                color: #fbbf24;
+            
+                transform: scale(1.15);
+            }
+
+            .tautulli-meta-play-btn:active {
+                transform: scale(0.92);
+            }
+
+            .tautulli-meta-play-btn svg {
+                width: 13px;
+                height: 13px;
+                fill: currentColor;
+            }
+
+            .tautulli-meta-title {
+                font-size: 13.5px;
+                font-weight: 700;
+                color: #ffffff;
+                text-decoration: none;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                transition: color 0.2s ease;
+            }
+
+            .tautulli-meta-title:hover {
+                color: #e5a00d;
+            }
+
+            .tautulli-meta-type-icon {
+                display: inline-flex;
+                align-items: center;
+                color: #94a3b8;
+                flex-shrink: 0;
+            }
+
+            .tautulli-meta-type-icon svg {
+                width: 12px;
+                height: 12px;
+                fill: currentColor;
+            }
+
+            .tautulli-meta-sub {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-meta-right {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex-shrink: 0;
+            }
+
+            .tautulli-meta-user {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                color: #cbd5e1;
+                text-decoration: none;
+                font-size: 11.5px;
+                font-weight: 600;
+                transition: color 0.2s ease;
+            }
+
+            .tautulli-meta-user:hover {
+                color: #ffffff;
+            }
+
+            .tautulli-meta-user .tautulli-user-avatar {
+                width: 22px;
+                height: 22px;
+                font-size: 10px;
+                border: 1.5px solid rgba(255,255,255,0.18);
+                transition: box-shadow 0.3s ease;
+            }
+
+            .tautulli-titles-container {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+
+            .tautulli-title-line {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .tautulli-title-primary {
+                font-size: 14.5px;
+                font-weight: 700;
+                color: #ffffff;
+                text-decoration: none;
+                letter-spacing: -0.02em;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                transition: color 0.2s ease;
+            }
+
+            .tautulli-title-primary:hover {
+                color: #38bdf8;
+            }
+
+            .tautulli-title-secondary {
+                font-size: 11.5px;
+                color: #94a3b8;
+                font-weight: 500;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                flex-wrap: wrap;
+            }
+
+            .tautulli-rating-badge {
+                padding: 1px 5px;
+                border-radius: 4px;
+                background: rgba(255, 255, 255, 0.07);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                font-size: 9.5px;
+                font-weight: 700;
+                color: #cbd5e1;
+                letter-spacing: 0.04em;
+                line-height: 1.2;
+            }
+
+            /* Badge Pill Row */
+            .tautulli-badge-row {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                flex-wrap: wrap;
+            }
+
+            .tautulli-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 2.5px 7.5px;
+                border-radius: 9999px;
+                font-size: 9.5px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                line-height: 1.3;
+                box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+            }
+
+            .tautulli-live-dot {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: currentColor;
+                display: inline-block;
+                box-shadow: 0 0 6px currentColor;
+                flex-shrink: 0;
+            }
+
+            .tautulli-badge-directplay {
+                background: rgba(16, 185, 129, 0.12);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.28);
+            }
+
+            .tautulli-badge-directstream {
+                background: rgba(56, 189, 248, 0.12);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.28);
+            }
+
+            .tautulli-badge-transcode {
+                background: rgba(239, 68, 68, 0.12);
+                color: #fca5a5;
+                border: 1px solid rgba(239, 68, 68, 0.28);
+            }
+
+            .tautulli-badge-hw {
+                background: rgba(168, 85, 247, 0.12);
+                color: #d8b4fe;
+                border: 1px solid rgba(168, 85, 247, 0.28);
+            }
+
+            .tautulli-badge-sw {
+                background: rgba(245, 158, 11, 0.12);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.28);
+            }
+
+            .tautulli-speed-good {
+                color: #34d399;
+                background: rgba(16, 185, 129, 0.12);
+                border: 1px solid rgba(16, 185, 129, 0.25);
+            }
+
+            .tautulli-speed-slow {
+                color: #fca5a5;
+                background: rgba(239, 68, 68, 0.12);
+                border: 1px solid rgba(239, 68, 68, 0.28);
+            }
+
+            .tautulli-badge-burnin {
+                background: rgba(245, 158, 11, 0.14);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.3);
+            }
+
+            .tautulli-badge-hdr {
+                background: rgba(255, 255, 255, 0.04);
+                color: #fcd34d;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
+            }
+
+            .tautulli-badge-res {
+                background: rgba(255, 255, 255, 0.04);
+                color: #f1f5f9;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
+            }
+
+            .tautulli-badge-audio {
+                background: rgba(255, 255, 255, 0.04);
+                color: #c7d2fe;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
+            }
+
+            .tautulli-badge-surround {
+                background: rgba(255, 255, 255, 0.04);
+                color: #bae6fd;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 4px;
+                padding: 2px 5.5px;
+            }
+
+            .tautulli-badge-tonemap {
+                background: rgba(245, 158, 11, 0.12);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.28);
+                border-radius: 4px;
+                padding: 2px 5.5px;
+            }
+
+
+            /* LAN/WAN/CELLULAR Connection Pill (Moonfin-style) */
+            .tautulli-net-pill {
+                display: inline-block;
+                font-size: 8px;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                padding: 2px 6px;
+                border-radius: 4px;
+                vertical-align: middle;
+                margin-left: 5px;
+                line-height: 1.5;
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+            }
+            .tautulli-net-pill-lan {
+                background: rgba(34, 197, 94, 0.12);
+                color: #4ade80;
+                border: 1px solid rgba(34, 197, 94, 0.28);
+            }
+            .tautulli-net-pill-wan {
+                background: rgba(251, 146, 60, 0.12);
+                color: #fb923c;
+                border: 1px solid rgba(251, 146, 60, 0.28);
+            }
+            .tautulli-net-pill-cellular {
+                background: rgba(251, 191, 36, 0.12);
+                color: #fbbf24;
+                border: 1px solid rgba(251, 191, 36, 0.28);
+            }
+
+            /* Logo-First Cinema Spec Badges */
+            .tautulli-tech-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 8.5px;
+                font-weight: 800;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                padding: 1px 5px;
+                border-radius: 3px;
+                vertical-align: middle;
+                margin-right: 4px;
+                line-height: 1.3;
+                flex-shrink: 0;
+            }
+            .tautulli-tech-badge svg {
+                display: inline-block;
+                vertical-align: middle;
+                flex-shrink: 0;
+            }
+            .tautulli-tech-nvenc {
+                background: rgba(118, 185, 0, 0.16);
+                color: #a3e635;
+                border: 1px solid rgba(118, 185, 0, 0.38);
+            }
+            .tautulli-tech-qsv {
+                background: rgba(0, 113, 197, 0.18);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.4);
+            }
+            .tautulli-tech-vtb {
+                background: rgba(255, 255, 255, 0.12);
+                color: #f1f5f9;
+                border: 1px solid rgba(255, 255, 255, 0.28);
+            }
+            .tautulli-tech-amf {
+                background: rgba(237, 28, 36, 0.16);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.38);
+            }
+            .tautulli-tech-vaapi {
+                background: rgba(99, 102, 241, 0.16);
+                color: #818cf8;
+                border: 1px solid rgba(129, 140, 248, 0.38);
+            }
+            .tautulli-tech-4k {
+                background: rgba(245, 158, 11, 0.16);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.4);
+            }
+            .tautulli-tech-dovi {
+                background: rgba(0, 0, 0, 0.7);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.35);
+            }
+            .tautulli-tech-hdr {
+                background: rgba(56, 189, 248, 0.14);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.35);
+            }
+            .tautulli-tech-hlg {
+                background: rgba(168, 85, 247, 0.14);
+                color: #c084fc;
+                border: 1px solid rgba(168, 85, 247, 0.35);
+            }
+            .tautulli-tech-atmos {
+                background: rgba(0, 0, 0, 0.75);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.35);
+            }
+            .tautulli-tech-dolby {
+                background: rgba(15, 23, 42, 0.75);
+                color: #e2e8f0;
+                border: 1px solid rgba(255, 255, 255, 0.25);
+            }
+            .tautulli-tech-dts {
+                background: rgba(239, 68, 68, 0.16);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.38);
+            }
+            .tautulli-tech-hires {
+                background: rgba(217, 119, 6, 0.18);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.42);
+            }
+            .tautulli-tech-sub {
+                background: rgba(255, 255, 255, 0.09);
+                color: #e2e8f0;
+                border: 1px solid rgba(255, 255, 255, 0.24);
+                padding: 1px 4px;
+            }
+
+            /* Spec Row Hover Highlight */
+            .tautulli-spec-row:hover {
+                background: rgba(255, 255, 255, 0.025);
+                border-radius: 4px;
+            }
+
+            /* Muted spec value (for None subtitle etc.) */
+            .tautulli-spec-value-muted {
+                color: #475569 !important;
+                font-style: italic;
+            }
+
+
+            /* Paused Card — Cool Shift: entire card feels "cold" and inactive */
+            .tautulli-card-paused {
+                filter: saturate(0.7) brightness(0.88);
+                transition: filter 0.45s ease;
+            }
+            .tautulli-card-paused .tautulli-spec-value {
+                color: #9aa5b4 !important;
+            }
+            .tautulli-card-paused .tautulli-stream-directplay,
+            .tautulli-card-paused .tautulli-stream-directstream,
+            .tautulli-card-paused .tautulli-stream-hw,
+            .tautulli-card-paused .tautulli-stream-transcode {
+                color: #9aa5b4 !important;
+            }
+
+            /* Paused Poster Dimming */
+            .tautulli-poster-paused .tautulli-poster-img {
+                filter: brightness(0.5) saturate(0.35);
+                transition: filter 0.3s ease;
+            }
+            .tautulli-poster-paused .tautulli-poster-fallback {
+                filter: brightness(0.5) saturate(0.35);
+            }
+
+            /* Year Badge (clean, refined pill) */
+            .tautulli-year-badge {
+                display: inline-block;
+                font-size: 9px;
+                font-weight: 600;
+                color: #94a3b8;
+                background: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 4px;
+                padding: 1px 5px;
+                margin-right: 6px;
+                vertical-align: middle;
+                letter-spacing: 0.04em;
+                flex-shrink: 0;
+            }
+
+            /* Live Bandwidth Pulse Dot */
+            .tautulli-bw-pulse {
+                display: inline-block;
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: #22c55e;
+                margin-left: 6px;
+                vertical-align: 1px;
+                animation: tautulli-bw-pulse-anim 2s ease-in-out infinite;
+                flex-shrink: 0;
+            }
+            .tautulli-bw-pulse.paused {
+                background: #f59e0b;
+                animation: none;
+                opacity: 0.6;
+            }
+            @keyframes tautulli-bw-pulse-anim {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.4; transform: scale(0.75); }
+            }
+            /* Live Bandwidth History Sparkline & Interactive Tooltip */
+            .tautulli-sparkline-wrap {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                margin-left: 8px;
+                vertical-align: middle;
+                height: 24px;
+                cursor: crosshair;
+            }
+
+            .tautulli-sparkline-svg {
+                overflow: visible;
+                display: block;
+            }
+
+            .tautulli-sparkline-dot {
+                animation: tautulli-pulse 2s infinite ease-in-out;
+            }
+
+            .tautulli-sparkline-cursor {
+                pointer-events: none;
+                transition: x1 0.05s ease, x2 0.05s ease;
+            }
+
+            .tautulli-sparkline-tooltip {
+                position: absolute;
+                bottom: calc(100% + 8px);
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(10, 14, 23, 0.95);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border: 1px solid rgba(56, 189, 248, 0.35);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 12px rgba(56, 189, 248, 0.18);
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 11px;
+                line-height: 1.35;
+                color: #f1f5f9;
+                white-space: nowrap;
+                pointer-events: none;
+                z-index: 1000;
+                transition: opacity 0.12s ease;
+            }
+
+            .tautulli-sparkline-tooltip-val {
+                font-weight: 700;
+                color: #38bdf8;
+                font-feature-settings: 'tnum';
+            }
+
+            .tautulli-sparkline-tooltip-sub {
+                font-size: 10px;
+                color: #94a3b8;
+                margin-top: 2px;
+            }
+
+            /* Cellular Network Pill */
+            .tautulli-net-cellular {
+                background: rgba(245, 158, 11, 0.14);
+                color: #fcd34d;
+                border: 1px solid rgba(245, 158, 11, 0.35);
+            }
+
+            /* Bandwidth Savings Badge */
+            .tautulli-badge-savings {
+                background: rgba(16, 185, 129, 0.14);
+                color: #6ee7b7;
+                border: 1px solid rgba(16, 185, 129, 0.35);
+                font-weight: 600;
+            }
+
+            /* SyncPlay Watch Party Badge */
+            .tautulli-badge-syncplay {
+                background: rgba(168, 85, 247, 0.15);
+                color: #d8b4fe;
+                border: 1px solid rgba(168, 85, 247, 0.38);
+                font-weight: 600;
+            }
+
+            /* Hi-Res Lossless Audio Badge */
+            .tautulli-badge-hires {
+                background: rgba(234, 179, 8, 0.15);
+                color: #fef08a;
+                border: 1px solid rgba(234, 179, 8, 0.4);
+                font-weight: 700;
+                letter-spacing: 0.02em;
+            }
+
+            /* Live Broadcast Badge & Dot Pulse */
+            .tautulli-badge-live {
+                background: rgba(239, 68, 68, 0.16) !important;
+                color: #f87171 !important;
+                border: 1px solid rgba(239, 68, 68, 0.4) !important;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            }
+
+            .tautulli-live-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background-color: #ef4444;
+                box-shadow: 0 0 6px #ef4444;
+                animation: tautulli-live-pulse 1.4s ease-in-out infinite;
+                flex-shrink: 0;
+            }
+
+            @keyframes tautulli-live-pulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50% { opacity: 0.3; transform: scale(0.8); }
+            }
+
+            /* Audiophile Vinyl Animation */
+            .tautulli-vinyl-container {
+                position: relative;
+                width: 96px;
+                height: 96px;
+                flex-shrink: 0;
+            }
+
+            .tautulli-vinyl-disc {
+                position: absolute;
+                top: 3px;
+                right: -16px;
+                width: 90px;
+                height: 90px;
+                border-radius: 50%;
+                background: radial-gradient(circle, #18181b 15%, #27272a 18%, #09090b 35%, #27272a 50%, #09090b 68%, #27272a 82%, #09090b 100%);
+                border: 1.5px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), inset 0 0 4px rgba(255, 255, 255, 0.2);
+                z-index: 0;
+                transition: transform 0.5s ease;
+            }
+
+            .tautulli-vinyl-spinning {
+                animation: tautulli-spin 7s linear infinite;
+            }
+
+            @keyframes tautulli-spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+
+            /* Live Audio Spectrum Equalizer Bars */
+            .tautulli-audio-spectrum {
+                display: inline-flex;
+                align-items: flex-end;
+                gap: 2px;
+                height: 12px;
+                width: 14px;
+                margin-left: 4px;
+            }
+
+            .tautulli-spectrum-bar {
+                width: 2px;
+                background: #38bdf8;
+                border-radius: 1px;
+                animation: tautulli-spectrum-bounce 0.8s ease-in-out infinite alternate;
+            }
+
+            .tautulli-spectrum-bar:nth-child(1) { height: 40%; animation-delay: 0.1s; }
+            .tautulli-spectrum-bar:nth-child(2) { height: 90%; animation-delay: 0.3s; }
+            .tautulli-spectrum-bar:nth-child(3) { height: 60%; animation-delay: 0.2s; }
+            .tautulli-spectrum-bar:nth-child(4) { height: 100%; animation-delay: 0.4s; }
+
+            .tautulli-spectrum-paused .tautulli-spectrum-bar {
+                animation: none;
+                height: 25% !important;
+                background: #64748b;
+            }
+
+            @keyframes tautulli-spectrum-bounce {
+                0% { height: 25%; }
+                100% { height: 100%; }
+            }
+
+            /* Empty State Container */
+            .tautulli-empty-container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 32px 20px;
+                background: rgba(13, 15, 23, 0.65);
+                backdrop-filter: blur(16px) saturate(180%);
+                -webkit-backdrop-filter: blur(16px) saturate(180%);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+                text-align: center;
+                gap: 10px;
+            }
+
+            .tautulli-empty-icon {
+                width: 36px;
+                height: 36px;
+                fill: #555555;
+            }
+
+            .tautulli-empty-text {
+                font-size: 13.5px;
+                font-weight: 500;
+                color: #777777;
+                letter-spacing: 0.02em;
+            }
+
+
+            /* Spec Group Separator (8px breathing room between semantic groups) */
+            .tautulli-spec-group-sep {
+                height: 0;
+                margin-top: 5px;
+                border-top: 1px solid rgba(255, 255, 255, 0.045);
+                margin-bottom: 1px;
+                position: relative;
+                z-index: 1;
+            }
+
+            /* Stream Decision Live Dot (recording-style indicator) */
+            .tautulli-stream-dot {
+                display: inline-block;
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                margin-right: 5px;
+                vertical-align: middle;
+                flex-shrink: 0;
+                animation: tautulli-stream-dot-pulse 2.4s ease-in-out infinite;
+            }
+            .tautulli-stream-dot-directplay  { background: #22c55e; box-shadow: 0 0 4px rgba(34,197,94,0.7); }
+            .tautulli-stream-dot-directstream { background: #38bdf8; box-shadow: 0 0 4px rgba(56,189,248,0.7); }
+            .tautulli-stream-dot-hw          { background: #a855f7; box-shadow: 0 0 4px rgba(168,85,247,0.7); }
+            .tautulli-stream-dot-transcode   { background: #f97316; box-shadow: 0 0 4px rgba(249,115,22,0.7); }
+            @keyframes tautulli-stream-dot-pulse {
+                0%, 100% { opacity: 1; transform: scale(1); }
+                50%       { opacity: 0.5; transform: scale(0.72); }
+            }
+
+            /* Skeleton Loading Shimmer */
+            .tautulli-skeleton-wrap {
+                padding: 0;
+            }
+            .tautulli-skeleton-card {
+                display: flex;
+                gap: 14px;
+                padding: 14px;
+                background: linear-gradient(155deg, rgba(255,255,255,0.03) 0%, rgba(9,10,16,0.85) 100%);
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 18px;
+                min-height: 158px;
+                overflow: hidden;
+            }
+            .tautulli-skeleton-poster {
+                width: 105px;
+                min-width: 105px;
+                aspect-ratio: 2/3;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.06);
+                overflow: hidden;
+                position: relative;
+            }
+            .tautulli-skeleton-body {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                justify-content: center;
+            }
+            .tautulli-skeleton-line {
+                height: 9px;
+                border-radius: 4px;
+                background: rgba(255,255,255,0.06);
+                overflow: hidden;
+                position: relative;
+            }
+            .tautulli-skeleton-line.w-40 { width: 40%; }
+            .tautulli-skeleton-line.w-50 { width: 50%; }
+            .tautulli-skeleton-line.w-60 { width: 60%; }
+            .tautulli-skeleton-line.w-70 { width: 70%; }
+            .tautulli-skeleton-line.w-80 { width: 80%; }
+
+            .tautulli-skeleton-poster::after,
+            .tautulli-skeleton-line::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(
+                    90deg,
+                    transparent 0%,
+                    rgba(255,255,255,0.09) 40%,
+                    rgba(255,255,255,0.16) 50%,
+                    rgba(255,255,255,0.09) 60%,
+                    transparent 100%
+                );
+                animation: tautulli-skeleton-shimmer 1.6s ease-in-out infinite;
+                transform: translateX(-100%);
+            }
+            @keyframes tautulli-skeleton-shimmer {
+                0%   { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
+            }
+
+            /* Connected Devices in Empty / Idle State */
+            .tautulli-connected-devices-container {
+                width: 100%;
+                margin-top: 14px;
+                padding: 14px 16px;
+                background: linear-gradient(155deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.008) 100%), #0d0f17;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                backdrop-filter: blur(20px);
+                -webkit-backdrop-filter: blur(20px);
+                box-shadow: var(--lg-specular-top), 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+                box-sizing: border-box;
+                text-align: left;
+            }
+
+            .tautulli-connected-devices-title {
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: #94a3b8;
+                margin-bottom: 12px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .tautulli-connected-devices-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 10px;
+            }
+
+            .tautulli-connected-device-chip {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 14px;
+                background: rgba(255, 255, 255, 0.035);
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 10px;
+                transition: background 0.2s, border-color 0.2s, transform 0.2s;
+            }
+
+            .tautulli-connected-device-chip:hover {
+                background: rgba(255, 255, 255, 0.06);
+                border-color: rgba(255, 255, 255, 0.14);
+                transform: translateY(-1px);
+            }
+
+            .tautulli-connected-device-icon {
+                color: #38bdf8;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+
+            .tautulli-connected-device-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .tautulli-connected-device-name {
+                font-size: 13px;
+                font-weight: 600;
+                color: #f1f5f9;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-connected-device-meta {
+                font-size: 11px;
+                color: #94a3b8;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .tautulli-connected-device-status {
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #34d399;
+                background: rgba(16, 185, 129, 0.12);
+                border: 1px solid rgba(16, 185, 129, 0.25);
+                border-radius: 100px;
+                padding: 2px 7px;
+                flex-shrink: 0;
+            }
+            /* ==========================================================================
+               Responsive Multi-Screen Optimization (Web >768px, Tablet 481-768px, Mobile <=480px)
+               Borrowed from NuvioMobile & Diskovarr
+               ========================================================================== */
+
+            /* Tablet Form Factor (481px to 768px) */
+            @media (max-width: 768px) {
+                .tautulli-grid {
+                    grid-template-columns: 1fr;
+                    gap: 16px;
+                }
+
+                .tautulli-card-body {
+                    padding: 12px;
+                    gap: 12px;
+                }
+
+                .tautulli-poster-wrapper {
+                    width: 82px;
+                    min-width: 82px;
+                    max-width: 82px;
+                    height: 122px;
+                    border-radius: 10px;
+                }
+
+                .tautulli-title-primary {
+                    font-size: 14px;
+                }
+
+                .tautulli-pipeline-grid {
+                    gap: 4px;
+                }
+
+                .tautulli-chip {
+                    font-size: 10.5px;
+                    padding: 2.5px 7px;
+                }
+
+                .tautulli-badge {
+                    font-size: 9px;
+                    padding: 2px 7px;
+                }
+            }
+
+            /* Mobile Form Factor (<= 480px) */
+            @media (max-width: 480px) {
+                #jellyfin-playback-card-container {
+                    margin: 0 0 20px 0;
+                }
+
+                /* Mobile banner: stacks vertically for 1-handed ergonomics */
+                .tautulli-activity-banner {
+                    flex-direction: column;
+                    align-items: stretch;
+                    gap: 10px;
+                    padding: 12px 14px;
+                    border-radius: 10px;
+                }
+
+                .tautulli-activity-left {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 8px;
+                    width: 100%;
+                }
+
+                .tautulli-activity-stats {
+                    font-size: 11px;
+                    gap: 8px;
+                }
+
+                .tautulli-filter-group {
+                    width: 100%;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                    padding: 3px;
+                }
+
+                .tautulli-filter-pill {
+                    padding: 5px 10px;
+                    font-size: 11px;
+                    min-height: 32px;
+                }
+
+                .tautulli-activity-tools {
+                    justify-content: flex-end;
+                    width: 100%;
+                }
+
+                .tautulli-tool-btn {
+                    min-height: 36px;
+                    padding: 6px 12px;
+                    font-size: 12px;
+                }
+
+                .tautulli-grid {
+                    grid-template-columns: 1fr;
+                    gap: 14px;
+                }
+
+                .tautulli-card {
+                    border-radius: 14px;
+                }
+
+                /* Mobile Header: wrap-safe */
+                .tautulli-card-header {
+                    padding: 8px 12px;
+                    gap: 6px;
+                    flex-wrap: wrap;
+                }
+
+                .tautulli-user-strip {
+                    flex: 1;
+                    min-width: 0;
+                }
+
+                .tautulli-header-controls {
+                    gap: 6px;
+                }
+
+                /* Nuvio 38px-40px touch zone for mobile action buttons */
+                .tautulli-action-btn {
+                    width: 38px;
+                    height: 38px;
+                    min-width: 38px;
+                    border-radius: 9px;
+                }
+
+                .tautulli-action-btn svg {
+                    width: 15px;
+                    height: 15px;
+                }
+
+                /* Card body: compact spacing */
+                .tautulli-card-body {
+                    padding: 10px 12px;
+                    gap: 10px;
+                    min-height: auto;
+                }
+
+                /* Compact poster thumbnail on mobile (leaves >200px width for titles/chips) */
+                .tautulli-poster-wrapper {
+                    width: 64px;
+                    min-width: 64px;
+                    max-width: 64px;
+                    height: 96px;
+                    border-radius: 8px;
+                }
+
+                .tautulli-titles-container {
+                    gap: 4px;
+                }
+
+                /* Title wraps onto 2 lines instead of aggressive truncation */
+                .tautulli-title-line {
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 2px;
+                }
+
+                .tautulli-title-primary {
+                    font-size: 13px;
+                    white-space: normal;
+                    line-height: 1.25;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+
+                .tautulli-title-secondary {
+                    font-size: 10.5px;
+                }
+
+                .tautulli-badge-row {
+                    gap: 3.5px;
+                }
+
+                .tautulli-badge {
+                    font-size: 9px;
+                    padding: 2px 6px;
+                }
+
+                .tautulli-pipeline-grid {
+                    gap: 3.5px;
+                    margin: 6px 0;
+                }
+
+                .tautulli-chip {
+                    font-size: 10px;
+                    padding: 2px 6px;
+                }
+
+                /* Card footer: touch target play/pause */
+                .tautulli-card-footer {
+                    padding: 8px 12px 10px 12px;
+                    gap: 6px;
+                }
+
+                .tautulli-state-icon {
+                    width: 36px;
+                    height: 36px;
+                    min-width: 36px;
+                }

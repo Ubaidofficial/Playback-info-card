@@ -172,7 +172,11 @@
     }
 
     /**
-     * Injects custom CSS styling for the Liquid Glass theme and Tautulli/Jellywatch card anatomy.
+     * Injects custom CSS styling for the Liquid Glass theme and card anatomy.
+     * Architectural Note: Styles are bundled inlined here to guarantee 100% self-contained delivery
+     * across reverse proxies (avoiding strict MIME-type nosniff blocks on /web/ConfigurationPage)
+     * and supporting direct custom JavaScript injection without external asset dependencies.
+     * The standalone, unbundled stylesheet is also maintained at Web/playbackcard.css.
      */
     function injectStyles() {
         let styleElement = document.getElementById(CONFIG.STYLES_ID);
