@@ -189,6 +189,33 @@ The previous `0.2.3.0` release artifact and repository manifest entry remain pre
 
 ---
 
+## ABI & Version Compatibility
+
+* **Compiled Server SDK**: Jellyfin 10.9.11 (`Jellyfin.Controller` and `Jellyfin.Model`).
+* **Target Runtime**: `.NET 8.0` (`net8.0`).
+* **Target ABI**: Declared as `10.9.0.0` in `plugin.json`.
+* **Version Scope**: Compatibility is designed for Jellyfin 10.9.x releases. Compatibility is treated as unverified until validated on your specific server environment and deployment type. We do not claim universal support across every Jellyfin version.
+
+---
+
+## Client Compatibility & Telemetry Limitations
+
+* **Dashboard Web Interface**: The Playback Monitor UI runs exclusively within the Jellyfin Web administrator interface (`Dashboard -> Server -> Playback Monitor`).
+* **Native Apps (Moonfin, Android TV, Apple TV, Roku, iOS, Infuse, Jellyfin Enhanced)**:
+  - Native apps provide playback session data and telemetry to the server API; they **do not** render this dashboard page.
+  - Do not assume universal client support: device names, client application titles, and operating system labels depend strictly on what each individual client reports upon session registration.
+  - Omitted fields: If a client does not report audio/video bitrates, framerates, or profile data, the monitor omits these tags rather than inventing placeholders.
+* **Network & Connection Type**: The monitor never attempts to distinguish Wi-Fi, Ethernet, or Cellular connections. Jellyfin cannot reliably distinguish these network modes, and network classification heuristics are strictly forbidden for privacy.
+
+---
+
+## Known Unverified Scenarios
+
+* **Live Server Environments**: Manual verification matrix across all physical native clients (Moonfin, Android TV, Jellyfin Enhanced) and live Windows host deployments remains to be verified by administrators on their respective servers.
+* **Method 1 Catalog**: The repository catalog (`manifest.json`) remains pinned to `0.2.3.0` as a safe rollback entry until live installation verification is completed on production servers.
+
+---
+
 ## Known Limitations
 
 * **Client and Device Metadata**: Device names, client app titles, and operating system labels depend entirely on the strings reported by the client during session registration. Unidentified clients report as "Generic / Unknown Client".
