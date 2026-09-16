@@ -3317,10 +3317,25 @@
             let text = '';
             const logUrl = apiClient.getUrl('System/Logs/Log', { name: latestLog.Name });
             if (typeof window.fetch === 'function') {
-                const headers = (typeof apiClient.defaultHeaders === 'function') ? apiClient.defaultHeaders() : {};
-                const res = await window.fetch(logUrl, { headers });
-                text = await res.text();
-            } else if (typeof apiClient.ajax === 'function') {
+                try {
+                    const headers = (typeof apiClient.defaultHeaders === 'function') ? apiClient.defaultHeaders() : {};
+                    if (typeof apiClient.authorizationHeader === 'function') {
+                        headers['Authorization'] = apiClient.authorizationHeader();
+                    } else if (typeof apiClient.accessToken === 'function' && apiClient.accessToken()) {
+                        headers['X-Emby-Token'] = apiClient.accessToken();
+                        headers['Authorization'] = `MediaBrowser Token="${apiClient.accessToken()}"`;
+                    } else if (apiClient._token) {
+                        headers['X-Emby-Token'] = apiClient._token;
+                    }
+                    const res = await window.fetch(logUrl, { headers });
+                    if (res.ok) {
+                        text = await res.text();
+                    }
+                } catch (fetchErr) {
+                    console.warn('[PlaybackCard] fetch failed for log, falling back to ajax:', fetchErr);
+                }
+            }
+            if (!text && typeof apiClient.ajax === 'function') {
                 text = await apiClient.ajax({
                     type: 'GET',
                     url: logUrl,
@@ -4794,6 +4809,7 @@
                 if (tt) {
                     const timeAgo = closest.time ? formatTimeAgo(new Date(closest.time).toISOString()) : 'Recent';
                     const lanBw = formatBitrate(closest.lan || 0);
+                    const wanBw = formatBitrate(closest.wan || 0);
                     const peakVal = escapeHtml(wrap.getAttribute('data-peak') || 'N/A');
                     tt.innerHTML = `
                         <div class="tautulli-sparkline-tooltip-val">${escapeHtml(formatBitrate(closest.total))}</div>
