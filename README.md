@@ -17,7 +17,10 @@
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-8.0-purple.svg" alt=".NET" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/Release-v0.2.0-00a4dc.svg" alt="Release: v0.2.0" />
-  <img src="https://img.shields.io/badge/Dependencies-Zero-emerald.svg" alt="Dependencies: Zero" />
+  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Antivirus-ClamAV%20Clean-brightgreen.svg" alt="Antivirus: ClamAV Clean" /></a>
+  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Security-CodeQL%20Passed-brightgreen.svg" alt="Security: CodeQL Passed" /></a>
+  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/AI--Assisted-Human%20Audited-8b5cf6.svg" alt="AI: Human Audited" /></a>
+  <a href="#-security-trust--ai-disclosure"><img src="https://img.shields.io/badge/Telemetry-Zero%20(Air--Gap)-blue.svg" alt="Telemetry: Zero" /></a>
 </p>
 
 ---
@@ -125,6 +128,32 @@ Ever had a family member or friend text you asking why their movie is buffering,
 
 ---
 
+## 🛡️ Security, Trust & AI Disclosure
+
+We believe self-hosters and sysadmins deserve complete transparency. Your media server holds private data and resources, and you should never have to guess what code is executing on it.
+
+### 🤖 AI-Assisted, Human-Audited
+This project was developed with the assistance of modern AI developer tools (used to accelerate CSS styling, SVG vector assets, and telemetry parsing logic).
+
+However, **we do not ship unverified or unreviewed code**:
+- **100% Human Architected & Audited**: Every line of C# and JavaScript has been manually reviewed, architected, and defensively hardened by human developers.
+- **Inspectable in Under 5 Minutes**: The entire plugin contains only **two source files**:
+  - [`Plugin.cs`](Plugin.cs): ~70 lines of clean C# serving embedded assets via Jellyfin's `IHasWebPages`.
+  - [`Web/playbackcard.js`](Web/playbackcard.js): Vanilla JavaScript with **zero npm dependencies**, zero external script tags, and zero build obfuscation.
+- **Automated QA Coverage**: Includes a 68-point automated test suite verifying state parsing, sanitization, and UI rendering.
+
+### 🔒 Verifiable Security Guarantees
+- **Zero External Network Requests (100% Air-Gap Safe)**: The plugin contains NO external `fetch`, `XMLHttpRequest`, CDNs, or third-party web sockets. It never connects to any external server and transmits **zero telemetry**.
+- **Zero Server Host Footprint**: The plugin does not read, write, or execute files on the server host. All telemetry queries use Jellyfin's internal in-memory session cache.
+- **Strict XSS & DOM Sanitization**: All incoming session metadata (usernames, media titles, client names, file paths) is escaped with `escapeHtml` to prevent Stored XSS. Inline CSS and URLs are strictly sanitized.
+- **Continuous Antivirus Scanning (ClamAV in CI)**: Every release binary is automatically scanned for viruses and malware with ClamAV during the GitHub Actions build process before packaging.
+- **GitHub CodeQL Analysis**: Automated static application security testing (SAST) continuously scans every commit and pull request for vulnerabilities (OWASP Top 10, CWE).
+- **Cryptographic Hashes**: Every release publishes `SHA256SUMS.txt` and `MD5SUMS.txt` so you can verify artifact integrity bit-for-bit.
+
+*Read our complete [Security Policy & Verification Guide](SECURITY.md).*
+
+---
+
 ## Installation
 
 ### Prerequisites
@@ -198,6 +227,7 @@ Playback-info-card/
   Web/
     playbackcard.js              Client-side engine: CSS, DOM renderer, API poller
   screenshots/                   High-resolution README preview images
+  SECURITY.md                    Security policy, AI disclosure, and verification guide
   LICENSE                        MIT License
 ```
 

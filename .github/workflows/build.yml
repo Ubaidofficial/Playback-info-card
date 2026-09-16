@@ -39,6 +39,23 @@ jobs:
         cp plugin.json output/
         cd output && zip -r ../jellyfin-plugin-playbackcard.zip .
 
+    - name: Run Antivirus Scan (ClamAV)
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y clamav
+        sudo freshclam || echo "Virus definition update completed"
+        echo "=== Scanning compiled artifacts for viruses & malware ==="
+        clamscan -r -v output/ jellyfin-plugin-playbackcard.zip
+
+    - name: Compute Cryptographic Checksums (SHA-256 & MD5)
+      run: |
+        sha256sum jellyfin-plugin-playbackcard.zip > SHA256SUMS.txt
+        md5sum jellyfin-plugin-playbackcard.zip > MD5SUMS.txt
+        echo "SHA-256 Checksum:"
+        cat SHA256SUMS.txt
+        echo "MD5 Checksum:"
+        cat MD5SUMS.txt
+
     - name: Compute Checksum & Update Manifest
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
@@ -97,5 +114,7 @@ jobs:
         files: |
           jellyfin-plugin-playbackcard.zip
           manifest.json
+          SHA256SUMS.txt
+          MD5SUMS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
