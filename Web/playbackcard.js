@@ -50,11 +50,17 @@
     let currentCardModels = [];
     let etaDisplayMode = 'clock'; // 'clock' | 'remaining'
     try {
-        etaDisplayMode = localStorage.getItem('jellyfin_playbackcard_eta_mode') || 'clock';
+        const savedEta = localStorage.getItem('jellyfin_playbackcard_eta_mode');
+        if (savedEta === 'clock' || savedEta === 'remaining') {
+            etaDisplayMode = savedEta;
+        }
     } catch (e) {}
     let currentSort = 'default'; // 'default', 'bandwidth', 'transcode', 'progress', 'user'
     try {
-        currentSort = localStorage.getItem('jellyfin_playbackcard_sort') || 'default';
+        const savedSort = localStorage.getItem('jellyfin_playbackcard_sort');
+        if (['default', 'bandwidth', 'transcode', 'progress', 'user'].includes(savedSort)) {
+            currentSort = savedSort;
+        }
     } catch (e) {}
     let currentPollInterval = CONFIG.POLL_INTERVAL_MS;
     try {
@@ -121,7 +127,7 @@
                 }
                 if (config.AccentColor) {
                     const cleanAccent = config.AccentColor.trim();
-                    if (cleanAccent && cleanAccent !== CONFIG.ACCENT_COLOR) {
+                    if (cleanAccent && cleanAccent !== CONFIG.ACCENT_COLOR && /^#[0-9a-fA-F]{3,8}$/.test(cleanAccent)) {
                         CONFIG.ACCENT_COLOR = cleanAccent;
                         injectStyles();
                     }
@@ -2181,6 +2187,14 @@
     }
 
     /**
+     * Sanitizes URLs used inside inline CSS url('...') properties to prevent CSS breakout or injection.
+     */
+    function safeCssUrl(url) {
+        if (!url) return '';
+        return escapeHtml(encodeURI(String(url)).replace(/['"()\\]/g, ''));
+    }
+
+    /**
      * Formats bitrates (bps) into clean human-readable strings (e.g. 4.5 Mbps, 931 kbps).
      */
     function formatBitrate(bitrate) {
@@ -2745,7 +2759,7 @@
      * Interactive Action: Stop / Kill Stream (Jellywatch & Tautulli flagship feature)
      */
     async function handleKillStream(sessionId, userName, mediaTitle) {
-        if (!window.ApiClient) return;
+        if (!window.ApiClient || !sessionId) return;
         const confirmMsg = `Terminate active playback for ${userName} (${mediaTitle})?`;
         if (!window.confirm(confirmMsg)) {
             return;
@@ -2757,7 +2771,7 @@
             } else if (typeof window.ApiClient.ajax === 'function') {
                 await window.ApiClient.ajax({
                     type: 'POST',
-                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/Stop`)
+                    url: window.ApiClient.getUrl(`Sessions/${encodeURIComponent(sessionId)}/Playing/Stop`)
                 });
             }
             // Trigger an immediate refresh
@@ -2772,7 +2786,7 @@
      * Interactive Action: Send On-Screen Message to Player (Jellywatch feature)
      */
     async function handleSendMessage(sessionId, userName, defaultMsg) {
-        if (!window.ApiClient) return;
+        if (!window.ApiClient || !sessionId) return;
         const msg = defaultMsg ? defaultMsg : window.prompt(`Send on-screen message to ${userName}:`, 'Server restart in 5 minutes.');
         if (!msg || !msg.trim()) {
             return;
@@ -2782,7 +2796,7 @@
             if (typeof window.ApiClient.ajax === 'function') {
                 await window.ApiClient.ajax({
                     type: 'POST',
-                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Message`),
+                    url: window.ApiClient.getUrl(`Sessions/${encodeURIComponent(sessionId)}/Message`),
                     data: JSON.stringify({
                         Text: msg.trim(),
                         Header: 'Server Notice',
@@ -2802,7 +2816,7 @@
      * Interactive Action: Toggle Play/Pause on client session
      */
     async function handleTogglePlayPause(sessionId, isCurrentlyPaused) {
-        if (!window.ApiClient) return;
+        if (!window.ApiClient || !sessionId) return;
         const command = isCurrentlyPaused ? 'Unpause' : 'Pause';
         try {
             if (typeof window.ApiClient.sendPlaystateCommand === 'function') {
@@ -2810,7 +2824,7 @@
             } else if (typeof window.ApiClient.ajax === 'function') {
                 await window.ApiClient.ajax({
                     type: 'POST',
-                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/${command}`)
+                    url: window.ApiClient.getUrl(`Sessions/${encodeURIComponent(sessionId)}/Playing/${encodeURIComponent(command)}`)
                 });
             }
             fetchAndRenderSessions();
@@ -2831,7 +2845,7 @@
             } else if (typeof window.ApiClient.ajax === 'function') {
                 await window.ApiClient.ajax({
                     type: 'POST',
-                    url: window.ApiClient.getUrl(`Sessions/${sessionId}/Playing/${command}`)
+                    url: window.ApiClient.getUrl(`Sessions/${encodeURIComponent(sessionId)}/Playing/${encodeURIComponent(command)}`)
                 });
             }
             fetchAndRenderSessions();
@@ -3593,8 +3607,8 @@
                     0 24px 52px -8px rgba(0,0,0,0.88),
                     0 8px 24px -4px rgba(0,0,0,0.6);
             ">
-                ${card.posterUrl ? `<div class="tautulli-card-ambient-bg" style="background-image: url('${escapeHtml(card.posterUrl)}');"></div>` : ''}
-                ${card.backdropUrl ? `<div class="tautulli-card-fanart-backdrop" style="background-image: url('${escapeHtml(card.backdropUrl)}');"></div>` : ''}
+                ${card.posterUrl ? `<div class="tautulli-card-ambient-bg" style="background-image: url('${safeCssUrl(card.posterUrl)}');"></div>` : ''}
+                ${card.backdropUrl ? `<div class="tautulli-card-fanart-backdrop" style="background-image: url('${safeCssUrl(card.backdropUrl)}');"></div>` : ''}
 
                 <!-- Card Body: Poster + Authentic Tautulli Spec Grid + Floating Time Stack -->
                 <div class="tautulli-card-body">
@@ -3735,7 +3749,7 @@
                     ${idleSessions.map(s => {
                         const devName = escapeHtml(resolveDeviceModel(s));
                         const client = escapeHtml(s.Client || '');
-                        const user = escapeHtml(s.UserName || 'User');
+                        const user = escapeHtml(isPrivacyMode ? 'Protected User' : (s.UserName || 'User'));
                         return `
                             <div class="tautulli-connected-device-chip">
                                 <div class="tautulli-connected-device-icon">
@@ -4109,11 +4123,11 @@
                 if (tt) {
                     const timeAgo = closest.time ? formatTimeAgo(new Date(closest.time).toISOString()) : 'Recent';
                     const lanBw = formatBitrate(closest.lan || 0);
-                    const wanBw = formatBitrate(closest.wan || 0);
+                    const peakVal = escapeHtml(wrap.getAttribute('data-peak') || 'N/A');
                     tt.innerHTML = `
-                        <div class="tautulli-sparkline-tooltip-val">${formatBitrate(closest.total)}</div>
-                        <div class="tautulli-sparkline-tooltip-sub">LAN: ${lanBw} · WAN: ${wanBw}</div>
-                        <div class="tautulli-sparkline-tooltip-sub">${timeAgo} · Peak: ${wrap.getAttribute('data-peak') || 'N/A'}</div>
+                        <div class="tautulli-sparkline-tooltip-val">${escapeHtml(formatBitrate(closest.total))}</div>
+                        <div class="tautulli-sparkline-tooltip-sub">LAN: ${escapeHtml(lanBw)} · WAN: ${escapeHtml(wanBw)}</div>
+                        <div class="tautulli-sparkline-tooltip-sub">${escapeHtml(timeAgo)} · Peak: ${peakVal}</div>
                     `;
                     tt.style.display = 'block';
                     const clampedX = Math.max(30, Math.min(rect.width - 30, closest.x));
