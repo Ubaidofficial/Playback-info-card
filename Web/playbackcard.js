@@ -1376,6 +1376,99 @@
                 border: 1px solid rgba(251, 191, 36, 0.28);
             }
 
+            /* Logo-First Cinema Spec Badges */
+            .tautulli-tech-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 3px;
+                font-size: 8.5px;
+                font-weight: 800;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                padding: 1px 5px;
+                border-radius: 3px;
+                vertical-align: middle;
+                margin-right: 4px;
+                line-height: 1.3;
+                flex-shrink: 0;
+            }
+            .tautulli-tech-badge svg {
+                display: inline-block;
+                vertical-align: middle;
+                flex-shrink: 0;
+            }
+            .tautulli-tech-nvenc {
+                background: rgba(118, 185, 0, 0.16);
+                color: #a3e635;
+                border: 1px solid rgba(118, 185, 0, 0.38);
+            }
+            .tautulli-tech-qsv {
+                background: rgba(0, 113, 197, 0.18);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.4);
+            }
+            .tautulli-tech-vtb {
+                background: rgba(255, 255, 255, 0.12);
+                color: #f1f5f9;
+                border: 1px solid rgba(255, 255, 255, 0.28);
+            }
+            .tautulli-tech-amf {
+                background: rgba(237, 28, 36, 0.16);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.38);
+            }
+            .tautulli-tech-vaapi {
+                background: rgba(99, 102, 241, 0.16);
+                color: #818cf8;
+                border: 1px solid rgba(129, 140, 248, 0.38);
+            }
+            .tautulli-tech-4k {
+                background: rgba(245, 158, 11, 0.16);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.4);
+            }
+            .tautulli-tech-dovi {
+                background: rgba(0, 0, 0, 0.7);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.35);
+            }
+            .tautulli-tech-hdr {
+                background: rgba(56, 189, 248, 0.14);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.35);
+            }
+            .tautulli-tech-hlg {
+                background: rgba(168, 85, 247, 0.14);
+                color: #c084fc;
+                border: 1px solid rgba(168, 85, 247, 0.35);
+            }
+            .tautulli-tech-atmos {
+                background: rgba(0, 0, 0, 0.75);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.35);
+            }
+            .tautulli-tech-dolby {
+                background: rgba(15, 23, 42, 0.75);
+                color: #e2e8f0;
+                border: 1px solid rgba(255, 255, 255, 0.25);
+            }
+            .tautulli-tech-dts {
+                background: rgba(239, 68, 68, 0.16);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.38);
+            }
+            .tautulli-tech-hires {
+                background: rgba(217, 119, 6, 0.18);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.42);
+            }
+            .tautulli-tech-sub {
+                background: rgba(255, 255, 255, 0.09);
+                color: #e2e8f0;
+                border: 1px solid rgba(255, 255, 255, 0.24);
+                padding: 1px 4px;
+            }
+
             /* Spec Row Hover Highlight */
             .tautulli-spec-row:hover {
                 background: rgba(255, 255, 255, 0.025);
@@ -2240,6 +2333,38 @@
         return `HW: ${hwType.toUpperCase()}`;
     }
 
+    /**
+     * Logo-First High-Density Cinema Tech Badges
+     */
+    const TECH_BADGES = {
+        nvenc: `<span class="tautulli-tech-badge tautulli-tech-nvenc" title="NVIDIA NVENC Hardware Acceleration"><svg viewBox="0 0 14 10" width="11" height="8" style="vertical-align:-1px;margin-right:2px"><path fill="#76B900" d="M7 0C3.5 0 .6 2.3 0 5.4c.5 1.5 1.7 2.7 3.2 3.3l-.7 1.3C1.2 9.2.3 7.5.1 5.5 1 2.3 4.1 0 7.8 0c2.3 0 4.4 1 5.9 2.5l-1.3 1.3C11.3 2.7 9.7 2 7.8 2c-2.3 0-4.3 1.4-5 3.3.4.9 1.1 1.6 2 2l-.6 1.2c-1.3-.6-2.2-1.8-2.6-3.2C2.1 3.5 4.3 2 7 2c1.7 0 3.2.7 4.2 1.8l-1.4 1.4C9 4.4 8 4 7 4c-1.1 0-2 .6-2.5 1.5l1.8.4C6.5 5.4 6.7 5.2 7 5.2c.6 0 1.2.3 1.5.8l-1.8 1.1c.4.3.9.5 1.4.5 1.1 0 2-.9 2-2 0-.8-.4-1.5-1-1.9L10.5 2.3C11.5 3.3 12 4.6 12 6c0 2.2-1.8 4-4 4-1.5 0-2.8-.8-3.5-2L2.7 9.1C3.8 10.8 5.8 12 8 12c3.3 0 6-2.7 6-6 0-3.3-2.7-6-6-6z"/></svg>NVENC</span>`,
+        qsv: `<span class="tautulli-tech-badge tautulli-tech-qsv" title="Intel QuickSync Video Hardware Acceleration"><svg viewBox="0 0 12 12" width="10" height="10" style="vertical-align:-1px;margin-right:2px"><rect x="2" y="2" width="8" height="8" rx="1.5" fill="none" stroke="#38bdf8" stroke-width="1.2"/><path fill="#38bdf8" d="M4 4h4v4H4z"/><path stroke="#38bdf8" stroke-width="1" d="M1 4h1M1 8h1M10 4h1M10 8h1M4 1v1M8 1v1M4 10v1M8 10v1"/></svg>QSV</span>`,
+        vtb: `<span class="tautulli-tech-badge tautulli-tech-vtb" title="Apple VideoToolbox Hardware Acceleration"><svg viewBox="0 0 12 14" width="9" height="11" style="vertical-align:-1px;margin-right:2px"><path fill="currentColor" d="M9.8 7.3c0-1.8 1.5-2.7 1.6-2.7-.9-1.2-2.2-1.4-2.7-1.4-1.1-.1-2.2.7-2.8.7-.5 0-1.5-.6-2.4-.6-1.2 0-2.4.7-3 1.8-1.3 2.2-.3 5.5.9 7.3.6.9 1.3 1.8 2.2 1.8.9 0 1.3-.6 2.3-.6 1.1 0 1.4.6 2.3.6 1 0 1.6-.9 2.2-1.7.7-1 1-2 1-2.1-.1 0-1.6-.6-1.6-2.5zm-1.8-5c.5-.6.8-1.4.7-2.3-.7 0-1.6.5-2.1 1-.4.5-.8 1.3-.7 2.2.8.1 1.6-.4 2.1-.9z"/></svg>VTB</span>`,
+        amf: `<span class="tautulli-tech-badge tautulli-tech-amf" title="AMD AMF Hardware Acceleration"><svg viewBox="0 0 12 12" width="10" height="10" style="vertical-align:-1px;margin-right:2px"><path fill="#f87171" d="M1 1h4v4H1zm6 0h4v4H7zm0 6h4v4H7z"/><polygon fill="#f87171" points="1,7 5,7 3,11"/></svg>AMF</span>`,
+        vaapi: `<span class="tautulli-tech-badge tautulli-tech-vaapi" title="Linux VAAPI Hardware Acceleration">VAAPI</span>`,
+        uhd4k: `<span class="tautulli-tech-badge tautulli-tech-4k" title="4K Ultra High Definition">4K UHD</span>`,
+        dovi: `<span class="tautulli-tech-badge tautulli-tech-dovi" title="Dolby Vision Dynamic HDR"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="#fff" d="M0 0h3.2c2.2 0 4 1.8 4 4s-1.8 4-4 4H0V0zm9.6 0H16v8h-3.2c-2.2 0-4-1.8-4-4s1.8-4 4-4zM2 2v4h1.2c1.1 0 2-.9 2-2s-.9-2-2-2H2zm10.8 0c-1.1 0-2 .9-2 2s.9 2 2 2H14V2h-1.2z"/></svg>VISION</span>`,
+        hdr10: `<span class="tautulli-tech-badge tautulli-tech-hdr" title="HDR10 High Dynamic Range">HDR10</span>`,
+        hdr10plus: `<span class="tautulli-tech-badge tautulli-tech-hdr" title="HDR10+ Dynamic Metadata">HDR10+</span>`,
+        hlg: `<span class="tautulli-tech-badge tautulli-tech-hlg" title="Hybrid Log-Gamma">HLG</span>`,
+        atmos: `<span class="tautulli-tech-badge tautulli-tech-atmos" title="Dolby Atmos Spatial Audio"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="#fff" d="M0 0h3.2c2.2 0 4 1.8 4 4s-1.8 4-4 4H0V0zm9.6 0H16v8h-3.2c-2.2 0-4-1.8-4-4s1.8-4 4-4zM2 2v4h1.2c1.1 0 2-.9 2-2s-.9-2-2-2H2zm10.8 0c-1.1 0-2 .9-2 2s.9 2 2 2H14V2h-1.2z"/></svg>ATMOS</span>`,
+        dolby: `<span class="tautulli-tech-badge tautulli-tech-dolby" title="Dolby Audio"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><path fill="currentColor" d="M0 0h3.2c2.2 0 4 1.8 4 4s-1.8 4-4 4H0V0zm9.6 0H16v8h-3.2c-2.2 0-4-1.8-4-4s1.8-4 4-4zM2 2v4h1.2c1.1 0 2-.9 2-2s-.9-2-2-2H2zm10.8 0c-1.1 0-2 .9-2 2s.9 2 2 2H14V2h-1.2z"/></svg>AUDIO</span>`,
+        dts: `<span class="tautulli-tech-badge tautulli-tech-dts" title="DTS-HD Master Audio">DTS-HD</span>`,
+        hires: `<span class="tautulli-tech-badge tautulli-tech-hires" title="Hi-Res Audiophile Lossless">HI-RES</span>`,
+        cc: `<span class="tautulli-tech-badge tautulli-tech-sub" title="Closed Captions"><svg viewBox="0 0 16 12" width="12" height="9" style="vertical-align:-1px;margin-right:2px"><rect x="0.5" y="0.5" width="15" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><text x="8" y="8.5" font-size="7" font-weight="900" font-family="system-ui,-apple-system,sans-serif" text-anchor="middle" fill="currentColor">CC</text></svg>CC</span>`
+    };
+
+    function getHwAccelBadgeHtml(hwAccelBadge) {
+        if (!hwAccelBadge) return '';
+        const lower = hwAccelBadge.toLowerCase();
+        if (lower.includes('nvenc')) return TECH_BADGES.nvenc;
+        if (lower.includes('quick') || lower.includes('qsv')) return TECH_BADGES.qsv;
+        if (lower.includes('video') || lower.includes('vtb') || lower.includes('apple')) return TECH_BADGES.vtb;
+        if (lower.includes('amf') || lower.includes('amd')) return TECH_BADGES.amf;
+        if (lower.includes('vaapi')) return TECH_BADGES.vaapi;
+        return `<span class="tautulli-tech-badge tautulli-tech-vaapi">${escapeHtml(hwAccelBadge.replace('HW: ', ''))}</span>`;
+    }
+
 
     /**
      * P1.1 Live Bandwidth History Sparkline: Generates an SVG micro-trendline.
@@ -2773,8 +2898,6 @@
         const mediaStreams = item.MediaStreams || [];
         const videoStream = mediaStreams.find((s) => s.Type === 'Video') || {};
         const audioStream = mediaStreams.find((s) => s.Type === 'Audio' && (playState.AudioStreamIndex == null || s.Index === playState.AudioStreamIndex)) || {};
-        const subStream = mediaStreams.find((s) => s.Type === 'Subtitle' && s.Index === playState.SubtitleStreamIndex) || null;
-
         // Subtitle Burn-In check
         let isSubtitleBurnIn = false;
         if (isTranscode && transcodeInfo && transcodeInfo.TranscodeReasons) {
@@ -2782,6 +2905,10 @@
                 isSubtitleBurnIn = true;
             }
         }
+
+        const subStream = (playState.SubtitleStreamIndex != null && playState.SubtitleStreamIndex >= 0)
+            ? mediaStreams.find((s) => s.Type === 'Subtitle' && s.Index === playState.SubtitleStreamIndex) || null
+            : (isSubtitleBurnIn ? mediaStreams.find((s) => s.Type === 'Subtitle') || null : null);
 
         // Container display (Tautulli style)
         const targetContainer = (transcodeInfo && transcodeInfo.Container ? transcodeInfo.Container.toUpperCase() : (isTranscode ? 'MP4' : origContainer));
@@ -2857,17 +2984,36 @@
 
         let videoDisplay = `${videoMethod} (${sourceVideoDesc})`;
         let videoChip = sourceVideoDesc;
+        let toneMapTag = '';
+        let targetVideoParts = [];
         if (videoMethod === 'Transcode' && transcodeInfo && transcodeInfo.IsVideoDirect === false) {
             const targetCodec = (transcodeInfo.VideoCodec || 'H264').toUpperCase();
             const targetResInfo = resolveResolutionInfo(transcodeInfo.Width, transcodeInfo.Height);
-            const targetRes = transcodeInfo.Height ? targetResInfo.short : origVideoRes;
-            const targetVideoParts = [targetRes, targetCodec, '8-bit'];
+            const targetRes = targetResInfo.short || origVideoRes;
+            targetVideoParts = [targetRes, targetCodec, '8-bit'];
             if (isToneMapped) targetVideoParts.push('SDR');
-            const toneMapTag = isToneMapped ? ' · Tone Mapped' : '';
+            toneMapTag = isToneMapped ? ' · Tone Mapped' : '';
             videoDisplay = `Transcode (${sourceVideoDesc} ➔ ${targetVideoParts.join(' ')}${toneMapTag})`;
             videoChip = `${sourceVideoDesc} ➔ ${targetVideoParts.join(' ')}`;
         } else if (transcodeInfo && transcodeInfo.IsVideoDirect === true && isTranscode) {
             videoDisplay = `Direct Stream (${sourceVideoDesc})`;
+        }
+
+        // Logo-First Video Badges (4K UHD, Dolby Vision, HDR10, HLG)
+        const videoBadges = [];
+        if (origVideoRes === '4K') videoBadges.push(TECH_BADGES.uhd4k);
+        if (hdrName === 'Dolby Vision') videoBadges.push(TECH_BADGES.dovi);
+        else if (hdrName === 'HDR10+') videoBadges.push(TECH_BADGES.hdr10plus);
+        else if (hdrName === 'HDR10') videoBadges.push(TECH_BADGES.hdr10);
+        else if (hdrName === 'HLG') videoBadges.push(TECH_BADGES.hlg);
+        const videoBadgesHtml = videoBadges.join('');
+
+        const cleanSourceParts = [origVideoRes !== '4K' ? origVideoRes : '', origVideoCodec, videoBitDepth].filter(Boolean).join(' ') || origVideoCodec;
+        let videoDisplayWithoutBadges = `${videoMethod} (${cleanSourceParts})`;
+        if (videoMethod === 'Transcode' && transcodeInfo && transcodeInfo.IsVideoDirect === false) {
+            videoDisplayWithoutBadges = `Transcode (${cleanSourceParts} ➔ ${targetVideoParts.join(' ')}${toneMapTag})`;
+        } else if (transcodeInfo && transcodeInfo.IsVideoDirect === true && isTranscode) {
+            videoDisplayWithoutBadges = `Direct Stream (${cleanSourceParts})`;
         }
 
         // Audio: Codec, Channels, Spatial Atmos, Bit Depth, Sample Rate, and Bitrate
@@ -2921,15 +3067,72 @@
             audioDisplay = `Direct Stream (${origAudioDesc})`;
         }
 
+        // Audio item & Hi-Res Audiophile Detection
+        const isAudioItem = item.Type === 'Audio';
+        const sampleRateHz = audioStream.SampleRate || 0;
+        const bitDepthBits = audioStream.BitDepth || 0;
+        const isHiResAudio = Boolean(isAudioItem && (
+            (sampleRateHz >= 48000 && bitDepthBits >= 24) ||
+            (sampleRateHz >= 88200) ||
+            (origAudioCodec === 'FLAC' && (bitDepthBits >= 24 || sampleRateHz >= 48000)) ||
+            (origAudioCodec === 'DSD' || origAudioCodec === 'DSF')
+        ));
+        let hiResBadgeText = null;
+        if (isHiResAudio) {
+            const srStr = sampleRateHz >= 1000 ? `${(sampleRateHz / 1000).toFixed(0)}kHz` : `${sampleRateHz}Hz`;
+            const bdStr = bitDepthBits ? `${bitDepthBits}-bit` : '';
+            hiResBadgeText = `Hi-Res ${[srStr, bdStr, origAudioCodec].filter(Boolean).join(' ')}`.trim();
+        }
+
+        // Logo-First Audio Badges (Dolby Atmos, Dolby Audio, DTS, Hi-Res)
+        const audioBadges = [];
+        if (isAtmos) {
+            audioBadges.push(TECH_BADGES.atmos);
+        } else if (origAudioCodec.includes('DTS')) {
+            audioBadges.push(TECH_BADGES.dts);
+        } else if (isHiResAudio) {
+            audioBadges.push(TECH_BADGES.hires);
+        } else if (origAudioCodec.includes('EAC3') || origAudioCodec.includes('AC3') || origAudioCodec.includes('TRUEHD') || origAudioCodec.includes('DOLBY')) {
+            audioBadges.push(TECH_BADGES.dolby);
+        }
+        const audioBadgesHtml = audioBadges.join('');
+
+        const sourceAudioCleanParts = [];
+        if (origAudioLang) sourceAudioCleanParts.push(origAudioLang);
+        sourceAudioCleanParts.push(origAudioCodec);
+        sourceAudioCleanParts.push(origChannels);
+        if (audioStream.BitDepth && (isLossless || audioStream.BitDepth >= 24)) {
+            sourceAudioCleanParts.push(`${audioStream.BitDepth}-bit`);
+        }
+        if (audioStream.SampleRate && (audioStream.SampleRate >= 48000 || isLossless)) {
+            const khz = (audioStream.SampleRate / 1000).toFixed(1).replace('.0', '');
+            sourceAudioCleanParts.push(`${khz}kHz`);
+        }
+        if (audioStream.BitRate) {
+            sourceAudioCleanParts.push(`· ${formatBitrate(audioStream.BitRate)}`);
+        }
+        const cleanAudioDesc = sourceAudioCleanParts.join(' ');
+        let audioDisplayWithoutBadges = `${audioMethod} (${cleanAudioDesc})`;
+        if (audioMethod === 'Transcode' && transcodeInfo && transcodeInfo.IsAudioDirect === false) {
+            const targetAudioCodec = (transcodeInfo.AudioCodec || 'AAC').toUpperCase();
+            const targetChannels = transcodeInfo.AudioChannels === 6 ? '5.1' : transcodeInfo.AudioChannels === 2 ? 'Stereo' : (transcodeInfo.AudioChannels ? `${transcodeInfo.AudioChannels} Ch` : 'Stereo');
+            const targetAudioBitrate = transcodeInfo.AudioBitrate ? ` · ${formatBitrate(transcodeInfo.AudioBitrate)}` : '';
+            audioDisplayWithoutBadges = `Transcode (${cleanAudioDesc} ➔ ${targetAudioCodec} ${targetChannels}${targetAudioBitrate})`;
+        } else if (transcodeInfo && transcodeInfo.IsAudioDirect === true && isTranscode) {
+            audioDisplayWithoutBadges = `Direct Stream (${cleanAudioDesc})`;
+        }
+
         // Subtitles (Explicit 'None' if unselected, exactly matching Tautulli)
         let subtitleDisplay = 'None';
         let subChip = null;
+        let subtitleBadgesHtml = '';
         if (subStream) {
             const subTitle = subStream.DisplayTitle || subStream.Language || 'Subtitles';
             const subCodec = (subStream.Codec || 'Text').toUpperCase();
             const burnInStr = isSubtitleBurnIn ? ' · Burn-in' : (subStream.IsExternal ? ' · External' : ' · Embedded');
             subtitleDisplay = `${subTitle} (${subCodec}${burnInStr})`;
             subChip = `${subTitle} (${subCodec})`;
+            subtitleBadgesHtml = TECH_BADGES.cc;
         }
 
         // Bandwidth & Quality
@@ -3019,9 +3222,33 @@
             streamTooltip = `Transcode: ${reasonStr}${hwAccelBadge ? ' · ' + hwAccelBadge : ''}${transcodeSpeedMultiplier ? ' · Speed ' + transcodeSpeedMultiplier + 'x' : ''}`;
         }
 
-        // Tautulli Product & Player Display
+        // Logo-First Stream & Hardware Acceleration
+        const hwBadgeHtml = getHwAccelBadgeHtml(hwAccelBadge);
+        let streamDisplayHtml = escapeHtml(streamDisplay);
+        if (isTranscode) {
+            const streamParts = [];
+            if (transcodeFps) streamParts.push(`${transcodeFps} fps`);
+            if (transcodeSpeedMultiplier) streamParts.push(`${transcodeSpeedMultiplier}x`);
+            if (transcodeInfo && transcodeInfo.IsThrottled) streamParts.push('Throttled');
+            const metricsText = streamParts.join(' · ');
+            if (hwBadgeHtml) {
+                streamDisplayHtml = `Transcode (${hwBadgeHtml}${metricsText ? ' · ' + escapeHtml(metricsText) : ''})`;
+            } else if (isSwTranscode) {
+                streamDisplayHtml = `Transcode (SW${metricsText ? ' · ' + escapeHtml(metricsText) : ''})`;
+            }
+        }
+
+        // Product & Player Display (Consolidated for cinema space efficiency)
         const productDisplay = session.Client || 'Jellyfin Web';
         const playerDisplay = resolveDeviceModel(session) || 'Player';
+        let combinedPlayerDisplay = playerDisplay;
+        if (productDisplay && productDisplay.toLowerCase() !== playerDisplay.toLowerCase() && productDisplay !== 'Player') {
+            if (playerDisplay === 'Player') {
+                combinedPlayerDisplay = productDisplay;
+            } else {
+                combinedPlayerDisplay = `${playerDisplay} (${productDisplay})`;
+            }
+        }
         const fileBasename = filePath
             ? filePath.replace(/\\/g, '/').split('/').pop() || filePath
             : '';
@@ -3114,7 +3341,6 @@
         // Titles & Navigation
         let primaryTitle = item.Name || 'Unknown Title';
         let secondaryTitle = ''; // will be set per-type below
-        const isAudioItem = item.Type === 'Audio';
 
         if (item.Type === 'Episode') {
             primaryTitle = item.SeriesName || item.Name;
@@ -3166,22 +3392,6 @@
             audioChannelsBadge = 'Stereo';
         }
 
-        // Tautulli-Inspired Hi-Res Audiophile Detection
-        const sampleRateHz = audioStream.SampleRate || 0;
-        const bitDepthBits = audioStream.BitDepth || 0;
-        const isHiResAudio = Boolean(isAudioItem && (
-            (sampleRateHz >= 48000 && bitDepthBits >= 24) ||
-            (sampleRateHz >= 88200) ||
-            (origAudioCodec === 'FLAC' && (bitDepthBits >= 24 || sampleRateHz >= 48000)) ||
-            (origAudioCodec === 'DSD' || origAudioCodec === 'DSF')
-        ));
-        let hiResBadgeText = null;
-        if (isHiResAudio) {
-            const srStr = sampleRateHz >= 1000 ? `${(sampleRateHz / 1000).toFixed(0)}kHz` : `${sampleRateHz}Hz`;
-            const bdStr = bitDepthBits ? `${bitDepthBits}-bit` : '';
-            hiResBadgeText = `Hi-Res ${[srStr, bdStr, origAudioCodec].filter(Boolean).join(' ')}`.trim();
-        }
-
         // Tautulli-Inspired SyncPlay Watch Party Group
         const syncPlayGroupId = session.SyncPlayGroupId || session.GroupId || (session.SyncPlay && session.SyncPlay.GroupId) || null;
 
@@ -3193,6 +3403,14 @@
             player: resolveDeviceModel(session),
             productDisplay,
             playerDisplay,
+            combinedPlayerDisplay,
+            hwBadgeHtml,
+            streamDisplayHtml,
+            videoBadgesHtml,
+            videoDisplayWithoutBadges,
+            audioBadgesHtml,
+            audioDisplayWithoutBadges,
+            subtitleBadgesHtml,
             qualityDisplay,
             streamDisplay,
             streamTooltip,
@@ -3394,12 +3612,8 @@
                     <!-- 2-Column Key-Value Spec Grid -->
                     <div class="tautulli-spec-table">
                         <div class="tautulli-spec-row">
-                            <span class="tautulli-spec-label">PRODUCT</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.productDisplay)}">${escapeHtml(card.productDisplay)}</span>
-                        </div>
-                        <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">PLAYER</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.playerDisplay)}">${escapeHtml(card.playerDisplay)}</span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.combinedPlayerDisplay || card.playerDisplay)}">${escapeHtml(card.combinedPlayerDisplay || card.playerDisplay)}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">QUALITY</span>
@@ -3408,7 +3622,7 @@
                         <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">STREAM</span>
-                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${escapeHtml(card.streamDisplay)}</span>
+                            <span class="tautulli-spec-value tautulli-stream-${escapeHtml(card.streamClass)}" title="${escapeHtml(card.streamTooltip || card.streamDisplay)}"><span class="tautulli-stream-dot tautulli-stream-dot-${escapeHtml(card.streamClass)}"></span>${card.streamDisplayHtml || escapeHtml(card.streamDisplay)}</span>
                         </div>
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">CONTAINER</span>
@@ -3417,16 +3631,16 @@
                         ${!card.isAudioItem ? `
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">VIDEO</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.videoDisplay)}">${escapeHtml(card.videoDisplay)}</span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.videoDisplay)}">${card.videoBadgesHtml || ''}${escapeHtml(card.videoDisplayWithoutBadges || card.videoDisplay)}</span>
                         </div>` : ''}
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">AUDIO</span>
-                            <span class="tautulli-spec-value" title="${escapeHtml(card.audioDisplay)}">${escapeHtml(card.audioDisplay)}</span>
+                            <span class="tautulli-spec-value" title="${escapeHtml(card.audioDisplay)}">${card.audioBadgesHtml || ''}${escapeHtml(card.audioDisplayWithoutBadges || card.audioDisplay)}</span>
                         </div>
                         ${!card.isAudioItem ? `
                         <div class="tautulli-spec-row">
                             <span class="tautulli-spec-label">SUBTITLE</span>
-                            <span class="tautulli-spec-value${card.subtitleDisplay === 'None' ? ' tautulli-spec-value-muted' : ''}" title="${escapeHtml(card.subtitleDisplay)}">${escapeHtml(card.subtitleDisplay)}</span>
+                            <span class="tautulli-spec-value${card.subtitleDisplay === 'None' ? ' tautulli-spec-value-muted' : ''}" title="${escapeHtml(card.subtitleDisplay)}">${card.subtitleBadgesHtml || ''}${escapeHtml(card.subtitleDisplay)}</span>
                         </div>` : ''}
                         <div class="tautulli-spec-group-sep"></div>
                         <div class="tautulli-spec-row">

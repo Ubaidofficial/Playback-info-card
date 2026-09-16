@@ -63,20 +63,19 @@ Ever had a family member or friend text you asking why their movie is buffering,
 
 ## Key Features
 
-### 1. Cinema-Grade Hardware Telemetry Matrix
-- **Complete Two-Column Diagnostic Table**:
-  - `PRODUCT`: Client application and build version
-  - `PLAYER`: Clean, recognized hardware model (e.g. `Apple TV 4K`, `MacBook Pro`, `Pixel 9 Pro`)
-  - `QUALITY`: Display resolution, bit-depth, and dynamic range (`4K HDR10`, `Dolby Vision BT.2020`, `1080p SDR`)
-  - `STREAM`: High-visibility status badge (`DIRECT PLAY`, `DIRECT STREAM`, `TRANSCODE`) with transcode reason tooltips
-  - `CONTAINER`: Media pipeline paths (e.g. `MKV ➔ MP4` or `Direct Play MKV`)
-  - `VIDEO`: Video codec, bitrate, frame rate, and profile
-  - `AUDIO`: Audio codec, channel configuration (`5.1`, `7.1`, `Stereo`), sample rate (`48kHz`, `96kHz`), and bitrates
-  - `SUBTITLE`: Active subtitle track, format (`SRT`, `PGS`, `ASS`), and burn-in status
+### 1. Logo-First High-Density Telemetry Matrix
+- **Space-Efficient Two-Column Diagnostic Table**:
+  - `PLAYER`: Consolidated device & client profile (e.g. `Apple TV 4K (Swiftfin)`, `MacBook Pro (Chrome)`, `Pixel 9 Pro (Finamp)`)
+  - `QUALITY`: Original vs. transcoded resolution and target bitrates
+  - `STREAM`: Live play method badge (`DIRECT PLAY`, `DIRECT STREAM`, `TRANSCODE`) with inline **GPU hardware acceleration badges** (`NVENC`, `QSV`, `VTB`, `AMF`, `VAAPI`)
+  - `CONTAINER`: Media container transformation pipeline (e.g. `MKV ➔ MP4` or `Direct Play MKV`)
+  - `VIDEO`: Codec, bit-depth, and frame rate with inline cinema badges (`4K UHD`, `Dolby Vision`, `HDR10`, `HLG`)
+  - `AUDIO`: Codec, spatial channels (`5.1`, `7.1`), sample rate (`48kHz`, `96kHz`) with inline sound badges (`Dolby Atmos`, `Dolby Audio`, `DTS-HD`, `Hi-Res FLAC`)
+  - `SUBTITLE`: Active subtitle track and format with inline `[CC]` Closed Caption badge and burn-in diagnostic alerts
   - `LOCATION`: Network origin with connection badge (`LAN`, `WAN`, `CELLULAR`) and client IP
-  - `BANDWIDTH`: Real-time session bandwidth throughput
+  - `BANDWIDTH`: Real-time session bandwidth throughput with live pulse beacon
   - `FILE`: Click-to-copy source media path with file size and instant "Copied!" feedback
-- **Hardware Acceleration Detection**: Automatic identification of NVENC, Intel QuickSync (QSV), VAAPI, Apple VideoToolbox, AMD AMF, or CPU software encoding.
+- **Hardware Acceleration Detection**: Automatic identification of NVENC, Intel QuickSync (QSV), VAAPI, Apple VideoToolbox, AMD AMF, or CPU software encoding with signature brand color pills.
 - **Live Transcode Performance & FPS**: Real-time FPS metrics and transcode speed multiplier (`2.5x @ 60 FPS`) with automatic low-speed stutter alarms if speed falls below `1.0x`.
 
 ### 2. 25 Official Vector Brand Badges (100% Offline)
