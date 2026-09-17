@@ -13,7 +13,7 @@
         "changelog": "Release v0.2.3.6 - In-place replacement of modern Jellyfin 12.1 React/MUI Devices widget, zero top-of-page fallback, connected devices visibility, and No active playback empty state.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.6/jellyfin-plugin-playbackcard.zip",
-        "checksum": "796bd444caf5631bef2b0825b6ebe922",
+        "checksum": "b62ddc5570b2676e1dab9ade1bb68ea5",
         "timestamp": "2026-09-17T16:11:00Z"
       },
       {
