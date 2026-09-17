@@ -13,7 +13,7 @@
         "changelog": "Release v0.2.3.5 - Corrective patch completely replacing stock Devices section with NOW PLAYING card on Jellyfin Dashboard, with empty state No active playback, autonomous loading, and zero duplicate mounting.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.5/jellyfin-plugin-playbackcard.zip",
-        "checksum": "d824974aead384c652d757e7983a8ab7",
+        "checksum": "a796df9b0ef96cbef066223d9a1fb6d4",
         "timestamp": "2026-09-17T15:32:00Z"
       },
       {
