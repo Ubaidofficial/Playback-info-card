@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.3.1 Test Suite', () => {
+describe('Playback Info Card v0.2.3.2 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.3.1 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.3.1', () => {
-            assert.equal(controller.version, '0.2.3.1');
-            assert.equal(controller.diagState.pluginVersion, '0.2.3.1');
+        it('initializes with default waiting state and version 0.2.3.2', () => {
+            assert.equal(controller.version, '0.2.3.2');
+            assert.equal(controller.diagState.pluginVersion, '0.2.3.2');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.3.1 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.3.1');
+            assert.equal(report.pluginVersion, '0.2.3.2');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.3.1 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.3.1',
+                pluginVersion: '0.2.3.2',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -460,6 +460,141 @@ describe('Playback Info Card v0.2.3.1 Test Suite', () => {
             assert.ok(!html.includes('Wi-Fi'));
             assert.ok(!html.includes('RemoteEndPoint'));
             assert.ok(!html.includes('ipAddress'));
+        });
+    });
+
+    describe('16. Notification Delivery Diagnostics and Controller Integration', () => {
+        it('includes all 12 notification diagnostic fields in buildDiagnosticReport', () => {
+            const report = controller.buildDiagnosticReport();
+            assert.equal(typeof report.notificationsEnabled, 'boolean');
+            assert.equal(typeof report.discordEnabled, 'boolean');
+            assert.equal(typeof report.telegramEnabled, 'boolean');
+            assert.equal(typeof report.notificationQueueDepth, 'number');
+            assert.equal(typeof report.notificationDroppedProgress, 'number');
+            assert.equal(typeof report.notificationDedupeCount, 'number');
+            assert.equal(typeof report.notificationRetryCount, 'number');
+            assert.equal(typeof report.notificationLastAttempt, 'string');
+            assert.equal(typeof report.notificationLastSuccess, 'string');
+            assert.equal(typeof report.notificationLastFailureCategory, 'string');
+            assert.equal(typeof report.discordAvailability, 'string');
+            assert.equal(typeof report.telegramAvailability, 'string');
+            assert.equal(typeof report.notificationQueueCapacity, 'number');
+            assert.equal(typeof report.notificationDroppedCritical, 'number');
+            assert.equal(typeof report.notificationCoalescedProgress, 'number');
+            assert.equal(typeof report.notificationRateLimitDrops, 'number');
+            assert.equal(typeof report.notificationValidationFailures, 'number');
+            assert.equal(typeof report.notificationWorkerState, 'string');
+            assert.equal(typeof report.notificationLastHttpStatus, 'number');
+        });
+
+        it('validates report with notification diagnostics and rejects invalid types', () => {
+            const validReport = controller.buildDiagnosticReport();
+            assert.equal(controller.validateDiagnosticReport(validReport), true);
+
+            // Negative queue depth rejected
+            const badQueueReport = { ...validReport, notificationQueueDepth: -1 };
+            assert.equal(controller.validateDiagnosticReport(badQueueReport), false);
+
+            // Non-boolean notification state rejected
+            const badEnabledReport = { ...validReport, notificationsEnabled: 'yes' };
+            assert.equal(controller.validateDiagnosticReport(badEnabledReport), false);
+        });
+
+        it('detects sensitive webhook URLs or bot tokens in sensitive data check', () => {
+            const webhookWithToken = 'https://discord.com/api/webhooks/123456789/abcdefghijk_token_here';
+            const botToken = 'token: 123456789:ABCDefGhIjKlMnOpQrStUvWxYz';
+            assert.equal(controller.checkSensitiveData(webhookWithToken), true);
+            assert.equal(controller.checkSensitiveData(botToken), true);
+        });
+
+        it('exports notification helper functions on controller', () => {
+            assert.equal(typeof controller.loadNotificationSettings, 'function');
+            assert.equal(typeof controller.saveNotificationSettings, 'function');
+            assert.equal(typeof controller.clearNotificationSecret, 'function');
+            assert.equal(typeof controller.sendTestNotification, 'function');
+            assert.equal(typeof controller.fetchNotificationDiagnostics, 'function');
+        });
+    });
+
+    describe('17. Stream Details, Info Toggle, and My Playback View', () => {
+        it('renders accessible [Info] toggle button with aria-expanded and aria-controls using deterministic card ID', () => {
+            const session = {
+                PlayState: { PlayMethod: 'DirectPlay', IsPaused: false },
+                NowPlayingItem: { Name: 'Sample Item' }
+            };
+            const html = controller.renderSessionCard(session);
+            assert.ok(html.includes('class="playback-btn-info"'));
+            assert.ok(html.includes('aria-expanded="false"'));
+            assert.ok(html.includes('aria-controls="details-card-1"'));
+            assert.ok(html.includes('id="details-card-1"'));
+            assert.ok(html.includes('data-card-id="card-1"'));
+            assert.ok(!html.includes('data-session-id'));
+        });
+
+        it('renders Video and Audio status badges (Direct vs Transcode)', () => {
+            const directSession = {
+                Id: 's-dir',
+                PlayState: { PlayMethod: 'DirectPlay' },
+                NowPlayingItem: { Name: 'Direct Stream' }
+            };
+            const directHtml = controller.renderSessionCard(directSession);
+            assert.ok(directHtml.includes('stream-badge video-direct'));
+            assert.ok(directHtml.includes('Video: Direct'));
+            assert.ok(directHtml.includes('stream-badge audio-direct'));
+            assert.ok(directHtml.includes('Audio: Direct'));
+
+            const transcodeSession = {
+                Id: 's-trans',
+                PlayState: { PlayMethod: 'Transcode' },
+                TranscodingInfo: { IsVideoDirect: false, IsAudioDirect: true },
+                NowPlayingItem: { Name: 'Transcoded Stream' }
+            };
+            const transHtml = controller.renderSessionCard(transcodeSession);
+            assert.ok(transHtml.includes('stream-badge video-transcode'));
+            assert.ok(transHtml.includes('Video: Transcode'));
+            assert.ok(transHtml.includes('stream-badge audio-direct'));
+            assert.ok(transHtml.includes('Audio: Direct'));
+        });
+
+        it('renders truthful Why and How transcode metadata', () => {
+            const session = {
+                Id: 's-whyhow',
+                PlayState: { PlayMethod: 'Transcode' },
+                TranscodingInfo: {
+                    HardwareAccelerationType: 'nvenc',
+                    VideoCodec: 'h264',
+                    AudioCodec: 'aac',
+                    Bitrate: 8000000,
+                    Framerate: 60,
+                    TranscodeReasons: ['ContainerNotSupported', 'VideoCodecNotSupported']
+                },
+                NowPlayingItem: { Name: 'Why How Test', Container: 'mkv' }
+            };
+            const html = controller.renderSessionCard(session);
+            assert.ok(html.includes('Engine: NVENC'));
+            assert.ok(html.includes('Video: H264'));
+            assert.ok(html.includes('Audio: AAC'));
+            assert.ok(html.includes('ContainerNotSupported (Container format not supported by client player)'));
+            assert.ok(html.includes('VideoCodecNotSupported (Video codec incompatible with device decoder)'));
+        });
+
+        it('renders UserPlaybackSessionDto from personal sessions endpoint cleanly', () => {
+            const userDto = {
+                MediaTitle: 'User Personal Movie',
+                SeriesName: null,
+                PlayMethod: 'DirectPlay',
+                IsPaused: false,
+                PlaybackPercentage: 45,
+                IsVideoDirect: true,
+                IsAudioDirect: true,
+                VideoStatus: 'Video Direct',
+                AudioStatus: 'Audio Direct'
+            };
+            const html = controller.renderSessionCard(userDto);
+            assert.ok(html.includes('User Personal Movie'));
+            assert.ok(html.includes('My Session'));
+            assert.ok(html.includes('stream-badge video-direct'));
+            assert.ok(html.includes('Video: Direct'));
         });
     });
 });

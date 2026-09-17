@@ -1,0 +1,292 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Jellyfin.Plugin.PlaybackCard.Notifications;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Jellyfin.Plugin.PlaybackCard.Controllers;
+
+/// <summary>
+/// Administrator-only API controller for managing native notification settings,
+/// running synthetic test deliveries, and inspecting delivery diagnostics.
+/// Enforces write-only secrets, UI masking, and strict administrator elevation.
+/// </summary>
+[ApiController]
+[Route("PlaybackCard/Notifications")]
+[Authorize(Policy = "RequiresElevation")]
+public class NotificationsConfigurationController : ControllerBase
+{
+    private readonly INotificationDeliveryService _deliveryService;
+    private readonly INotificationSecretStore _secretStore;
+    private readonly PluginConfiguration? _testConfig;
+
+    public NotificationsConfigurationController(
+        INotificationDeliveryService deliveryService,
+        INotificationSecretStore secretStore)
+        : this(deliveryService, secretStore, null)
+    {
+    }
+
+    internal NotificationsConfigurationController(
+        INotificationDeliveryService deliveryService,
+        INotificationSecretStore secretStore,
+        PluginConfiguration? testConfig)
+    {
+        _deliveryService = deliveryService;
+        _secretStore = secretStore;
+        _testConfig = testConfig;
+    }
+
+    private bool IsAdministrator()
+    {
+        if (User.IsInRole("Administrator") ||
+            User.HasClaim("IsAdministrator", "true") ||
+            User.HasClaim(c => c.Type.Equals("IsAdministrator", StringComparison.OrdinalIgnoreCase) && c.Value.Equals("true", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Obtains current notification settings with masked credentials and real-time diagnostics.
+    /// Never returns full Discord webhook URLs or Telegram bot tokens.
+    /// </summary>
+    [HttpGet("Configuration")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult<NotificationConfigurationDto> GetConfiguration()
+    {
+        if (!IsAdministrator())
+        {
+            return Forbid();
+        }
+
+        var config = _testConfig ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        return Ok(ToDto(config));
+    }
+
+    /// <summary>
+    /// Updates notification settings with write-only credential handling and strict validation.
+    /// Blank credential inputs preserve existing stored secrets.
+    /// </summary>
+    [HttpPost("Configuration")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult<NotificationConfigurationDto> UpdateConfiguration([FromBody] UpdateNotificationConfigurationRequest request)
+    {
+        if (!IsAdministrator())
+        {
+            return Forbid();
+        }
+
+        if (request == null)
+        {
+            return BadRequest(new { error = "InvalidConfiguration", message = "Request body is missing." });
+        }
+
+        var config = _testConfig ?? Plugin.Instance?.Configuration;
+        if (config == null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "PluginNotLoaded" });
+        }
+
+        // 1. Handle Discord Webhook Credential
+        if (request.ClearDiscordWebhook == true || string.Equals(request.DiscordWebhookUrl, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
+        {
+            _secretStore.ClearDiscordWebhookUrl();
+        }
+        else if (!string.IsNullOrWhiteSpace(request.DiscordWebhookUrl))
+        {
+            var trimmed = request.DiscordWebhookUrl.Trim();
+            if (!DiscordWebhookSender.ValidateWebhookUrl(trimmed, out _, out var errCategory))
+            {
+                return BadRequest(new { error = errCategory, message = "Invalid Discord webhook URL format, scheme, host, or path." });
+            }
+            _secretStore.SetDiscordWebhookUrl(trimmed);
+        }
+
+        // 2. Handle Telegram Bot Token Credential
+        if (request.ClearTelegramBotToken == true || string.Equals(request.TelegramBotToken, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
+        {
+            _secretStore.ClearTelegramBotToken();
+        }
+        else if (!string.IsNullOrWhiteSpace(request.TelegramBotToken))
+        {
+            var trimmedToken = request.TelegramBotToken.Trim();
+            var targetChatId = request.TelegramChatId ?? config.TelegramChatId;
+            if (!TelegramBotApiSender.ValidateEndpoint(trimmedToken, targetChatId, out _, out var errCategory))
+            {
+                return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format or endpoint." });
+            }
+            _secretStore.SetTelegramBotToken(trimmedToken);
+        }
+
+        if (request.TelegramChatId != null)
+        {
+            config.TelegramChatId = request.TelegramChatId.Trim();
+        }
+
+        // 3. Update switches and event preferences
+        config.NotificationsEnabled = request.NotificationsEnabled;
+        config.DiscordEnabled = request.DiscordEnabled;
+        config.TelegramEnabled = request.TelegramEnabled;
+        config.NotifyOnStart = request.NotifyOnStart;
+        config.NotifyOnStop = request.NotifyOnStop;
+        config.NotifyOnPauseResume = request.NotifyOnPauseResume;
+        config.NotifyOnProgress = request.NotifyOnProgress;
+        config.ProgressIntervalMinutes = Math.Max(5, request.ProgressIntervalMinutes);
+        config.NotifyOnCompletion = request.NotifyOnCompletion;
+        config.UsernameDisclosure = request.UsernameDisclosure;
+        config.ClientDeviceDisclosure = request.ClientDeviceDisclosure;
+        config.UserFilterMode = request.UserFilterMode;
+
+        if (request.SelectedUserIds != null)
+        {
+            config.SelectedUserIds = new List<string>(request.SelectedUserIds);
+        }
+
+        Plugin.Instance?.SaveConfiguration();
+
+        return Ok(ToDto(config));
+    }
+
+    /// <summary>
+    /// Dispatches a synthetic test notification using dummy media data.
+    /// </summary>
+    [HttpPost("Test")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<DeliveryResult>> SendTestNotification([FromBody] SendTestNotificationRequest request)
+    {
+        if (!IsAdministrator())
+        {
+            return Forbid();
+        }
+
+        if (request == null || string.IsNullOrWhiteSpace(request.Destination))
+        {
+            return BadRequest(DeliveryResult.Failed("InvalidConfiguration"));
+        }
+
+        var result = await _deliveryService.SendTestNotificationAsync(request.Destination, HttpContext.RequestAborted).ConfigureAwait(false);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Retrieves current delivery diagnostics snapshot.
+    /// </summary>
+    [HttpGet("Diagnostics")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public ActionResult<NotificationDiagnosticsSnapshot> GetDiagnostics()
+    {
+        if (!IsAdministrator())
+        {
+            return Forbid();
+        }
+
+        return Ok(_deliveryService.GetDiagnostics());
+    }
+
+    private NotificationConfigurationDto ToDto(PluginConfiguration config)
+    {
+        var discordWebhook = _secretStore.GetDiscordWebhookUrl();
+        var telegramToken = _secretStore.GetTelegramBotToken();
+
+        return new NotificationConfigurationDto
+        {
+            NotificationsEnabled = config.NotificationsEnabled,
+            DiscordEnabled = config.DiscordEnabled,
+            HasDiscordWebhook = !string.IsNullOrWhiteSpace(discordWebhook),
+            DiscordWebhookMasked = SecretRedactor.MaskDiscordWebhook(discordWebhook),
+            TelegramEnabled = config.TelegramEnabled,
+            HasTelegramBotToken = !string.IsNullOrWhiteSpace(telegramToken),
+            TelegramBotTokenMasked = SecretRedactor.MaskTelegramToken(telegramToken),
+            TelegramChatId = config.TelegramChatId,
+            NotifyOnStart = config.NotifyOnStart,
+            NotifyOnStop = config.NotifyOnStop,
+            NotifyOnPauseResume = config.NotifyOnPauseResume,
+            NotifyOnProgress = config.NotifyOnProgress,
+            ProgressIntervalMinutes = config.ProgressIntervalMinutes,
+            NotifyOnCompletion = config.NotifyOnCompletion,
+            UsernameDisclosure = config.UsernameDisclosure,
+            ClientDeviceDisclosure = config.ClientDeviceDisclosure,
+            UserFilterMode = config.UserFilterMode,
+            SelectedUserIds = config.SelectedUserIds,
+            Diagnostics = _deliveryService.GetDiagnostics()
+        };
+    }
+}
+
+/// <summary>
+/// Masked DTO returned to client for safe rendering.
+/// Never contains plaintext Discord webhook URLs or Telegram bot tokens.
+/// </summary>
+public sealed class NotificationConfigurationDto
+{
+    public bool NotificationsEnabled { get; init; }
+    public bool DiscordEnabled { get; init; }
+    public bool HasDiscordWebhook { get; init; }
+    public string DiscordWebhookMasked { get; init; } = string.Empty;
+
+    public bool TelegramEnabled { get; init; }
+    public bool HasTelegramBotToken { get; init; }
+    public string TelegramBotTokenMasked { get; init; } = string.Empty;
+    public string TelegramChatId { get; init; } = string.Empty;
+
+    public bool NotifyOnStart { get; init; }
+    public bool NotifyOnStop { get; init; }
+    public bool NotifyOnPauseResume { get; init; }
+    public bool NotifyOnProgress { get; init; }
+    public int ProgressIntervalMinutes { get; init; }
+    public bool NotifyOnCompletion { get; init; }
+
+    public bool UsernameDisclosure { get; init; }
+    public bool ClientDeviceDisclosure { get; init; }
+    public UserFilterMode UserFilterMode { get; init; }
+    public IReadOnlyList<string> SelectedUserIds { get; init; } = Array.Empty<string>();
+
+    public NotificationDiagnosticsSnapshot? Diagnostics { get; init; }
+}
+
+/// <summary>
+/// Write-only request payload for updating notification settings.
+/// </summary>
+public sealed class UpdateNotificationConfigurationRequest
+{
+    public bool NotificationsEnabled { get; set; }
+    public bool DiscordEnabled { get; set; }
+    public string? DiscordWebhookUrl { get; set; }
+    public bool? ClearDiscordWebhook { get; set; }
+
+    public bool TelegramEnabled { get; set; }
+    public string? TelegramBotToken { get; set; }
+    public bool? ClearTelegramBotToken { get; set; }
+    public string? TelegramChatId { get; set; }
+
+    public bool NotifyOnStart { get; set; }
+    public bool NotifyOnStop { get; set; }
+    public bool NotifyOnPauseResume { get; set; }
+    public bool NotifyOnProgress { get; set; }
+    public int ProgressIntervalMinutes { get; set; }
+    public bool NotifyOnCompletion { get; set; }
+
+    public bool UsernameDisclosure { get; set; }
+    public bool ClientDeviceDisclosure { get; set; }
+    public UserFilterMode UserFilterMode { get; set; }
+    public List<string>? SelectedUserIds { get; set; }
+}
+
+/// <summary>
+/// Request payload for synthetic test notification dispatch.
+/// </summary>
+public sealed class SendTestNotificationRequest
+{
+    public string Destination { get; set; } = string.Empty;
+}

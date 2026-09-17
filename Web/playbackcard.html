@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.3.1</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.3.2</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -38,6 +38,192 @@
                         <p class="emptySubtitle">When users stream media from this Jellyfin server, session telemetry will appear here.</p>
                     </div>
                     <div id="playbackSessionsGrid" class="playbackMonitorGrid"></div>
+                </div>
+
+                <!-- Notifications Section (Server-Side Native Dispatches) -->
+                <div id="playbackNotificationsSection" class="playbackNotificationsCard" style="display: none;">
+                    <div class="notificationsHeader">
+                        <div class="notificationsTitleGroup">
+                            <h3 class="notificationsTitle">
+                                <svg class="notifIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                Playback Notifications
+                            </h3>
+                            <span class="notificationsNotice">Admin Only &bull; IP-Safe by Omission</span>
+                        </div>
+                        <div class="notificationsMasterToggle">
+                            <label class="toggleSwitchLabel" for="chkNotificationsEnabled">
+                                <input type="checkbox" id="chkNotificationsEnabled" class="notifCheckbox">
+                                <span class="toggleSwitchTrack"><span class="toggleSwitchThumb"></span></span>
+                                <span class="toggleSwitchText">Master Switch</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="notifDisclosureBanner">
+                        <strong>Privacy Notice:</strong> IP-safe by omission: This plugin never collects or transmits IP addresses, internal endpoints, or file paths. Enabling notifications dispatches selected media playback metadata to external Discord or Telegram endpoints.
+                    </div>
+
+                    <div id="notificationsFeedback" class="notificationsFeedback" style="display: none;"></div>
+
+                    <div class="notifGrid">
+                        <!-- Discord Destination Card -->
+                        <div class="notifDestCard">
+                            <div class="notifDestHeader">
+                                <div class="notifDestTitle">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                                    </svg>
+                                    Discord Webhook
+                                </div>
+                                <span id="badgeDiscordStatus" class="notifBadge">Disabled</span>
+                            </div>
+                            <div class="notifFieldGroup">
+                                <label class="toggleSwitchLabel" for="chkDiscordEnabled">
+                                    <input type="checkbox" id="chkDiscordEnabled" class="notifCheckbox">
+                                    <span class="toggleSwitchTrack"><span class="toggleSwitchThumb"></span></span>
+                                    <span class="toggleSwitchText">Enable Discord Delivery</span>
+                                </label>
+                            </div>
+                            <div class="notifFieldGroup">
+                                <label class="notifFieldLabel" for="txtDiscordWebhookUrl">Webhook URL</label>
+                                <input type="password" id="txtDiscordWebhookUrl" class="notifInput" autocomplete="off" placeholder="https://discord.com/api/webhooks/••••••••">
+                                <span class="notifInputHint">Secrets are masked in responses and stored as server-local plaintext.</span>
+                            </div>
+                            <div class="notifBtnRow">
+                                <button type="button" id="btnSaveDiscord" class="btnNotifAction btnPrimary">Save Discord</button>
+                                <button type="button" id="btnClearDiscord" class="btnNotifAction btnDanger">Clear Secret</button>
+                                <button type="button" id="btnTestDiscord" class="btnNotifAction btnSecondary">Test Discord</button>
+                            </div>
+                        </div>
+
+                        <!-- Telegram Destination Card -->
+                        <div class="notifDestCard">
+                            <div class="notifDestHeader">
+                                <div class="notifDestTitle">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18.892-1.284 5.334-1.844 7.643-.238.977-.6 1.304-.949 1.335-.758.069-1.333-.501-2.067-.982-1.15-.753-1.8-1.221-2.915-1.956-1.29-.85-.454-1.317.281-2.082.193-.2 3.541-3.245 3.606-3.521.008-.035.015-.164-.062-.232-.077-.069-.191-.046-.273-.027-.116.026-1.96 1.246-5.534 3.659-.524.36-1 .536-1.425.526-.469-.01-1.371-.265-2.043-.483-.824-.268-1.48-.41-1.423-.865.03-.237.357-.48 1.026-.745 4.02-1.751 6.702-2.906 8.046-3.466 3.827-1.597 4.622-1.875 5.141-1.884.114-.002.37.027.536.162.14.114.179.268.197.375.019.108.014.338-.005.474z"/>
+                                    </svg>
+                                    Telegram Bot
+                                </div>
+                                <span id="badgeTelegramStatus" class="notifBadge">Disabled</span>
+                            </div>
+                            <div class="notifFieldGroup">
+                                <label class="toggleSwitchLabel" for="chkTelegramEnabled">
+                                    <input type="checkbox" id="chkTelegramEnabled" class="notifCheckbox">
+                                    <span class="toggleSwitchTrack"><span class="toggleSwitchThumb"></span></span>
+                                    <span class="toggleSwitchText">Enable Telegram Delivery</span>
+                                </label>
+                            </div>
+                            <div class="notifFieldGroup">
+                                <label class="notifFieldLabel" for="txtTelegramBotToken">Bot Token</label>
+                                <input type="password" id="txtTelegramBotToken" class="notifInput" autocomplete="off" placeholder="••••••••••••••••">
+                                <span class="notifInputHint">From @BotFather (e.g. 123456:ABC-DEF...)</span>
+                            </div>
+                            <div class="notifFieldGroup">
+                                <label class="notifFieldLabel" for="txtTelegramChatId">Chat / Channel ID</label>
+                                <input type="text" id="txtTelegramChatId" class="notifInput" placeholder="-100123456789">
+                            </div>
+                            <div class="notifBtnRow">
+                                <button type="button" id="btnSaveTelegram" class="btnNotifAction btnPrimary">Save Telegram</button>
+                                <button type="button" id="btnClearTelegram" class="btnNotifAction btnDanger">Clear Secret</button>
+                                <button type="button" id="btnTestTelegram" class="btnNotifAction btnSecondary">Test Telegram</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Event Subscriptions & Privacy Disclosures -->
+                    <div class="notifPrefsCard">
+                        <h4 class="notifPrefsTitle">Event Subscriptions &amp; Privacy Disclosures</h4>
+                        <div class="notifCheckGrid">
+                            <label class="notifCheckItem">
+                                <input type="checkbox" id="chkNotifyOnStart">
+                                <span>Playback Start</span>
+                            </label>
+                            <label class="notifCheckItem">
+                                <input type="checkbox" id="chkNotifyOnStop">
+                                <span>Playback Stop</span>
+                            </label>
+                            <label class="notifCheckItem">
+                                <input type="checkbox" id="chkNotifyOnCompletion">
+                                <span>Media Played to Completion</span>
+                            </label>
+                            <label class="notifCheckItem">
+                                <input type="checkbox" id="chkNotifyOnPauseResume">
+                                <span>Pause &amp; Resume Transitions</span>
+                            </label>
+                            <div class="notifProgressGroup">
+                                <label class="notifCheckItem">
+                                    <input type="checkbox" id="chkNotifyOnProgress">
+                                    <span>Periodic Progress Updates</span>
+                                </label>
+                                <div class="notifIntervalGroup">
+                                    <span>every</span>
+                                    <input type="number" id="numProgressInterval" min="5" max="120" value="15" class="notifNumberInput">
+                                    <span>minutes (min 5)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="notifDisclosureGroup">
+                            <label class="notifCheckItem">
+                                <input type="checkbox" id="chkUsernameDisclosure">
+                                <span>Disclose Jellyfin Account Username in Notifications</span>
+                            </label>
+                            <span class="notifDisclosureNote">When enabled, user account names are sent to Discord/Telegram. Disabled by default for privacy.</span>
+
+                            <label class="notifCheckItem" style="margin-top: 0.5rem;">
+                                <input type="checkbox" id="chkClientDeviceDisclosure">
+                                <span>Disclose Client Name &amp; Device Model in Notifications</span>
+                            </label>
+                            <span class="notifDisclosureNote">When enabled, client names (e.g. "Jellyfin Web") and device models (e.g. "Chrome") are sent. Disabled by default.</span>
+                        </div>
+
+                        <div class="notifBtnRow" style="margin-top: 1rem;">
+                            <button type="button" id="btnSavePreferences" class="btnNotifAction btnPrimary">Save Preferences</button>
+                        </div>
+                    </div>
+
+                    <!-- Live Delivery Telemetry -->
+                    <div class="notifTelemetryCard">
+                        <h4 class="notifTelemetryTitle">Delivery Health &amp; Queue Telemetry</h4>
+                        <div class="notifTelemetryGrid">
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Discord Queue Depth</span>
+                                <span id="telemDiscordQueue" class="telemValue">0</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Telegram Queue Depth</span>
+                                <span id="telemTelegramQueue" class="telemValue">0</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Dropped Progress</span>
+                                <span id="telemDroppedProgress" class="telemValue">0</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Deduplicated Events</span>
+                                <span id="telemDedupeCount" class="telemValue">0</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Retry Count</span>
+                                <span id="telemRetryCount" class="telemValue">0</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Last Delivery Attempt</span>
+                                <span id="telemLastAttempt" class="telemValue">None</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Last Successful Delivery</span>
+                                <span id="telemLastSuccess" class="telemValue">None</span>
+                            </div>
+                            <div class="notifTelemItem">
+                                <span class="telemLabel">Last Failure Category</span>
+                                <span id="telemLastFailure" class="telemValue">OK</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Diagnostics Section (Local & Offline) -->
@@ -76,7 +262,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.3.1</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.3.2</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -113,6 +299,34 @@
                         <div class="diagItem">
                             <span class="diagLabel">Render Errors</span>
                             <span id="diagRenderErrors" class="diagValue">0</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Notifications Feature</span>
+                            <span id="diagNotifFeature" class="diagValue">Disabled</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Discord Status</span>
+                            <span id="diagDiscordStatus" class="diagValue">Disabled</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Telegram Status</span>
+                            <span id="diagTelegramStatus" class="diagValue">Disabled</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Notification Queues</span>
+                            <span id="diagNotifQueues" class="diagValue">0</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Dropped Progress</span>
+                            <span id="diagNotifDropped" class="diagValue">0</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Deduplicated Events</span>
+                            <span id="diagNotifDedupe" class="diagValue">0</span>
+                        </div>
+                        <div class="diagItem">
+                            <span class="diagLabel">Retry Count</span>
+                            <span id="diagNotifRetries" class="diagValue">0</span>
                         </div>
                     </div>
                 </div>
@@ -613,6 +827,473 @@
     overflow-wrap: anywhere;
 }
 
+/* Accessible Info Toggle Button */
+.playbackMonitorPage .playback-btn-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.playbackMonitorPage .playback-btn-info:hover,
+.playbackMonitorPage .playback-btn-info:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    outline: none;
+}
+
+.playbackMonitorPage .playback-btn-info[aria-expanded="true"] {
+    background: rgba(0, 164, 220, 0.2);
+    border-color: rgba(0, 164, 220, 0.5);
+    color: #38bdf8;
+}
+
+/* Video & Audio Status Badges */
+.playbackMonitorPage .playback-stream-badges {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+
+.playbackMonitorPage .stream-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.playbackMonitorPage .stream-badge.video-direct {
+    background-color: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #4ade80;
+}
+
+.playbackMonitorPage .stream-badge.video-transcode {
+    background-color: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.playbackMonitorPage .stream-badge.audio-direct {
+    background-color: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #4ade80;
+}
+
+.playbackMonitorPage .stream-badge.audio-transcode {
+    background-color: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fbbf24;
+}
+
+/* Expandable Details Panel */
+.playbackMonitorPage .playback-details-panel {
+    display: none;
+    margin-top: 0.35rem;
+    padding: 0.6rem 0.8rem;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.76rem;
+    color: #cbd5e1;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.playbackMonitorPage .playback-details-panel.open {
+    display: flex;
+}
+
+.playbackMonitorPage .playback-details-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 0.15rem;
+}
+
+.playbackMonitorPage .playback-details-row {
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* Notifications Card & Controls */
+.playbackMonitorPage .playbackNotificationsCard {
+    margin-top: 2rem;
+    padding: 1.25rem;
+    background: #111620;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+
+.playbackMonitorPage .notificationsHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.playbackMonitorPage .notificationsTitleGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.playbackMonitorPage .notificationsTitle {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.playbackMonitorPage .notifIcon {
+    color: #00a4dc;
+}
+
+.playbackMonitorPage .notificationsNotice {
+    font-size: 0.75rem;
+    color: #64748b;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.playbackMonitorPage .notifDisclosureBanner {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #94a3b8;
+    background: rgba(0, 164, 220, 0.08);
+    border: 1px solid rgba(0, 164, 220, 0.25);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.playbackMonitorPage .notificationsFeedback {
+    padding: 0.65rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    margin-bottom: 1rem;
+}
+
+.playbackMonitorPage .notificationsFeedback.success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+}
+
+.playbackMonitorPage .notificationsFeedback.error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.playbackMonitorPage .notifGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.playbackMonitorPage .notifDestCard {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.playbackMonitorPage .notifDestHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.5rem;
+}
+
+.playbackMonitorPage .notifDestTitle {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.playbackMonitorPage .notifBadge {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+}
+
+.playbackMonitorPage .notifBadge.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.playbackMonitorPage .notifFieldGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.playbackMonitorPage .notifFieldLabel {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #cbd5e1;
+}
+
+.playbackMonitorPage .notifInput {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.82rem;
+    color: #f8fafc;
+    font-family: monospace;
+}
+
+.playbackMonitorPage .notifInput:focus {
+    outline: none;
+    border-color: #00a4dc;
+}
+
+.playbackMonitorPage .notifInputHint {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.playbackMonitorPage .notifBtnRow {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: auto;
+}
+
+.playbackMonitorPage .btnNotifAction {
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.35rem 0.7rem;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s ease;
+}
+
+.playbackMonitorPage .btnNotifAction.btnPrimary {
+    background: #00a4dc;
+    color: #ffffff;
+}
+
+.playbackMonitorPage .btnNotifAction.btnPrimary:hover {
+    background: #0088b6;
+}
+
+.playbackMonitorPage .btnNotifAction.btnSecondary {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #e2e8f0;
+}
+
+.playbackMonitorPage .btnNotifAction.btnSecondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.playbackMonitorPage .btnNotifAction.btnDanger {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.playbackMonitorPage .btnNotifAction.btnDanger:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
+.playbackMonitorPage .toggleSwitchLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.playbackMonitorPage .notifCheckbox {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.playbackMonitorPage .toggleSwitchTrack {
+    width: 32px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.2s ease;
+}
+
+.playbackMonitorPage .toggleSwitchThumb {
+    width: 14px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease;
+}
+
+.playbackMonitorPage .notifCheckbox:checked + .toggleSwitchTrack {
+    background: #00a4dc;
+}
+
+.playbackMonitorPage .notifCheckbox:checked + .toggleSwitchTrack .toggleSwitchThumb {
+    transform: translateX(14px);
+}
+
+.playbackMonitorPage .toggleSwitchText {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.playbackMonitorPage .notifPrefsCard,
+.playbackMonitorPage .notifTelemetryCard {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.playbackMonitorPage .notifPrefsTitle,
+.playbackMonitorPage .notifTelemetryTitle {
+    margin: 0 0 0.85rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.playbackMonitorPage .notifCheckGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.65rem;
+}
+
+.playbackMonitorPage .notifCheckItem {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.82rem;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.playbackMonitorPage .notifProgressGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+}
+
+.playbackMonitorPage .notifIntervalGroup {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.playbackMonitorPage .notifNumberInput {
+    width: 60px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+    color: #f8fafc;
+}
+
+.playbackMonitorPage .notifDisclosureGroup {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.playbackMonitorPage .notifDisclosureNote {
+    font-size: 0.72rem;
+    color: #64748b;
+    margin-left: 1.4rem;
+}
+
+.playbackMonitorPage .notifTelemetryGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.65rem;
+}
+
+.playbackMonitorPage .notifTelemItem {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    padding: 0.5rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.playbackMonitorPage .telemLabel {
+    font-size: 0.68rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.playbackMonitorPage .telemValue {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    font-family: monospace;
+}
+
 /* Diagnostics Card */
 .playbackMonitorPage .playbackDiagnosticsCard {
     margin-top: 2rem;
@@ -790,6 +1471,15 @@
         justify-content: flex-start;
     }
 }
+
+@media (prefers-reduced-motion: reduce) {
+    .playbackMonitorPage .playback-card,
+    .playbackMonitorPage .playback-btn-info,
+    .playbackMonitorPage .playback-progress-bar-fill,
+    .playbackMonitorPage .modeBtn {
+        transition: none !important;
+    }
+}
         </style>
 
         <script type="text/javascript">
@@ -800,7 +1490,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.3.1';
+    var PLUGIN_VERSION = '0.2.3.2';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -828,7 +1518,22 @@
         artworkFallbackCount: 0,
         artworkErrorCount: 0,
         ignoredSessionCount: 0,
-        renderErrors: 0
+        renderErrors: 0,
+        notifications: {
+            enabled: false,
+            discordEnabled: false,
+            telegramEnabled: false,
+            discordQueueDepth: 0,
+            telegramQueueDepth: 0,
+            droppedProgressCount: 0,
+            dedupeCount: 0,
+            retryCount: 0,
+            lastAttempt: 'None',
+            lastSuccess: 'None',
+            lastFailureCategory: 'OK',
+            discordAvailability: 'Available',
+            telegramAvailability: 'Available'
+        }
     };
 
     // Sensitive data detection pattern
@@ -1022,15 +1727,38 @@
         return !isDisposed && activePage === page && currentGeneration === capturedGen;
     }
 
-    function renderSessionCard(session) {
+    function formatTranscodeReason(reason) {
+        if (!reason) return '';
+        var r = String(reason);
+        var map = {
+            'ContainerNotSupported': 'ContainerNotSupported (Container format not supported by client player)',
+            'VideoCodecNotSupported': 'VideoCodecNotSupported (Video codec incompatible with device decoder)',
+            'AudioCodecNotSupported': 'AudioCodecNotSupported (Audio codec incompatible with client player)',
+            'ContainerBitrateExceedsLimit': 'ContainerBitrateExceedsLimit (Bitrate exceeds client network profile limit)',
+            'AudioBitrateNotSupported': 'AudioBitrateNotSupported (Audio bitrate exceeds client decoder capabilities)',
+            'AudioChannelsNotSupported': 'AudioChannelsNotSupported (Audio channel layout exceeds playback target)',
+            'VideoResolutionNotSupported': 'VideoResolutionNotSupported (Video resolution exceeds display hardware capabilities)',
+            'DirectPlayError': 'DirectPlayError (Direct playback encountered an unexpected client error)',
+            'VideoBitrateNotSupported': 'VideoBitrateNotSupported (Video bitrate exceeds allowable maximum)',
+            'VideoProfileNotSupported': 'VideoProfileNotSupported (Video profile not supported by device)',
+            'SecondaryAudioNotSupported': 'SecondaryAudioNotSupported (Secondary audio stream format incompatible)'
+        };
+        return map[r] || r;
+    }
+
+    function renderSessionCard(session, index) {
         try {
             if (!session || typeof session !== 'object') {
                 diagState.ignoredSessionCount++;
                 return '';
             }
 
-            var user = escapeHtml(session.UserName || 'Unknown User');
-            var client = escapeHtml(session.Client || 'Unknown Client');
+            var cardIdx = typeof index === 'number' ? (index + 1) : 1;
+            var cardDomId = 'card-' + cardIdx;
+            var detailsDomId = 'details-' + cardDomId;
+
+            var user = escapeHtml(session.UserName || (session.MediaTitle ? 'My Session' : 'Unknown User'));
+            var client = escapeHtml(session.Client || 'Playback Client');
             var device = escapeHtml(session.DeviceName || '');
             var clientDevice = client + (device ? ' &mdash; ' + device : '');
             if (session.ApplicationVersion) {
@@ -1040,26 +1768,28 @@
             var platformIconSvg = getPlatformIconSvg(session.Client, session.DeviceName);
 
             var item = session.NowPlayingItem || {};
-            var title = escapeHtml(item.Name || 'Unknown Media');
+            var title = escapeHtml(session.MediaTitle || item.Name || 'Unknown Media');
             var subtitle = '';
-            if (item.SeriesName) {
-                subtitle = escapeHtml(item.SeriesName);
-                if (item.SeasonName) {
-                    subtitle += ' &bull; ' + escapeHtml(item.SeasonName);
+            if (session.SeriesName || item.SeriesName) {
+                subtitle = escapeHtml(session.SeriesName || item.SeriesName);
+                var sNum = session.SeasonNumber != null ? session.SeasonNumber : (item.SeasonName || item.ParentIndexNumber);
+                if (sNum) {
+                    subtitle += ' &bull; ' + (typeof sNum === 'number' ? 'Season ' + sNum : escapeHtml(String(sNum)));
                 }
-                if (item.IndexNumber != null) {
-                    subtitle += ' &bull; Ep ' + escapeHtml(item.IndexNumber);
+                var epNum = session.EpisodeNumber != null ? session.EpisodeNumber : item.IndexNumber;
+                if (epNum != null) {
+                    subtitle += ' &bull; Ep ' + escapeHtml(String(epNum));
                 }
-            } else if (item.ProductionYear) {
-                subtitle = escapeHtml(String(item.ProductionYear));
+            } else if (session.ProductionYear || item.ProductionYear) {
+                subtitle = escapeHtml(String(session.ProductionYear || item.ProductionYear));
             }
 
             var playState = session.PlayState || {};
-            var isPaused = Boolean(playState.IsPaused);
-            var playMethod = playState.PlayMethod || 'DirectPlay';
+            var isPaused = session.IsPaused != null ? Boolean(session.IsPaused) : Boolean(playState.IsPaused);
+            var playMethod = session.PlayMethod || playState.PlayMethod || 'DirectPlay';
 
             var tInfo = session.TranscodingInfo;
-            var isRemux = Boolean(tInfo && tInfo.IsVideoDirect && (!tInfo.IsAudioDirect || (tInfo.Container && item.Container && tInfo.Container.toLowerCase() !== item.Container.toLowerCase())));
+            var isRemux = Boolean(session.IsContainerRemux || (tInfo && tInfo.IsVideoDirect && (!tInfo.IsAudioDirect || (tInfo.Container && item.Container && tInfo.Container.toLowerCase() !== item.Container.toLowerCase()))));
 
             var badgeClass = 'direct-play';
             var badgeText = 'Direct Play';
@@ -1069,7 +1799,7 @@
                 badgeClass = 'paused';
                 badgeText = 'Paused';
                 stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
-            } else if (isRemux) {
+            } else if (isRemux || playMethod === 'Remux') {
                 badgeClass = 'remux';
                 badgeText = 'Remux';
             } else if (playMethod === 'DirectStream') {
@@ -1079,6 +1809,36 @@
                 badgeClass = 'transcode';
                 badgeText = 'Transcode';
             }
+
+            // Video & Audio Direct/Transcode status determination
+            var isVideoDirect = null;
+            var isAudioDirect = null;
+            if (typeof session.IsVideoDirect === 'boolean') {
+                isVideoDirect = session.IsVideoDirect;
+            } else if (tInfo && typeof tInfo.IsVideoDirect === 'boolean') {
+                isVideoDirect = tInfo.IsVideoDirect;
+            } else if (playMethod === 'DirectPlay') {
+                isVideoDirect = true;
+            }
+
+            if (typeof session.IsAudioDirect === 'boolean') {
+                isAudioDirect = session.IsAudioDirect;
+            } else if (tInfo && typeof tInfo.IsAudioDirect === 'boolean') {
+                isAudioDirect = tInfo.IsAudioDirect;
+            } else if (playMethod === 'DirectPlay') {
+                isAudioDirect = true;
+            }
+
+            var videoBadgeText = (isVideoDirect === true) ? 'Video: Direct' : (isVideoDirect === false ? 'Video: Transcode' : 'Video: Direct');
+            var videoBadgeCls = (isVideoDirect === false) ? 'stream-badge video-transcode' : 'stream-badge video-direct';
+
+            var audioBadgeText = (isAudioDirect === true) ? 'Audio: Direct' : (isAudioDirect === false ? 'Audio: Transcode' : 'Audio: Direct');
+            var audioBadgeCls = (isAudioDirect === false) ? 'stream-badge audio-transcode' : 'stream-badge audio-direct';
+
+            // Accessible Info toggle button
+            var isExtended = (displayMode === 'extended');
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isExtended ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle stream details">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
             // Media Streams extraction
             var mediaStreams = item.MediaStreams || [];
@@ -1101,10 +1861,10 @@
             var hdrPill = extractDynamicRangePill(videoStream);
             if (hdrPill) pills.push({ text: hdrPill, cls: 'hdr' });
 
-            var vCodec = (videoStream && videoStream.Codec ? videoStream.Codec.toUpperCase() : '');
+            var vCodec = session.VideoCodec || (tInfo && tInfo.VideoCodec) || (videoStream && videoStream.Codec ? videoStream.Codec.toUpperCase() : '');
             if (vCodec) {
-                if (vCodec === 'H264') vCodec = 'H.264';
-                else if (vCodec === 'HEVC') vCodec = 'HEVC';
+                if (vCodec === 'H264' || vCodec === 'h264') vCodec = 'H.264';
+                else if (vCodec === 'HEVC' || vCodec === 'hevc') vCodec = 'HEVC';
                 pills.push({ text: vCodec, cls: '' });
             }
 
@@ -1133,68 +1893,97 @@
             }).join('');
 
             // Progress
-            var positionTicks = (typeof playState.PositionTicks === 'number' && isFinite(playState.PositionTicks) && playState.PositionTicks > 0)
-                ? playState.PositionTicks
-                : 0;
-            var runtimeTicks = (typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks) && item.RunTimeTicks > 0)
-                ? item.RunTimeTicks
-                : 0;
+            var positionTicks = (typeof session.PositionTicks === 'number' && isFinite(session.PositionTicks))
+                ? session.PositionTicks
+                : ((typeof playState.PositionTicks === 'number' && isFinite(playState.PositionTicks) && playState.PositionTicks > 0)
+                    ? playState.PositionTicks
+                    : 0);
+
+            var runtimeTicks = (typeof session.RunTimeTicks === 'number' && isFinite(session.RunTimeTicks))
+                ? session.RunTimeTicks
+                : ((typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks) && item.RunTimeTicks > 0)
+                    ? item.RunTimeTicks
+                    : 0);
+
             var percent = 0;
-            if (runtimeTicks > 0) {
+            if (typeof session.PlaybackPercentage === 'number' && isFinite(session.PlaybackPercentage)) {
+                percent = Math.min(100, Math.max(0, session.PlaybackPercentage));
+            } else if (runtimeTicks > 0) {
                 percent = Math.min(100, Math.max(0, (positionTicks / runtimeTicks) * 100));
             }
 
-            // Transcode details
-            var transcodeHtml = '';
-            if (tInfo && typeof tInfo === 'object') {
-                var metaParts = [];
-                var engine = extractTranscoderEngine(tInfo.HardwareAccelerationType);
+            // Truthful "How" & "Why" metadata for the expandable panel
+            var metaParts = [];
+            var engine = session.TranscodeEngine || (tInfo ? extractTranscoderEngine(tInfo.HardwareAccelerationType) : '');
+            if (engine) {
                 metaParts.push('Engine: ' + escapeHtml(engine));
-
-                if (tInfo.VideoCodec) metaParts.push('Video: ' + escapeHtml(tInfo.VideoCodec.toUpperCase()));
-                if (tInfo.AudioCodec) metaParts.push('Audio: ' + escapeHtml(tInfo.AudioCodec.toUpperCase()));
-                if (tInfo.Container) {
-                    var cConversion = item.Container
-                        ? (escapeHtml(item.Container.toUpperCase()) + ' &rarr; ' + escapeHtml(tInfo.Container.toUpperCase()))
-                        : escapeHtml(tInfo.Container.toUpperCase());
-                    metaParts.push('Container: ' + cConversion);
-                }
-                if (typeof tInfo.Framerate === 'number' && isFinite(tInfo.Framerate) && tInfo.Framerate > 0) {
-                    metaParts.push(Math.round(tInfo.Framerate) + ' fps');
-                }
-                if (typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
-                    var mbps = (tInfo.Bitrate / 1000000).toFixed(1);
-                    metaParts.push('Bitrate: ' + mbps + ' Mbps');
-                }
-
-                var reasonsHtml = '';
-                if (Array.isArray(tInfo.TranscodeReasons) && tInfo.TranscodeReasons.length > 0) {
-                    var validReasons = tInfo.TranscodeReasons.filter(function (r) {
-                        return r != null;
-                    }).map(escapeHtml);
-                    if (validReasons.length > 0) {
-                        reasonsHtml = '<div class="playback-transcode-reasons">Reasons: ' + validReasons.join(', ') + '</div>';
-                    }
-                }
-
-                if (metaParts.length > 0 || reasonsHtml) {
-                    transcodeHtml = '<div class="playback-card-transcode-details">' +
-                        (metaParts.length > 0 ? '<div class="playback-transcode-meta">' + metaParts.join(' &bull; ') + '</div>' : '') +
-                        reasonsHtml +
-                    '</div>';
-                }
             }
+
+            var streamVideoCodec = session.VideoCodec || (tInfo && tInfo.VideoCodec);
+            if (streamVideoCodec) metaParts.push('Video: ' + escapeHtml(streamVideoCodec.toUpperCase()));
+
+            var streamAudioCodec = session.AudioCodec || (tInfo && tInfo.AudioCodec);
+            if (streamAudioCodec) metaParts.push('Audio: ' + escapeHtml(streamAudioCodec.toUpperCase()));
+
+            var container = session.Container || (tInfo && tInfo.Container) || item.Container;
+            if (container) {
+                var cConversion = (item.Container && tInfo && tInfo.Container && item.Container.toLowerCase() !== tInfo.Container.toLowerCase())
+                    ? (escapeHtml(item.Container.toUpperCase()) + ' &rarr; ' + escapeHtml(tInfo.Container.toUpperCase()))
+                    : escapeHtml(container.toUpperCase());
+                metaParts.push('Container: ' + cConversion);
+            }
+
+            if (session.Resolution) {
+                metaParts.push('Resolution: ' + escapeHtml(session.Resolution));
+            }
+
+            if (tInfo && typeof tInfo.Framerate === 'number' && isFinite(tInfo.Framerate) && tInfo.Framerate > 0) {
+                metaParts.push(Math.round(tInfo.Framerate) + ' fps');
+            }
+
+            if (tInfo && typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
+                var mbps = (tInfo.Bitrate / 1000000).toFixed(1);
+                metaParts.push('Bitrate: ' + mbps + ' Mbps');
+            }
+
+            var reasonsWhyHtml = '';
+            if (session.TranscodeReasonsWhy) {
+                reasonsWhyHtml = escapeHtml(session.TranscodeReasonsWhy);
+            } else if (Array.isArray(session.TranscodeReasons) && session.TranscodeReasons.length > 0) {
+                var validSessionReasons = session.TranscodeReasons.map(formatTranscodeReason);
+                reasonsWhyHtml = escapeHtml(validSessionReasons.join(', '));
+            } else if (tInfo && Array.isArray(tInfo.TranscodeReasons) && tInfo.TranscodeReasons.length > 0) {
+                var validTInfoReasons = tInfo.TranscodeReasons.filter(function (r) {
+                    return r != null;
+                }).map(formatTranscodeReason);
+                if (validTInfoReasons.length > 0) {
+                    reasonsWhyHtml = escapeHtml(validTInfoReasons.join(', '));
+                }
+            } else if (playMethod === 'Transcode' || tInfo) {
+                reasonsWhyHtml = 'Reason not reported by server';
+            }
+
+            var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isExtended ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
+                '<div class="playback-stream-badges">' +
+                    '<span class="' + videoBadgeCls + '">' + escapeHtml(videoBadgeText) + '</span>' +
+                    '<span class="' + audioBadgeCls + '">' + escapeHtml(audioBadgeText) + '</span>' +
+                '</div>' +
+                (metaParts.length > 0 ? '<div class="playback-details-row"><strong>Stream:</strong> ' + metaParts.join(' &bull; ') + '</div>' : '') +
+                (reasonsWhyHtml ? '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> ' + reasonsWhyHtml + '</div>' : '') +
+            '</div>';
 
             // Poster & Backdrop handling
             var apiClient = getApiClient();
             var posterUrl = '';
             var backdropUrl = '';
-            if (apiClient && typeof apiClient.getImageUrl === 'function' && item.Id) {
-                if (item.PrimaryImageTag) {
-                    posterUrl = apiClient.getImageUrl(item.Id, { type: 'Primary', tag: item.PrimaryImageTag, maxWidth: 200 });
+            var itemId = session.ItemId || item.Id;
+            var primaryTag = session.PrimaryImageTag || item.PrimaryImageTag;
+            if (apiClient && typeof apiClient.getImageUrl === 'function' && itemId) {
+                if (primaryTag) {
+                    posterUrl = apiClient.getImageUrl(itemId, { type: 'Primary', tag: primaryTag, maxWidth: 200 });
                 }
                 if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
-                    backdropUrl = apiClient.getImageUrl(item.Id, { type: 'Backdrop', tag: item.BackdropImageTags[0], maxWidth: 600 });
+                    backdropUrl = apiClient.getImageUrl(itemId, { type: 'Backdrop', tag: item.BackdropImageTags[0], maxWidth: 600 });
                 }
             }
 
@@ -1207,7 +1996,7 @@
                 posterHtml = '<div class="playback-poster-fallback"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg></div>';
             }
 
-            return '<div class="playback-card" data-session-id="' + escapeHtml(session.Id || '') + '">' +
+            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '">' +
                 '<div class="playback-card-backdrop"' + backdropStyle + '></div>' +
                 '<div class="playback-card-inner">' +
                     '<div class="playback-card-header">' +
@@ -1220,6 +2009,7 @@
                         '</div>' +
                         '<div class="playback-badge-group">' +
                             '<span class="playback-badge ' + badgeClass + '">' + stateIcon + ' ' + badgeText + '</span>' +
+                            infoBtnHtml +
                         '</div>' +
                     '</div>' +
                     '<div class="playback-card-main">' +
@@ -1239,7 +2029,7 @@
                             '<span>' + formatTicks(runtimeTicks) + '</span>' +
                         '</div>' +
                     '</div>' +
-                    transcodeHtml +
+                    detailsPanelHtml +
                 '</div>' +
             '</div>';
         } catch (cardErr) {
@@ -1308,6 +2098,52 @@
             }
             if (elIgnored) elIgnored.textContent = String(diagState.ignoredSessionCount);
             if (elRenderErrors) elRenderErrors.textContent = String(diagState.renderErrors);
+
+            // Notification Diagnostics Grid Items
+            var notifs = diagState.notifications || {};
+            var elNotifFeature = activePage.querySelector('#diagNotifFeature');
+            var elDiscordStatus = activePage.querySelector('#diagDiscordStatus');
+            var elTelegramStatus = activePage.querySelector('#diagTelegramStatus');
+            var elNotifQueues = activePage.querySelector('#diagNotifQueues');
+            var elNotifDropped = activePage.querySelector('#diagNotifDropped');
+            var elNotifDedupe = activePage.querySelector('#diagNotifDedupe');
+            var elNotifRetries = activePage.querySelector('#diagNotifRetries');
+
+            if (elNotifFeature) {
+                elNotifFeature.textContent = notifs.enabled ? 'Enabled' : 'Disabled';
+                elNotifFeature.className = 'diagValue ' + (notifs.enabled ? 'status-ok' : 'status-disabled');
+            }
+            if (elDiscordStatus) {
+                elDiscordStatus.textContent = notifs.discordEnabled ? (notifs.discordAvailability || 'Available') : 'Disabled';
+                elDiscordStatus.className = 'diagValue ' + (notifs.discordEnabled ? 'status-ok' : 'status-disabled');
+            }
+            if (elTelegramStatus) {
+                elTelegramStatus.textContent = notifs.telegramEnabled ? (notifs.telegramAvailability || 'Available') : 'Disabled';
+                elTelegramStatus.className = 'diagValue ' + (notifs.telegramEnabled ? 'status-ok' : 'status-disabled');
+            }
+            if (elNotifQueues) elNotifQueues.textContent = 'Discord: ' + (notifs.discordQueueDepth || 0) + ', Telegram: ' + (notifs.telegramQueueDepth || 0);
+            if (elNotifDropped) elNotifDropped.textContent = String(notifs.droppedProgressCount || 0);
+            if (elNotifDedupe) elNotifDedupe.textContent = String(notifs.dedupeCount || 0);
+            if (elNotifRetries) elNotifRetries.textContent = String(notifs.retryCount || 0);
+
+            // Telemetry Card Elements
+            var elTelemDiscordQueue = activePage.querySelector('#telemDiscordQueue');
+            var elTelemTelegramQueue = activePage.querySelector('#telemTelegramQueue');
+            var elTelemDropped = activePage.querySelector('#telemDroppedProgress');
+            var elTelemDedupe = activePage.querySelector('#telemDedupeCount');
+            var elTelemRetries = activePage.querySelector('#telemRetryCount');
+            var elTelemLastAttempt = activePage.querySelector('#telemLastAttempt');
+            var elTelemLastSuccess = activePage.querySelector('#telemLastSuccess');
+            var elTelemLastFailure = activePage.querySelector('#telemLastFailure');
+
+            if (elTelemDiscordQueue) elTelemDiscordQueue.textContent = String(notifs.discordQueueDepth || 0);
+            if (elTelemTelegramQueue) elTelemTelegramQueue.textContent = String(notifs.telegramQueueDepth || 0);
+            if (elTelemDropped) elTelemDropped.textContent = String(notifs.droppedProgressCount || 0);
+            if (elTelemDedupe) elTelemDedupe.textContent = String(notifs.dedupeCount || 0);
+            if (elTelemRetries) elTelemRetries.textContent = String(notifs.retryCount || 0);
+            if (elTelemLastAttempt) elTelemLastAttempt.textContent = String(notifs.lastAttempt || 'None');
+            if (elTelemLastSuccess) elTelemLastSuccess.textContent = String(notifs.lastSuccess || 'None');
+            if (elTelemLastFailure) elTelemLastFailure.textContent = String(notifs.lastFailureCategory || 'OK');
         } catch (e) {
             console.error('[PlaybackCard] Error updating diagnostics view:', e);
         }
@@ -1327,7 +2163,26 @@
         'pollingState',
         'artwork',
         'ignoredSessionCount',
-        'renderErrors'
+        'renderErrors',
+        'notificationsEnabled',
+        'discordEnabled',
+        'telegramEnabled',
+        'notificationQueueDepth',
+        'notificationDroppedProgress',
+        'notificationDedupeCount',
+        'notificationRetryCount',
+        'notificationLastAttempt',
+        'notificationLastSuccess',
+        'notificationLastFailureCategory',
+        'discordAvailability',
+        'telegramAvailability',
+        'notificationQueueCapacity',
+        'notificationDroppedCritical',
+        'notificationCoalescedProgress',
+        'notificationRateLimitDrops',
+        'notificationValidationFailures',
+        'notificationWorkerState',
+        'notificationLastHttpStatus'
     ];
 
     function validateDiagnosticReport(report) {
@@ -1350,6 +2205,27 @@
         if (report.artwork !== 'loaded' && report.artwork !== 'fallback' && report.artwork !== 'error') return false;
         if (typeof report.ignoredSessionCount !== 'number' || !isFinite(report.ignoredSessionCount) || report.ignoredSessionCount < 0) return false;
         if (typeof report.renderErrors !== 'number' || !isFinite(report.renderErrors) || report.renderErrors < 0) return false;
+
+        // Notification diagnostics validations
+        if (typeof report.notificationsEnabled !== 'boolean') return false;
+        if (typeof report.discordEnabled !== 'boolean') return false;
+        if (typeof report.telegramEnabled !== 'boolean') return false;
+        if (typeof report.notificationQueueDepth !== 'number' || !isFinite(report.notificationQueueDepth) || report.notificationQueueDepth < 0) return false;
+        if (typeof report.notificationDroppedProgress !== 'number' || !isFinite(report.notificationDroppedProgress) || report.notificationDroppedProgress < 0) return false;
+        if (typeof report.notificationDedupeCount !== 'number' || !isFinite(report.notificationDedupeCount) || report.notificationDedupeCount < 0) return false;
+        if (typeof report.notificationRetryCount !== 'number' || !isFinite(report.notificationRetryCount) || report.notificationRetryCount < 0) return false;
+        if (typeof report.notificationLastAttempt !== 'string') return false;
+        if (typeof report.notificationLastSuccess !== 'string') return false;
+        if (typeof report.notificationLastFailureCategory !== 'string') return false;
+        if (typeof report.discordAvailability !== 'string') return false;
+        if (typeof report.telegramAvailability !== 'string') return false;
+        if (typeof report.notificationQueueCapacity !== 'number' || !isFinite(report.notificationQueueCapacity) || report.notificationQueueCapacity < 0) return false;
+        if (typeof report.notificationDroppedCritical !== 'number' || !isFinite(report.notificationDroppedCritical) || report.notificationDroppedCritical < 0) return false;
+        if (typeof report.notificationCoalescedProgress !== 'number' || !isFinite(report.notificationCoalescedProgress) || report.notificationCoalescedProgress < 0) return false;
+        if (typeof report.notificationRateLimitDrops !== 'number' || !isFinite(report.notificationRateLimitDrops) || report.notificationRateLimitDrops < 0) return false;
+        if (typeof report.notificationValidationFailures !== 'number' || !isFinite(report.notificationValidationFailures) || report.notificationValidationFailures < 0) return false;
+        if (typeof report.notificationWorkerState !== 'string') return false;
+        if (typeof report.notificationLastHttpStatus !== 'number' || !isFinite(report.notificationLastHttpStatus)) return false;
 
         // Route must be a clean relative path without query strings or private hostnames
         if (typeof report.route !== 'string' || report.route.indexOf('?') !== -1 || report.route.indexOf('&') !== -1 || report.route.indexOf('//') !== -1) {
@@ -1376,6 +2252,9 @@
         if (diagState.sessionsApiStatus === 'Sessions unavailable') sessionsStatus = 'error';
         else if (diagState.sessionsApiStatus === 'Timeout') sessionsStatus = 'timeout';
 
+        var notifs = diagState.notifications || {};
+        var totalQueueDepth = (Number(notifs.discordQueueDepth) || 0) + (Number(notifs.telegramQueueDepth) || 0);
+
         return {
             pluginVersion: diagState.pluginVersion,
             jellyfinVersion: diagState.jellyfinVersion,
@@ -1387,7 +2266,26 @@
             pollingState: diagState.pollingState,
             artwork: artworkStatus,
             ignoredSessionCount: diagState.ignoredSessionCount,
-            renderErrors: diagState.renderErrors
+            renderErrors: diagState.renderErrors,
+            notificationsEnabled: Boolean(notifs.enabled),
+            discordEnabled: Boolean(notifs.discordEnabled),
+            telegramEnabled: Boolean(notifs.telegramEnabled),
+            notificationQueueDepth: totalQueueDepth,
+            notificationDroppedProgress: Number(notifs.droppedProgressCount) || 0,
+            notificationDedupeCount: Number(notifs.dedupeCount) || 0,
+            notificationRetryCount: Number(notifs.retryCount) || 0,
+            notificationLastAttempt: String(notifs.lastAttempt || 'None'),
+            notificationLastSuccess: String(notifs.lastSuccess || 'None'),
+            notificationLastFailureCategory: String(notifs.lastFailureCategory || 'OK'),
+            discordAvailability: String(notifs.discordAvailability || 'Available'),
+            telegramAvailability: String(notifs.telegramAvailability || 'Available'),
+            notificationQueueCapacity: Number(notifs.queueCapacity) || 100,
+            notificationDroppedCritical: Number(notifs.droppedCriticalCount) || 0,
+            notificationCoalescedProgress: Number(notifs.coalescedProgressCount) || 0,
+            notificationRateLimitDrops: Number(notifs.rateLimitDropCount) || 0,
+            notificationValidationFailures: Number(notifs.validationFailureCount) || 0,
+            notificationWorkerState: String(notifs.workerState || 'Idle'),
+            notificationLastHttpStatus: notifs.lastHttpStatus != null ? Number(notifs.lastHttpStatus) : 0
         };
     }
 
@@ -1476,11 +2374,66 @@
         }
     }
 
+    function isMyPlaybackView(page) {
+        if (!page) return false;
+        if (page.getAttribute('data-name') === 'myplayback' || page.getAttribute('data-title') === 'My Playback') {
+            return true;
+        }
+        if (typeof window !== 'undefined' && window.location) {
+            var href = (window.location.href || '').toLowerCase();
+            if (href.indexOf('myplayback') !== -1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function fetchSessions(page, capturedGen) {
         if (!isStateValid(page, capturedGen)) return;
 
         var elements = getElements(page);
         if (!elements) return;
+
+        if (isMyPlaybackView(page)) {
+            callNotificationApi('PlaybackCard/Self/Sessions', { method: 'GET' })
+                .then(function (sessions) {
+                    if (!isStateValid(page, capturedGen)) return;
+
+                    var sessionsArray = Array.isArray(sessions) ? sessions : [];
+                    diagState.sessionsApiStatus = 'OK';
+                    diagState.lastSuccessTime = Date.now();
+                    diagState.pollingState = 'active';
+                    diagState.lastErrorCategory = 'OK';
+                    updateDiagnosticsDisplay();
+
+                    elements.statusEl.style.display = 'none';
+                    elements.statusEl.textContent = '';
+                    elements.statusEl.className = 'playbackMonitorStatusMsg';
+
+                    if (sessionsArray.length === 0) {
+                        elements.emptyEl.style.display = 'flex';
+                        elements.gridEl.innerHTML = '';
+                    } else {
+                        elements.emptyEl.style.display = 'none';
+                        elements.gridEl.innerHTML = sessionsArray.map(renderSessionCard).join('');
+                    }
+                })
+                .catch(function (err) {
+                    console.error('[PlaybackCard] Failed to fetch personal sessions:', err);
+                    if (!isStateValid(page, capturedGen)) return;
+                    diagState.sessionsApiStatus = 'Sessions unavailable';
+                    diagState.lastErrorCategory = 'Sessions unavailable';
+                    diagState.lastFailureTime = Date.now();
+                    updateDiagnosticsDisplay();
+
+                    elements.gridEl.innerHTML = '';
+                    elements.emptyEl.style.display = 'none';
+                    elements.statusEl.textContent = 'Could not load your playback sessions.';
+                    elements.statusEl.className = 'playbackMonitorStatusMsg error';
+                    elements.statusEl.style.display = 'block';
+                });
+            return;
+        }
 
         var apiClient = getApiClient();
         if (!apiClient || typeof apiClient.getSessions !== 'function') {
@@ -1563,6 +2516,345 @@
         }
     }
 
+    var notifControlsBound = false;
+
+    function showNotificationFeedback(page, message, isError) {
+        if (!page) return;
+        var feedbackEl = page.querySelector('#notificationsFeedback');
+        if (!feedbackEl) return;
+        feedbackEl.className = 'notificationsFeedback ' + (isError ? 'error' : 'success');
+        feedbackEl.textContent = message;
+        feedbackEl.style.display = 'block';
+        setTimeout(function () {
+            if (feedbackEl) feedbackEl.style.display = 'none';
+        }, 6000);
+    }
+
+    function callNotificationApi(endpoint, options) {
+        var opts = options || {};
+        var method = opts.method || 'GET';
+        var apiClient = getApiClient();
+        var url = endpoint;
+        var headers = {
+            'Accept': 'application/json'
+        };
+
+        if (apiClient && typeof apiClient.getUrl === 'function') {
+            url = apiClient.getUrl(endpoint);
+        }
+
+        if (apiClient && typeof apiClient.accessToken === 'function' && apiClient.accessToken()) {
+            headers['Authorization'] = 'MediaBrowser Client="' + (apiClient.appName ? apiClient.appName() : 'PlaybackCard') + '", Device="' + (apiClient.deviceName ? apiClient.deviceName() : 'Web') + '", DeviceId="' + (apiClient.deviceId ? apiClient.deviceId() : 'Web') + '", Version="' + PLUGIN_VERSION + '", Token="' + apiClient.accessToken() + '"';
+        }
+
+        var fetchOptions = {
+            method: method,
+            headers: headers
+        };
+
+        if (opts.body) {
+            headers['Content-Type'] = 'application/json';
+            fetchOptions.body = typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+        }
+
+        return fetch(url, fetchOptions).then(function (response) {
+            if (!response.ok) {
+                return response.text().then(function (text) {
+                    var errorMsg = 'HTTP ' + response.status;
+                    try {
+                        var parsed = JSON.parse(text);
+                        if (parsed && (parsed.message || parsed.error)) {
+                            errorMsg += ': ' + (parsed.message || parsed.error);
+                        }
+                    } catch (e) {
+                        if (text && text.length < 200) {
+                            errorMsg += ': ' + text;
+                        }
+                    }
+                    var err = new Error(errorMsg);
+                    err.status = response.status;
+                    throw err;
+                });
+            }
+            if (response.status === 204) return null;
+            return response.json();
+        });
+    }
+
+    function loadNotificationSettings(page) {
+        if (!page) return Promise.resolve();
+        return callNotificationApi('PlaybackInfoCard/Notifications/Configuration', { method: 'GET' })
+            .then(function (data) {
+                if (!data) return;
+
+                var chkMaster = page.querySelector('#chkNotificationsEnabled');
+                var chkDiscord = page.querySelector('#chkDiscordEnabled');
+                var txtDiscord = page.querySelector('#txtDiscordWebhookUrl');
+                var badgeDiscord = page.querySelector('#badgeDiscordStatus');
+
+                var chkTelegram = page.querySelector('#chkTelegramEnabled');
+                var txtTelegramToken = page.querySelector('#txtTelegramBotToken');
+                var txtTelegramChat = page.querySelector('#txtTelegramChatId');
+                var badgeTelegram = page.querySelector('#badgeTelegramStatus');
+
+                var chkStart = page.querySelector('#chkNotifyOnStart');
+                var chkStop = page.querySelector('#chkNotifyOnStop');
+                var chkComp = page.querySelector('#chkNotifyOnCompletion');
+                var chkPause = page.querySelector('#chkNotifyOnPauseResume');
+                var chkProg = page.querySelector('#chkNotifyOnProgress');
+                var numProg = page.querySelector('#numProgressInterval');
+
+                var chkUser = page.querySelector('#chkUsernameDisclosure');
+                var chkDev = page.querySelector('#chkClientDeviceDisclosure');
+
+                if (chkMaster) chkMaster.checked = Boolean(data.enabled);
+                if (chkDiscord) chkDiscord.checked = Boolean(data.discordEnabled);
+                if (txtDiscord) {
+                    txtDiscord.value = '';
+                    if (data.discordWebhookUrlMasked) {
+                        txtDiscord.placeholder = data.discordWebhookUrlMasked;
+                    }
+                }
+                if (badgeDiscord) {
+                    badgeDiscord.textContent = data.discordEnabled ? (data.hasDiscordWebhook ? 'Configured' : 'Missing URL') : 'Disabled';
+                    badgeDiscord.className = 'notifBadge ' + (data.discordEnabled && data.hasDiscordWebhook ? 'status-ok' : 'status-disabled');
+                }
+
+                if (chkTelegram) chkTelegram.checked = Boolean(data.telegramEnabled);
+                if (txtTelegramToken) {
+                    txtTelegramToken.value = '';
+                    if (data.telegramBotTokenMasked) {
+                        txtTelegramToken.placeholder = data.telegramBotTokenMasked;
+                    }
+                }
+                if (txtTelegramChat) txtTelegramChat.value = data.telegramChatId || '';
+                if (badgeTelegram) {
+                    var tgOk = data.hasTelegramBotToken && data.telegramChatId;
+                    badgeTelegram.textContent = data.telegramEnabled ? (tgOk ? 'Configured' : 'Missing Info') : 'Disabled';
+                    badgeTelegram.className = 'notifBadge ' + (data.telegramEnabled && tgOk ? 'status-ok' : 'status-disabled');
+                }
+
+                if (chkStart) chkStart.checked = Boolean(data.notifyOnPlaybackStart);
+                if (chkStop) chkStop.checked = Boolean(data.notifyOnPlaybackStop);
+                if (chkComp) chkComp.checked = Boolean(data.notifyOnPlaybackCompletion);
+                if (chkPause) chkPause.checked = Boolean(data.notifyOnPlaybackPauseResume);
+                if (chkProg) chkProg.checked = Boolean(data.notifyOnPlaybackProgress);
+                if (numProg) numProg.value = data.playbackProgressIntervalMinutes || 15;
+
+                if (chkUser) chkUser.checked = Boolean(data.includeUserAccountName);
+                if (chkDev) chkDev.checked = Boolean(data.includeClientAndDeviceName);
+
+                // Update local diag state
+                var notifs = diagState.notifications;
+                notifs.enabled = Boolean(data.enabled);
+                notifs.discordEnabled = Boolean(data.discordEnabled);
+                notifs.telegramEnabled = Boolean(data.telegramEnabled);
+                if (data.diagnostics) {
+                    notifs.discordQueueDepth = data.diagnostics.discordQueueDepth || 0;
+                    notifs.telegramQueueDepth = data.diagnostics.telegramQueueDepth || 0;
+                    notifs.droppedProgressCount = data.diagnostics.droppedProgressCount || 0;
+                    notifs.dedupeCount = data.diagnostics.deduplicatedEventsCount || 0;
+                    notifs.retryCount = data.diagnostics.retryAttemptsCount || 0;
+                    notifs.lastAttempt = data.diagnostics.lastDeliveryAttemptUtc ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastDeliveryAttemptUtc).getTime()) : 'None';
+                    notifs.lastSuccess = data.diagnostics.lastSuccessfulDeliveryUtc ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastSuccessfulDeliveryUtc).getTime()) : 'None';
+                    notifs.lastFailureCategory = data.diagnostics.lastFailureCategory || 'OK';
+                    notifs.discordAvailability = data.diagnostics.discordAvailability || 'Available';
+                    notifs.telegramAvailability = data.diagnostics.telegramAvailability || 'Available';
+                }
+
+                updateDiagnosticsDisplay();
+            })
+            .catch(function (err) {
+                console.error('[PlaybackCard] Failed to load notification settings:', err);
+            });
+    }
+
+    function saveNotificationSettings(page, section) {
+        if (!page) return;
+        var payload = {};
+
+        if (section === 'master') {
+            var chkMaster = page.querySelector('#chkNotificationsEnabled');
+            payload.enabled = chkMaster ? chkMaster.checked : false;
+        } else if (section === 'discord') {
+            var chkDiscord = page.querySelector('#chkDiscordEnabled');
+            var txtWebhook = page.querySelector('#txtDiscordWebhookUrl');
+            payload.discordEnabled = chkDiscord ? chkDiscord.checked : false;
+            if (txtWebhook && txtWebhook.value.trim().length > 0) {
+                payload.discordWebhookUrl = txtWebhook.value.trim();
+            }
+        } else if (section === 'telegram') {
+            var chkTelegram = page.querySelector('#chkTelegramEnabled');
+            var txtToken = page.querySelector('#txtTelegramBotToken');
+            var txtChat = page.querySelector('#txtTelegramChatId');
+            payload.telegramEnabled = chkTelegram ? chkTelegram.checked : false;
+            if (txtToken && txtToken.value.trim().length > 0) {
+                payload.telegramBotToken = txtToken.value.trim();
+            }
+            if (txtChat) {
+                payload.telegramChatId = txtChat.value.trim();
+            }
+        } else if (section === 'preferences') {
+            var chkStart = page.querySelector('#chkNotifyOnStart');
+            var chkStop = page.querySelector('#chkNotifyOnStop');
+            var chkComp = page.querySelector('#chkNotifyOnCompletion');
+            var chkPause = page.querySelector('#chkNotifyOnPauseResume');
+            var chkProg = page.querySelector('#chkNotifyOnProgress');
+            var numProg = page.querySelector('#numProgressInterval');
+            var chkUser = page.querySelector('#chkUsernameDisclosure');
+            var chkDev = page.querySelector('#chkClientDeviceDisclosure');
+
+            payload.notifyOnPlaybackStart = chkStart ? chkStart.checked : false;
+            payload.notifyOnPlaybackStop = chkStop ? chkStop.checked : false;
+            payload.notifyOnPlaybackCompletion = chkComp ? chkComp.checked : false;
+            payload.notifyOnPlaybackPauseResume = chkPause ? chkPause.checked : false;
+            payload.notifyOnPlaybackProgress = chkProg ? chkProg.checked : false;
+            payload.playbackProgressIntervalMinutes = numProg ? Math.max(5, Math.min(120, parseInt(numProg.value, 10) || 15)) : 15;
+            payload.includeUserAccountName = chkUser ? chkUser.checked : false;
+            payload.includeClientAndDeviceName = chkDev ? chkDev.checked : false;
+        }
+
+        callNotificationApi('PlaybackInfoCard/Notifications/Configuration', {
+            method: 'POST',
+            body: payload
+        }).then(function () {
+            showNotificationFeedback(page, 'Notification configuration saved successfully.', false);
+            loadNotificationSettings(page);
+        }).catch(function (err) {
+            console.error('[PlaybackCard] Failed to save notification settings:', err);
+            showNotificationFeedback(page, 'Save failed: ' + (err && err.message ? err.message : 'Unknown error'), true);
+        });
+    }
+
+    function clearNotificationSecret(page, secretType) {
+        if (!page) return;
+        var payload = {};
+        if (secretType === 'discord') {
+            payload.clearDiscordWebhookUrl = true;
+            payload.discordEnabled = false;
+        } else if (secretType === 'telegram') {
+            payload.clearTelegramBotToken = true;
+            payload.telegramEnabled = false;
+        }
+
+        callNotificationApi('PlaybackInfoCard/Notifications/Configuration', {
+            method: 'POST',
+            body: payload
+        }).then(function () {
+            showNotificationFeedback(page, 'Secret cleared successfully.', false);
+            loadNotificationSettings(page);
+        }).catch(function (err) {
+            console.error('[PlaybackCard] Failed to clear secret:', err);
+            showNotificationFeedback(page, 'Clear secret failed: ' + (err && err.message ? err.message : 'Unknown error'), true);
+        });
+    }
+
+    function sendTestNotification(page, destination) {
+        if (!page) return;
+        showNotificationFeedback(page, 'Sending test ' + destination + ' notification…', false);
+        callNotificationApi('PlaybackInfoCard/Notifications/Test', {
+            method: 'POST',
+            body: { destination: destination }
+        }).then(function () {
+            showNotificationFeedback(page, 'Test ' + destination + ' notification queued successfully.', false);
+            fetchNotificationDiagnostics(page);
+        }).catch(function (err) {
+            console.error('[PlaybackCard] Test notification dispatch error:', err);
+            showNotificationFeedback(page, 'Test dispatch failed: ' + (err && err.message ? err.message : 'Unknown error'), true);
+        });
+    }
+
+    function fetchNotificationDiagnostics(page) {
+        if (!page) return;
+        callNotificationApi('PlaybackInfoCard/Notifications/Diagnostics', { method: 'GET' })
+            .then(function (data) {
+                if (!data) return;
+                var notifs = diagState.notifications;
+                notifs.discordQueueDepth = data.discordQueueDepth || 0;
+                notifs.telegramQueueDepth = data.telegramQueueDepth || 0;
+                notifs.droppedProgressCount = data.droppedProgressCount || 0;
+                notifs.droppedCriticalCount = data.droppedCriticalCount || 0;
+                notifs.coalescedProgressCount = data.coalescedProgressCount || 0;
+                notifs.rateLimitDropCount = data.rateLimitDropCount || 0;
+                notifs.dedupeCount = data.deduplicatedEventsCount || 0;
+                notifs.retryCount = data.retryAttemptsCount || 0;
+                notifs.queueCapacity = data.queueCapacity || 100;
+                notifs.validationFailureCount = data.validationFailureCount || 0;
+                notifs.workerState = data.workerState || 'Idle';
+                notifs.lastHttpStatus = data.lastHttpStatus != null ? data.lastHttpStatus : null;
+                notifs.lastAttempt = data.lastDeliveryAttemptUtc ? formatRelativeTime(Date.now() - new Date(data.lastDeliveryAttemptUtc).getTime()) : 'None';
+                notifs.lastSuccess = data.lastSuccessfulDeliveryUtc ? formatRelativeTime(Date.now() - new Date(data.lastSuccessfulDeliveryUtc).getTime()) : 'None';
+                notifs.lastFailureCategory = data.lastFailureCategory || 'OK';
+                notifs.discordAvailability = data.discordAvailability || 'Available';
+                notifs.telegramAvailability = data.telegramAvailability || 'Available';
+                updateDiagnosticsDisplay();
+            })
+            .catch(function () {
+                // Silently ignore poll errors
+            });
+    }
+
+    function bindNotificationControls(page) {
+        if (!page || notifControlsBound) return;
+        notifControlsBound = true;
+
+        var chkMaster = page.querySelector('#chkNotificationsEnabled');
+        if (chkMaster) {
+            chkMaster.addEventListener('change', function () {
+                saveNotificationSettings(page, 'master');
+            });
+        }
+
+        var btnSaveDiscord = page.querySelector('#btnSaveDiscord');
+        if (btnSaveDiscord) {
+            btnSaveDiscord.addEventListener('click', function () {
+                saveNotificationSettings(page, 'discord');
+            });
+        }
+
+        var btnClearDiscord = page.querySelector('#btnClearDiscord');
+        if (btnClearDiscord) {
+            btnClearDiscord.addEventListener('click', function () {
+                clearNotificationSecret(page, 'discord');
+            });
+        }
+
+        var btnTestDiscord = page.querySelector('#btnTestDiscord');
+        if (btnTestDiscord) {
+            btnTestDiscord.addEventListener('click', function () {
+                sendTestNotification(page, 'Discord');
+            });
+        }
+
+        var btnSaveTelegram = page.querySelector('#btnSaveTelegram');
+        if (btnSaveTelegram) {
+            btnSaveTelegram.addEventListener('click', function () {
+                saveNotificationSettings(page, 'telegram');
+            });
+        }
+
+        var btnClearTelegram = page.querySelector('#btnClearTelegram');
+        if (btnClearTelegram) {
+            btnClearTelegram.addEventListener('click', function () {
+                clearNotificationSecret(page, 'telegram');
+            });
+        }
+
+        var btnTestTelegram = page.querySelector('#btnTestTelegram');
+        if (btnTestTelegram) {
+            btnTestTelegram.addEventListener('click', function () {
+                sendTestNotification(page, 'Telegram');
+            });
+        }
+
+        var btnSavePrefs = page.querySelector('#btnSavePreferences');
+        if (btnSavePrefs) {
+            btnSavePrefs.addEventListener('click', function () {
+                saveNotificationSettings(page, 'preferences');
+            });
+        }
+    }
+
     function setupControls(page) {
         if (!page) return;
         var btnCompact = page.querySelector('#btnModeCompact');
@@ -1590,6 +2882,35 @@
                 copyDiagnosticReport(page);
             });
         }
+
+        var gridEl = page.querySelector('#playbackSessionsGrid');
+        if (gridEl && !gridEl._hasInfoListener) {
+            gridEl._hasInfoListener = true;
+            gridEl.addEventListener('click', function (e) {
+                var btn = e.target && e.target.closest ? e.target.closest('.playback-btn-info') : null;
+                if (!btn) return;
+                var targetId = btn.getAttribute('aria-controls');
+                if (!targetId) return;
+                var panel = page.querySelector('#' + targetId);
+                if (!panel) return;
+                var isExpanded = btn.getAttribute('aria-expanded') === 'true';
+                btn.setAttribute('aria-expanded', isExpanded ? 'false' : 'true');
+                if (isExpanded) {
+                    panel.classList.remove('open');
+                } else {
+                    panel.classList.add('open');
+                }
+            });
+            gridEl.addEventListener('keydown', function (e) {
+                if (e.key === ' ' || e.key === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
+                    var btn = e.target && e.target.closest ? e.target.closest('.playback-btn-info') : null;
+                    if (btn) {
+                        e.preventDefault();
+                        btn.click();
+                    }
+                }
+            });
+        }
     }
 
     function startPolling(page) {
@@ -1602,6 +2923,16 @@
         if (!elements) return;
 
         setupControls(page);
+
+        var isMyPlayback = isMyPlaybackView(page);
+        if (isMyPlayback) {
+            var titleEl = page.querySelector('.playbackMonitorTitle');
+            if (titleEl) titleEl.textContent = 'My Playback';
+            var descEl = page.querySelector('.playbackMonitorDescription');
+            if (descEl) descEl.textContent = 'Real-time playback telemetry for your active sessions. Local & privacy-first.';
+            var notifSection = page.querySelector('#playbackNotificationsSection');
+            if (notifSection) notifSection.style.display = 'none';
+        }
 
         elements.gridEl.innerHTML = '';
         elements.emptyEl.style.display = 'none';
@@ -1617,7 +2948,7 @@
                 return;
             }
 
-            if (!isAdmin) {
+            if (!isAdmin && !isMyPlayback) {
                 elements.gridEl.innerHTML = '';
                 elements.emptyEl.style.display = 'none';
                 elements.statusEl.textContent = 'Administrator privileges are required to view playback telemetry.';
@@ -1627,6 +2958,15 @@
                 diagState.lastErrorCategory = 'Administrator privileges required';
                 updateDiagnosticsDisplay();
                 return;
+            }
+
+            if (isAdmin && !isMyPlayback) {
+                var notifSection = page.querySelector('#playbackNotificationsSection');
+                if (notifSection) {
+                    notifSection.style.display = 'block';
+                }
+                bindNotificationControls(page);
+                loadNotificationSettings(page);
             }
 
             fetchSessions(page, capturedGen);
@@ -1639,10 +2979,17 @@
             pollTimer = setInterval(function () {
                 currentGeneration++;
                 fetchSessions(page, currentGeneration);
+                if (isAdmin && !isMyPlayback) {
+                    fetchNotificationDiagnostics(page);
+                }
             }, POLL_INTERVAL_MS);
         }).catch(function (err) {
             console.error('[PlaybackCard] Unexpected error during administrator check:', err);
             if (!isStateValid(page, capturedGen)) {
+                return;
+            }
+            if (isMyPlayback) {
+                fetchSessions(page, capturedGen);
                 return;
             }
             elements.gridEl.innerHTML = '';
@@ -1695,6 +3042,7 @@
     function dispose() {
         if (isDisposed) return;
         isDisposed = true;
+        notifControlsBound = false;
         stopPolling();
         if (typeof document !== 'undefined') {
             document.removeEventListener('viewshow', onViewShow);
@@ -1728,7 +3076,12 @@
         copyDiagnosticReport: copyDiagnosticReport,
         startPolling: startPolling,
         stopPolling: stopPolling,
-        setDisplayMode: function (mode) { displayMode = mode; }
+        setDisplayMode: function (mode) { displayMode = mode; },
+        loadNotificationSettings: loadNotificationSettings,
+        saveNotificationSettings: saveNotificationSettings,
+        clearNotificationSecret: clearNotificationSecret,
+        sendTestNotification: sendTestNotification,
+        fetchNotificationDiagnostics: fetchNotificationDiagnostics
     };
 
     if (typeof window !== 'undefined') {

@@ -30,3 +30,5 @@ bld/
 ## Scratch and test logs
 scratch/
 *.log
+.local/
+Library/

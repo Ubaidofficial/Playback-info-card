@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 
+[assembly: InternalsVisibleTo("JellyfinPlaybackCard.Tests")]
+
 namespace Jellyfin.Plugin.PlaybackCard;
 
 /// <summary>
 /// Core entry point for the Playback Info Card plugin.
-/// Implements <see cref="BasePlugin{TConfiguration}"/> and <see cref="IHasWebPages"/> to serve one embedded, plugin-owned monitor page.
+/// Implements <see cref="BasePlugin{TConfiguration}"/> and <see cref="IHasWebPages"/> to serve
+/// the administrator Playback Monitor page and the authenticated user "My Playback" page.
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
@@ -44,10 +48,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// Gets the plugin description.
     /// </summary>
     public override string Description =>
-        "Admin playback session monitor displaying active streams, play state, and real-time transcode telemetry.";
+        "Admin playback session monitor and user playback telemetry dashboard displaying active streams and transcode metrics.";
 
     /// <summary>
-    /// Serves one embedded, plugin-owned monitor page to the Jellyfin Web client interface.
+    /// Serves embedded, plugin-owned pages to the Jellyfin Web client interface.
     /// </summary>
     /// <returns>A collection of <see cref="PluginPageInfo"/> objects representing client resources.</returns>
     public IEnumerable<PluginPageInfo> GetPages()
@@ -65,6 +69,18 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 EnableInMainMenu = true,
                 MenuSection = "server",
                 MenuIcon = "play_circle"
+            },
+            new PluginPageInfo
+            {
+                Name = "myplayback",
+                DisplayName = "My Playback",
+                EmbeddedResourcePath = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}.Web.playbackcard.html",
+                    GetType().Namespace),
+                EnableInMainMenu = true,
+                MenuSection = "playback",
+                MenuIcon = "tv"
             }
         };
     }

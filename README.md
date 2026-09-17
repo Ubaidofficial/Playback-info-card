@@ -1,14 +1,14 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.1**
+**Stable Version: v0.2.3.2**
 
 Real-time, cinema-grade visual stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 
-## What Changed in v0.2.3.1
+## What Changed in v0.2.3.2
 
-Version `0.2.3.1` is a complete architectural overhaul focused on server safety, client stability, and administrator privacy.
+Version `0.2.3.2` introduces native server-side Discord & Telegram notifications, an accessible stream details drawer, truthful transcode reason reporting, and an authenticated "My Playback" view for end users.
 
 * **Plugin-Owned Web Page**: The monitor is now served via Jellyfin's official `IHasWebPages` interface as a dedicated internal admin page (`Dashboard -> Server -> Playback Monitor`).
 * **Zero Host Injection**: Completely eliminated ASP.NET Core middleware, response-stream HTML rewriting, startup pipeline filters (`IStartupFilter`), and disk file manipulation.
@@ -99,11 +99,11 @@ Before copying, an automated redaction check scans for sensitive keywords (`Remo
 2. Add the custom repository:
    - **Repository Name**: `Playback Info Card`
    - **Repository URL**: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
-3. Navigate to **Catalog**, find **Playback Info Card**, and select version **0.2.3.1**.
+3. Navigate to **Catalog**, find **Playback Info Card**, and select version **0.2.3.2**.
 4. Click **Install** and restart Jellyfin server.
 
 ### Method 2: Manual Installation (ZIP / Binary)
-1. Download `jellyfin-plugin-playbackcard.zip` from [v0.2.3.1 GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases/tag/v0.2.3.1).
+1. Download `jellyfin-plugin-playbackcard.zip` from [v0.2.3.2 GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases/tag/v0.2.3.2).
 2. Locate your Jellyfin `plugins` directory:
    - **Linux (systemd)**: `/var/lib/jellyfin/plugins/PlaybackCard/`
    - **Docker**: `<path-to-config>/plugins/PlaybackCard/`
@@ -216,81 +216,104 @@ The previous `0.2.3.0` release artifact and repository manifest entry remain pre
 
 ---
 
-## Playback Notifications (Discord & Telegram)
+## Playback Notifications (Native Discord & Telegram)
 
-Administrators seeking Tautulli-like playback notifications can integrate Jellyfin with Discord and Telegram. While native server-side notification dispatch is planned for a future milestone (Option B), notifications can be enabled immediately using the official [Jellyfin Webhook Plugin](https://github.com/jellyfin/jellyfin-plugin-webhook) (Option A).
+Playback Info Card provides high-performance, server-side native playback notifications for **Discord** and **Telegram**. Dispatches occur directly inside the Jellyfin server background pipeline, operating completely independently of client browsers or external plugins.
 
-### Upstream Security & Privacy Warning
+### Privacy by Omission & Threat Model
+
+* **IP-Safe by Omission**: The notification pipeline never queries, collects, or transmits client IP addresses, server internal IPs, remote endpoints, private LAN/WAN classifications, local filesystem paths, or authentication tokens.
+* **Explicit Disclosures**: Username and client/device disclosures are **disabled by default**. Administrators must explicitly check the respective disclosure checkboxes in the UI to include user account names or device models in external messages.
+* **Server-Local Plaintext Storage Disclosure**: In accordance with Jellyfin plugin architecture, plugin settings and configured secrets (Discord webhook URLs, Telegram bot tokens) are stored in server-local XML configuration files on disk in plaintext. Secrets are never encrypted on disk. Ensure file-system access to your Jellyfin server is strictly restricted to authorized administrators.
+* **Write-Only Secrets & Masking in API**: The plugin's administration REST API masks all tokens and secrets in responses (e.g. `••••••••`). Raw secret values are never reflected back over the network to the browser.
+* **Mention Storm Suppression**: Outbound Discord payloads strictly enforce `"allowed_mentions": { "parse": [] }` and sanitize `@everyone`, `@here`, and role mention strings from media titles to prevent ping storms.
+* **HTML Tag Integrity**: Outbound Telegram messages strictly escape HTML special characters (`&`, `<`, `>`, `"`) and cap messages at 4,096 characters to prevent HTML tag corruption.
+
+---
+
+### Configuration Guide
+
+#### 1. Native Configuration via Playback Monitor Page
+Administrators can configure notifications directly on the **Playback Monitor** page (`/playbackcard`):
+1. Navigate to **Dashboard** &rarr; **Playback Monitor** (or `/playbackcard`).
+2. Scroll to the **Playback Notifications** section (visible only to server administrators).
+3. Toggle the **Master Switch** to enable the notification engine.
+4. Configure your desired destination (Discord and/or Telegram).
+5. Select your desired event subscriptions (Playback Start, Stop, Media Completion, Pause/Resume, and Periodic Progress).
+6. Click **Test Discord** or **Test Telegram** to send a synthetic test dispatch and verify delivery health.
+
+---
+
+#### 2. Telegram Bot Setup
+1. Open Telegram and start a chat with [@BotFather](https://t.me/botfather).
+2. Send `/newbot` and follow the prompts to create your bot and obtain your HTTP API bot token (formatted as `123456789:ABCdefGhIjKlMnOpQrStUvWxYz`).
+3. Create a Telegram channel or group for alerts, add your bot as an administrator, and send a test message.
+4. Obtain the target Chat ID using `@userinfobot`, `@get_id_bot`, or by querying `https://api.telegram.org/bot<TOKEN>/getUpdates`.
+5. In Playback Info Card settings, enter the Bot Token and Chat ID, toggle **Enable Telegram Delivery**, and click **Save Telegram**.
+
+---
+
+#### 3. Discord Webhook Setup
+1. In Discord, open your server's **Server Settings** &rarr; **Integrations** &rarr; **Webhooks**.
+2. Click **New Webhook**, assign a name (e.g., `Jellyfin Playback`), and select the alert channel.
+3. Click **Copy Webhook URL** (must start with `https://discord.com/api/webhooks/` or `https://discordapp.com/api/webhooks/`).
+4. In Playback Info Card settings, paste the Webhook URL into **Webhook URL**, toggle **Enable Discord Delivery**, and click **Save Discord**.
+
+---
+
+### Delivery Engine & Resilience
+
+* **Independent Bounded Queues**: Discord and Telegram queues are fully isolated with an in-memory capacity of 100 items each.
+* **Priority Delivery**: Playback Start, Stop, and Media Completion events are prioritized over progress updates. A dedicated reservation of 20 slots ensures critical notifications are never blocked by high volumes of progress updates.
+* **Progress Coalescing**: Consecutive periodic progress updates for the same playback session replace older pending progress in the queue, preventing delivery backlog.
+* **Rate Limiting & Backoff**: Handles HTTP 429 rate limits by parsing Discord `Retry-After` headers and Telegram `parameters.retry_after`. Transient network errors (5xx, timeouts) automatically retry up to 3 times with exponential backoff and jitter. Permanent client errors (400, 401, 403, 404) fail immediately without retry.
+* **Shutdown Drain Budget**: On Jellyfin server shutdown, background queues execute a graceful drain with a 3-second maximum budget to flush pending events without delaying server termination.
+
+---
+
+### Optional Upstream Webhook Plugin Integration (Alternative Option A)
+
+If you prefer using the generic upstream [Jellyfin Webhook Plugin](https://github.com/jellyfin/jellyfin-plugin-webhook) instead of the native engine:
 
 > [!CAUTION]
 > **DO NOT USE THE OFFICIAL UPSTREAM SAMPLE TELEGRAM TEMPLATE AS-IS.**
 > The sample `PlaybackStart.handlebars` template in the official webhook repository includes `{{RemoteEndPoint}}`, which broadcasts internal server IP addresses, client IP addresses, and private network topologies into chat rooms.
-> Always use the privacy-safe templates below, which strictly omit all IP and network fields.
+> Always use IP-safe templates that strictly omit all IP and network fields.
 
----
+#### IP-Safe Upstream Telegram Template:
+```json
+{
+  "chat_id": "YOUR_CHAT_ID",
+  "text": "🎬 <b>Playback Started</b>\n\n<b>Title:</b> {{#if_equals ItemType 'Episode'}}<b>{{SeriesName}}</b> — S{{SeasonNumber00}}E{{EpisodeNumber00}} {{Name}}{{else}}<b>{{Name}}</b> ({{Year}}){{/if_equals}}\n<b>User:</b> {{NotificationUsername}}\n<b>Client:</b> {{ClientName}} ({{DeviceName}})\n<b>Play Method:</b> {{PlayMethod}}\n<b>Video:</b> {{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}\n<b>Audio:</b> {{Audio_0_Codec}} ({{Audio_0_Channels}}ch)",
+  "parse_mode": "HTML",
+  "protect_content": true,
+  "disable_web_page_preview": true
+}
+```
 
-### Telegram Setup (Generic Destination)
-
-1. **Create Bot & Obtain Credentials**:
-   - Talk to [@BotFather](https://t.me/botfather) on Telegram to create a bot and receive your bot token (`<BOT_TOKEN>`).
-   - Obtain your target Telegram chat ID (using `@userinfobot` or `@get_id_bot`).
-2. **Configure Jellyfin Webhook Plugin**:
-   - In Jellyfin Web, open **Dashboard** &rarr; **Plugins** &rarr; **Webhook**.
-   - Add a new destination: **Generic Destination**.
-   - **Webhook Name**: `Telegram Playback Alerts`
-   - **Webhook URL**: `https://api.telegram.org/bot<BOT_TOKEN>/sendMessage`
-   - **Notification Type**: Enable `Playback Start` and `Playback Stop`.
-   - **Request Header**:
-     - Key: `Content-Type`
-     - Value: `application/json`
-3. **Privacy-Safe Telegram Template**:
-   Paste the following payload into the template field:
-   ```json
-   {
-     "chat_id": "YOUR_CHAT_ID",
-     "text": "🎬 <b>Playback Started</b>\n\n<b>Title:</b> {{#if_equals ItemType 'Episode'}}<b>{{SeriesName}}</b> — S{{SeasonNumber00}}E{{EpisodeNumber00}} {{Name}}{{else}}<b>{{Name}}</b> ({{Year}}){{/if_equals}}\n<b>User:</b> {{NotificationUsername}}\n<b>Client:</b> {{ClientName}} ({{DeviceName}})\n<b>Play Method:</b> {{PlayMethod}}\n<b>Video:</b> {{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}\n<b>Audio:</b> {{Audio_0_Codec}} ({{Audio_0_Channels}}ch)",
-     "parse_mode": "HTML",
-     "protect_content": true,
-     "disable_web_page_preview": true
-   }
-   ```
-
----
-
-### Discord Setup (Discord Destination or Webhook)
-
-1. **Create Discord Webhook**:
-   - In Discord, go to **Server Settings** &rarr; **Integrations** &rarr; **Webhooks** &rarr; **New Webhook**.
-   - Select the destination channel and copy the Webhook URL.
-2. **Configure Jellyfin Webhook Plugin**:
-   - In Jellyfin Web, open **Dashboard** &rarr; **Plugins** &rarr; **Webhook**.
-   - Add a new destination: **Discord Destination** or **Generic Destination**.
-   - **Webhook URL**: `https://discord.com/api/webhooks/<ID>/<TOKEN>`
-   - **Notification Type**: Enable `Playback Start` and `Playback Stop`.
-3. **Privacy-Safe Discord Embed Template**:
-   ```json
-   {
-     "content": "",
-     "allowed_mentions": { "parse": [] },
-     "embeds": [
-       {
-         "title": "🎬 Playback Started",
-         "description": "{{#if_equals ItemType 'Episode'}}**{{SeriesName}}**\nS{{SeasonNumber00}}E{{EpisodeNumber00}} — {{Name}}{{else}}**{{Name}}** ({{Year}}){{/if_equals}}",
-         "color": 421980,
-         "fields": [
-           { "name": "User", "value": "{{NotificationUsername}}", "inline": true },
-           { "name": "Client", "value": "{{ClientName}} ({{DeviceName}})", "inline": true },
-           { "name": "Stream", "value": "{{PlayMethod}}", "inline": true },
-           { "name": "Video", "value": "{{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}", "inline": true },
-           { "name": "Audio", "value": "{{Audio_0_Codec}} {{Audio_0_Channels}}ch", "inline": true }
-         ],
-         "footer": { "text": "Playback Info Card • Privacy Safe" },
-         "timestamp": "{{UtcTimestamp}}"
-       }
-     ]
-   }
-   ```
-   *Note: `"allowed_mentions": { "parse": [] }` strictly prevents media titles containing `@everyone` from generating Discord ping storms.*
+#### IP-Safe Upstream Discord Embed Template:
+```json
+{
+  "content": "",
+  "allowed_mentions": { "parse": [] },
+  "embeds": [
+    {
+      "title": "🎬 Playback Started",
+      "description": "{{#if_equals ItemType 'Episode'}}**{{SeriesName}}**\nS{{SeasonNumber00}}E{{EpisodeNumber00}} — {{Name}}{{else}}**{{Name}}** ({{Year}}){{/if_equals}}",
+      "color": 421980,
+      "fields": [
+        { "name": "User", "value": "{{NotificationUsername}}", "inline": true },
+        { "name": "Client", "value": "{{ClientName}} ({{DeviceName}})", "inline": true },
+        { "name": "Stream", "value": "{{PlayMethod}}", "inline": true },
+        { "name": "Video", "value": "{{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}", "inline": true },
+        { "name": "Audio", "value": "{{Audio_0_Codec}} {{Audio_0_Channels}}ch", "inline": true }
+      ],
+      "footer": { "text": "Playback Info Card • Privacy Safe" },
+      "timestamp": "{{UtcTimestamp}}"
+    }
+  ]
+}
+```
 
 ---
 
