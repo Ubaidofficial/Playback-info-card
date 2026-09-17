@@ -13,7 +13,7 @@
         "changelog": "Release v0.2.3.7 - Telemetry accuracy corrections: Remux and Direct Stream separation in header counts, strict QSV/HW engine suppression when video is direct, truthful framerate parsing (rejection of ffmpeg throughput counter 2191 fps), server-reported transcode reasons without speculative inference, TV series artwork fallback, and accessible 21-field technical breakdown drawer.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.7/jellyfin-plugin-playbackcard.zip",
-        "checksum": "1dc47d73ed36b97577fa78d41c114685",
+        "checksum": "91ed0b7645aee44062cf6457b5dcc2d6",
         "timestamp": "2026-09-17T17:25:00Z"
       },
       {
