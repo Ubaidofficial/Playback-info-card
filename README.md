@@ -1,14 +1,20 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.2**
+**Stable Version: v0.2.3.3**
 
 Real-time, cinema-grade visual stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 
-## What Changed in v0.2.3.2
+## What Changed in v0.2.3.3
 
-Version `0.2.3.2` introduces native server-side Discord & Telegram notifications, an accessible stream details drawer, truthful transcode reason reporting, and an authenticated "My Playback" view for end users.
+Version `0.2.3.3` provides a critical reliability patch for native Discord and Telegram notifications:
+
+* **Dual Route Aliasing**: Resolved HTTP 404 route mismatch on notification and self-session endpoints by supporting both `PlaybackCard/Notifications` and `PlaybackInfoCard/Notifications` (and `/Self`) routes.
+* **Non-Destructive Partial Configuration Updates**: Saving Telegram or Discord configuration independently now safely preserves master notification state and other destination settings without clobbering existing configuration.
+* **Flexible Telegram Token Parsing**: Gracefully accepts Bot API tokens with or without the optional leading `bot` prefix (`bot123...` and `123...`).
+* **Descriptive Diagnostic Results**: Outbound test dispatches now return actionable, privacy-redacted error descriptions and status codes directly in the web UI.
+* **UI State Synchronization**: Diagnostics panel and notification switches now stay synchronized in real time.
 
 * **Plugin-Owned Web Page**: The monitor is now served via Jellyfin's official `IHasWebPages` interface as a dedicated internal admin page (`Dashboard -> Server -> Playback Monitor`).
 * **Zero Host Injection**: Completely eliminated ASP.NET Core middleware, response-stream HTML rewriting, startup pipeline filters (`IStartupFilter`), and disk file manipulation.
@@ -99,11 +105,11 @@ Before copying, an automated redaction check scans for sensitive keywords (`Remo
 2. Add the custom repository:
    - **Repository Name**: `Playback Info Card`
    - **Repository URL**: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
-3. Navigate to **Catalog**, find **Playback Info Card**, and select version **0.2.3.2**.
+3. Navigate to **Catalog**, find **Playback Info Card**, and select version **0.2.3.3**.
 4. Click **Install** and restart Jellyfin server.
 
 ### Method 2: Manual Installation (ZIP / Binary)
-1. Download `jellyfin-plugin-playbackcard.zip` from [v0.2.3.2 GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases/tag/v0.2.3.2).
+1. Download `jellyfin-plugin-playbackcard.zip` from [v0.2.3.3 GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases/tag/v0.2.3.3).
 2. Locate your Jellyfin `plugins` directory:
    - **Linux (systemd)**: `/var/lib/jellyfin/plugins/PlaybackCard/`
    - **Docker**: `<path-to-config>/plugins/PlaybackCard/`

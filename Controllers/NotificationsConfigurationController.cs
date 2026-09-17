@@ -15,6 +15,7 @@ namespace Jellyfin.Plugin.PlaybackCard.Controllers;
 /// </summary>
 [ApiController]
 [Route("PlaybackCard/Notifications")]
+[Route("PlaybackInfoCard/Notifications")]
 [Authorize(Policy = "RequiresElevation")]
 public class NotificationsConfigurationController : ControllerBase
 {
@@ -131,19 +132,56 @@ public class NotificationsConfigurationController : ControllerBase
             config.TelegramChatId = request.TelegramChatId.Trim();
         }
 
-        // 3. Update switches and event preferences
-        config.NotificationsEnabled = request.NotificationsEnabled;
-        config.DiscordEnabled = request.DiscordEnabled;
-        config.TelegramEnabled = request.TelegramEnabled;
-        config.NotifyOnStart = request.NotifyOnStart;
-        config.NotifyOnStop = request.NotifyOnStop;
-        config.NotifyOnPauseResume = request.NotifyOnPauseResume;
-        config.NotifyOnProgress = request.NotifyOnProgress;
-        config.ProgressIntervalMinutes = Math.Max(5, request.ProgressIntervalMinutes);
-        config.NotifyOnCompletion = request.NotifyOnCompletion;
-        config.UsernameDisclosure = request.UsernameDisclosure;
-        config.ClientDeviceDisclosure = request.ClientDeviceDisclosure;
-        config.UserFilterMode = request.UserFilterMode;
+        // 3. Update switches and event preferences (only overwrite when supplied)
+        var notifsEnabled = request.NotificationsEnabled ?? request.Enabled;
+        if (notifsEnabled.HasValue)
+        {
+            config.NotificationsEnabled = notifsEnabled.Value;
+        }
+
+        if (request.DiscordEnabled.HasValue)
+        {
+            config.DiscordEnabled = request.DiscordEnabled.Value;
+            if (config.DiscordEnabled && !notifsEnabled.HasValue && !config.NotificationsEnabled)
+            {
+                config.NotificationsEnabled = true;
+            }
+        }
+
+        if (request.TelegramEnabled.HasValue)
+        {
+            config.TelegramEnabled = request.TelegramEnabled.Value;
+            if (config.TelegramEnabled && !notifsEnabled.HasValue && !config.NotificationsEnabled)
+            {
+                config.NotificationsEnabled = true;
+            }
+        }
+
+        var onStart = request.NotifyOnStart ?? request.NotifyOnPlaybackStart;
+        if (onStart.HasValue) config.NotifyOnStart = onStart.Value;
+
+        var onStop = request.NotifyOnStop ?? request.NotifyOnPlaybackStop;
+        if (onStop.HasValue) config.NotifyOnStop = onStop.Value;
+
+        var onPauseResume = request.NotifyOnPauseResume ?? request.NotifyOnPlaybackPauseResume;
+        if (onPauseResume.HasValue) config.NotifyOnPauseResume = onPauseResume.Value;
+
+        var onProgress = request.NotifyOnProgress ?? request.NotifyOnPlaybackProgress;
+        if (onProgress.HasValue) config.NotifyOnProgress = onProgress.Value;
+
+        var progInterval = request.ProgressIntervalMinutes ?? request.PlaybackProgressIntervalMinutes;
+        if (progInterval.HasValue) config.ProgressIntervalMinutes = Math.Max(5, progInterval.Value);
+
+        var onCompletion = request.NotifyOnCompletion ?? request.NotifyOnPlaybackCompletion;
+        if (onCompletion.HasValue) config.NotifyOnCompletion = onCompletion.Value;
+
+        var userDisc = request.UsernameDisclosure ?? request.IncludeUserAccountName;
+        if (userDisc.HasValue) config.UsernameDisclosure = userDisc.Value;
+
+        var devDisc = request.ClientDeviceDisclosure ?? request.IncludeClientAndDeviceName;
+        if (devDisc.HasValue) config.ClientDeviceDisclosure = devDisc.Value;
+
+        if (request.UserFilterMode.HasValue) config.UserFilterMode = request.UserFilterMode.Value;
 
         if (request.SelectedUserIds != null)
         {
@@ -171,7 +209,7 @@ public class NotificationsConfigurationController : ControllerBase
 
         if (request == null || string.IsNullOrWhiteSpace(request.Destination))
         {
-            return BadRequest(DeliveryResult.Failed("InvalidConfiguration"));
+            return BadRequest(DeliveryResult.Failed("InvalidConfiguration", 400, permanent: true, description: "Missing destination. Specify 'Discord' or 'Telegram'."));
         }
 
         var result = await _deliveryService.SendTestNotificationAsync(request.Destination, HttpContext.RequestAborted).ConfigureAwait(false);
@@ -231,9 +269,12 @@ public class NotificationsConfigurationController : ControllerBase
 public sealed class NotificationConfigurationDto
 {
     public bool NotificationsEnabled { get; init; }
+    public bool Enabled => NotificationsEnabled;
+
     public bool DiscordEnabled { get; init; }
     public bool HasDiscordWebhook { get; init; }
     public string DiscordWebhookMasked { get; init; } = string.Empty;
+    public string DiscordWebhookUrlMasked => DiscordWebhookMasked;
 
     public bool TelegramEnabled { get; init; }
     public bool HasTelegramBotToken { get; init; }
@@ -241,14 +282,22 @@ public sealed class NotificationConfigurationDto
     public string TelegramChatId { get; init; } = string.Empty;
 
     public bool NotifyOnStart { get; init; }
+    public bool NotifyOnPlaybackStart => NotifyOnStart;
     public bool NotifyOnStop { get; init; }
+    public bool NotifyOnPlaybackStop => NotifyOnStop;
     public bool NotifyOnPauseResume { get; init; }
+    public bool NotifyOnPlaybackPauseResume => NotifyOnPauseResume;
     public bool NotifyOnProgress { get; init; }
+    public bool NotifyOnPlaybackProgress => NotifyOnProgress;
     public int ProgressIntervalMinutes { get; init; }
+    public int PlaybackProgressIntervalMinutes => ProgressIntervalMinutes;
     public bool NotifyOnCompletion { get; init; }
+    public bool NotifyOnPlaybackCompletion => NotifyOnCompletion;
 
     public bool UsernameDisclosure { get; init; }
+    public bool IncludeUserAccountName => UsernameDisclosure;
     public bool ClientDeviceDisclosure { get; init; }
+    public bool IncludeClientAndDeviceName => ClientDeviceDisclosure;
     public UserFilterMode UserFilterMode { get; init; }
     public IReadOnlyList<string> SelectedUserIds { get; init; } = Array.Empty<string>();
 
@@ -257,29 +306,40 @@ public sealed class NotificationConfigurationDto
 
 /// <summary>
 /// Write-only request payload for updating notification settings.
+/// Supports partial updates: omitted/null properties do not overwrite existing settings.
 /// </summary>
 public sealed class UpdateNotificationConfigurationRequest
 {
-    public bool NotificationsEnabled { get; set; }
-    public bool DiscordEnabled { get; set; }
+    public bool? NotificationsEnabled { get; set; }
+    public bool? Enabled { get; set; }
+
+    public bool? DiscordEnabled { get; set; }
     public string? DiscordWebhookUrl { get; set; }
     public bool? ClearDiscordWebhook { get; set; }
 
-    public bool TelegramEnabled { get; set; }
+    public bool? TelegramEnabled { get; set; }
     public string? TelegramBotToken { get; set; }
     public bool? ClearTelegramBotToken { get; set; }
     public string? TelegramChatId { get; set; }
 
-    public bool NotifyOnStart { get; set; }
-    public bool NotifyOnStop { get; set; }
-    public bool NotifyOnPauseResume { get; set; }
-    public bool NotifyOnProgress { get; set; }
-    public int ProgressIntervalMinutes { get; set; }
-    public bool NotifyOnCompletion { get; set; }
+    public bool? NotifyOnStart { get; set; }
+    public bool? NotifyOnPlaybackStart { get; set; }
+    public bool? NotifyOnStop { get; set; }
+    public bool? NotifyOnPlaybackStop { get; set; }
+    public bool? NotifyOnPauseResume { get; set; }
+    public bool? NotifyOnPlaybackPauseResume { get; set; }
+    public bool? NotifyOnProgress { get; set; }
+    public bool? NotifyOnPlaybackProgress { get; set; }
+    public int? ProgressIntervalMinutes { get; set; }
+    public int? PlaybackProgressIntervalMinutes { get; set; }
+    public bool? NotifyOnCompletion { get; set; }
+    public bool? NotifyOnPlaybackCompletion { get; set; }
 
-    public bool UsernameDisclosure { get; set; }
-    public bool ClientDeviceDisclosure { get; set; }
-    public UserFilterMode UserFilterMode { get; set; }
+    public bool? UsernameDisclosure { get; set; }
+    public bool? IncludeUserAccountName { get; set; }
+    public bool? ClientDeviceDisclosure { get; set; }
+    public bool? IncludeClientAndDeviceName { get; set; }
+    public UserFilterMode? UserFilterMode { get; set; }
     public List<string>? SelectedUserIds { get; set; }
 }
 

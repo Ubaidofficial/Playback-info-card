@@ -286,10 +286,10 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
                 }
 
                 // Permanent client errors (400, 401, 403, 404)
-                if (status == 400) return DeliveryResult.Failed("BadRequest", 400, permanent: true);
-                if (status == 401) return DeliveryResult.Failed("Unauthorized", 401, permanent: true);
-                if (status == 403) return DeliveryResult.Failed("Forbidden", 403, permanent: true);
-                if (status == 404) return DeliveryResult.Failed("NotFound", 404, permanent: true);
+                if (status == 400) return DeliveryResult.Failed("BadRequest", 400, permanent: true, description: "Bad Request (malformed Discord payload or parameters)");
+                if (status == 401) return DeliveryResult.Failed("Unauthorized", 401, permanent: true, description: "Unauthorized (invalid or revoked Discord webhook token)");
+                if (status == 403) return DeliveryResult.Failed("Forbidden", 403, permanent: true, description: "Forbidden (Discord webhook lacks permissions in channel)");
+                if (status == 404) return DeliveryResult.Failed("NotFound", 404, permanent: true, description: "Not Found (Discord webhook URL does not exist or channel was deleted)");
 
                 // Transient server errors (5xx, 408, 425)
                 if (attempt < maxRetries && (status >= 500 || status == 408 || status == 425))

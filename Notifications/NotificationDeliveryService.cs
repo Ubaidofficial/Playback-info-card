@@ -392,7 +392,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         var config = Plugin.Instance?.Configuration;
         if (config == null)
         {
-            return DeliveryResult.Failed("InvalidConfiguration");
+            return DeliveryResult.Failed("InvalidConfiguration", 500, permanent: true, description: "Plugin configuration is not initialized.");
         }
 
         if (string.Equals(destination, "discord", StringComparison.OrdinalIgnoreCase))
@@ -400,7 +400,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             var webhookUrl = _secretStore.GetDiscordWebhookUrl();
             if (string.IsNullOrWhiteSpace(webhookUrl))
             {
-                return DeliveryResult.Failed("InvalidConfiguration");
+                return DeliveryResult.Failed("InvalidConfiguration", 400, permanent: true, description: "Discord Webhook URL is not configured. Save a valid Discord Webhook URL first.");
             }
             return await _discordSender.SendTestAsync(webhookUrl, cancellationToken).ConfigureAwait(false);
         }
@@ -408,14 +408,18 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         if (string.Equals(destination, "telegram", StringComparison.OrdinalIgnoreCase))
         {
             var botToken = _secretStore.GetTelegramBotToken();
-            if (string.IsNullOrWhiteSpace(botToken) || string.IsNullOrWhiteSpace(config.TelegramChatId))
+            if (string.IsNullOrWhiteSpace(botToken))
             {
-                return DeliveryResult.Failed("InvalidConfiguration");
+                return DeliveryResult.Failed("InvalidConfiguration", 400, permanent: true, description: "Telegram Bot Token is not configured. Save a valid bot token first.");
+            }
+            if (string.IsNullOrWhiteSpace(config.TelegramChatId))
+            {
+                return DeliveryResult.Failed("InvalidConfiguration", 400, permanent: true, description: "Telegram Chat ID is not configured. Save a valid Chat ID or @channel username first.");
             }
             return await _telegramSender.SendTestAsync(botToken, config.TelegramChatId, cancellationToken).ConfigureAwait(false);
         }
 
-        return DeliveryResult.Failed("InvalidConfiguration");
+        return DeliveryResult.Failed("InvalidConfiguration", 400, permanent: true, description: $"Unsupported destination '{destination}'. Supported destinations: 'Discord', 'Telegram'.");
     }
 
     /// <inheritdoc />

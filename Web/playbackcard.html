@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.3.2</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.3.3</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -262,7 +262,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.3.2</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.3.3</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -1490,7 +1490,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.3.2';
+    var PLUGIN_VERSION = '0.2.3.3';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -2583,7 +2583,7 @@
 
     function loadNotificationSettings(page) {
         if (!page) return Promise.resolve();
-        return callNotificationApi('PlaybackInfoCard/Notifications/Configuration', { method: 'GET' })
+        return callNotificationApi('PlaybackCard/Notifications/Configuration', { method: 'GET' })
             .then(function (data) {
                 if (!data) return;
 
@@ -2607,12 +2607,14 @@
                 var chkUser = page.querySelector('#chkUsernameDisclosure');
                 var chkDev = page.querySelector('#chkClientDeviceDisclosure');
 
-                if (chkMaster) chkMaster.checked = Boolean(data.enabled);
+                var isMaster = data.notificationsEnabled != null ? data.notificationsEnabled : data.enabled;
+                if (chkMaster) chkMaster.checked = Boolean(isMaster);
                 if (chkDiscord) chkDiscord.checked = Boolean(data.discordEnabled);
                 if (txtDiscord) {
                     txtDiscord.value = '';
-                    if (data.discordWebhookUrlMasked) {
-                        txtDiscord.placeholder = data.discordWebhookUrlMasked;
+                    var maskedDiscord = data.discordWebhookMasked || data.discordWebhookUrlMasked;
+                    if (maskedDiscord) {
+                        txtDiscord.placeholder = maskedDiscord;
                     }
                 }
                 if (badgeDiscord) {
@@ -2634,32 +2636,32 @@
                     badgeTelegram.className = 'notifBadge ' + (data.telegramEnabled && tgOk ? 'status-ok' : 'status-disabled');
                 }
 
-                if (chkStart) chkStart.checked = Boolean(data.notifyOnPlaybackStart);
-                if (chkStop) chkStop.checked = Boolean(data.notifyOnPlaybackStop);
-                if (chkComp) chkComp.checked = Boolean(data.notifyOnPlaybackCompletion);
-                if (chkPause) chkPause.checked = Boolean(data.notifyOnPlaybackPauseResume);
-                if (chkProg) chkProg.checked = Boolean(data.notifyOnPlaybackProgress);
-                if (numProg) numProg.value = data.playbackProgressIntervalMinutes || 15;
+                if (chkStart) chkStart.checked = Boolean(data.notifyOnStart != null ? data.notifyOnStart : data.notifyOnPlaybackStart);
+                if (chkStop) chkStop.checked = Boolean(data.notifyOnStop != null ? data.notifyOnStop : data.notifyOnPlaybackStop);
+                if (chkComp) chkComp.checked = Boolean(data.notifyOnCompletion != null ? data.notifyOnCompletion : data.notifyOnPlaybackCompletion);
+                if (chkPause) chkPause.checked = Boolean(data.notifyOnPauseResume != null ? data.notifyOnPauseResume : data.notifyOnPlaybackPauseResume);
+                if (chkProg) chkProg.checked = Boolean(data.notifyOnProgress != null ? data.notifyOnProgress : data.notifyOnPlaybackProgress);
+                if (numProg) numProg.value = data.progressIntervalMinutes || data.playbackProgressIntervalMinutes || 15;
 
-                if (chkUser) chkUser.checked = Boolean(data.includeUserAccountName);
-                if (chkDev) chkDev.checked = Boolean(data.includeClientAndDeviceName);
+                if (chkUser) chkUser.checked = Boolean(data.usernameDisclosure != null ? data.usernameDisclosure : data.includeUserAccountName);
+                if (chkDev) chkDev.checked = Boolean(data.clientDeviceDisclosure != null ? data.clientDeviceDisclosure : data.includeClientAndDeviceName);
 
                 // Update local diag state
                 var notifs = diagState.notifications;
-                notifs.enabled = Boolean(data.enabled);
+                notifs.enabled = Boolean(isMaster);
                 notifs.discordEnabled = Boolean(data.discordEnabled);
                 notifs.telegramEnabled = Boolean(data.telegramEnabled);
                 if (data.diagnostics) {
                     notifs.discordQueueDepth = data.diagnostics.discordQueueDepth || 0;
                     notifs.telegramQueueDepth = data.diagnostics.telegramQueueDepth || 0;
                     notifs.droppedProgressCount = data.diagnostics.droppedProgressCount || 0;
-                    notifs.dedupeCount = data.diagnostics.deduplicatedEventsCount || 0;
-                    notifs.retryCount = data.diagnostics.retryAttemptsCount || 0;
-                    notifs.lastAttempt = data.diagnostics.lastDeliveryAttemptUtc ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastDeliveryAttemptUtc).getTime()) : 'None';
-                    notifs.lastSuccess = data.diagnostics.lastSuccessfulDeliveryUtc ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastSuccessfulDeliveryUtc).getTime()) : 'None';
-                    notifs.lastFailureCategory = data.diagnostics.lastFailureCategory || 'OK';
-                    notifs.discordAvailability = data.diagnostics.discordAvailability || 'Available';
-                    notifs.telegramAvailability = data.diagnostics.telegramAvailability || 'Available';
+                    notifs.dedupeCount = data.diagnostics.deduplicatedEventsCount || data.diagnostics.dedupeCount || 0;
+                    notifs.retryCount = data.diagnostics.retryAttemptsCount || data.diagnostics.retryCount || 0;
+                    notifs.lastAttempt = data.diagnostics.lastDeliveryAttemptUtc || data.diagnostics.lastAttemptTimestamp ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastDeliveryAttemptUtc || data.diagnostics.lastAttemptTimestamp).getTime()) : 'None';
+                    notifs.lastSuccess = data.diagnostics.lastSuccessfulDeliveryUtc || data.diagnostics.lastSuccessTimestamp ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastSuccessfulDeliveryUtc || data.diagnostics.lastSuccessTimestamp).getTime()) : 'None';
+                    notifs.lastFailureCategory = data.diagnostics.lastFailureCategory || data.diagnostics.lastSanitizedFailureCategory || 'OK';
+                    notifs.discordAvailability = data.diagnostics.discordAvailability || data.diagnostics.discordAvailabilityState || 'Available';
+                    notifs.telegramAvailability = data.diagnostics.telegramAvailability || data.diagnostics.telegramAvailabilityState || 'Available';
                 }
 
                 updateDiagnosticsDisplay();
@@ -2675,11 +2677,18 @@
 
         if (section === 'master') {
             var chkMaster = page.querySelector('#chkNotificationsEnabled');
-            payload.enabled = chkMaster ? chkMaster.checked : false;
+            payload.notificationsEnabled = chkMaster ? chkMaster.checked : false;
+            payload.enabled = payload.notificationsEnabled;
         } else if (section === 'discord') {
             var chkDiscord = page.querySelector('#chkDiscordEnabled');
             var txtWebhook = page.querySelector('#txtDiscordWebhookUrl');
+            var chkMaster = page.querySelector('#chkNotificationsEnabled');
             payload.discordEnabled = chkDiscord ? chkDiscord.checked : false;
+            if (payload.discordEnabled && chkMaster && !chkMaster.checked) {
+                chkMaster.checked = true;
+                payload.notificationsEnabled = true;
+                payload.enabled = true;
+            }
             if (txtWebhook && txtWebhook.value.trim().length > 0) {
                 payload.discordWebhookUrl = txtWebhook.value.trim();
             }
@@ -2687,7 +2696,13 @@
             var chkTelegram = page.querySelector('#chkTelegramEnabled');
             var txtToken = page.querySelector('#txtTelegramBotToken');
             var txtChat = page.querySelector('#txtTelegramChatId');
+            var chkMaster = page.querySelector('#chkNotificationsEnabled');
             payload.telegramEnabled = chkTelegram ? chkTelegram.checked : false;
+            if (payload.telegramEnabled && chkMaster && !chkMaster.checked) {
+                chkMaster.checked = true;
+                payload.notificationsEnabled = true;
+                payload.enabled = true;
+            }
             if (txtToken && txtToken.value.trim().length > 0) {
                 payload.telegramBotToken = txtToken.value.trim();
             }
@@ -2704,17 +2719,25 @@
             var chkUser = page.querySelector('#chkUsernameDisclosure');
             var chkDev = page.querySelector('#chkClientDeviceDisclosure');
 
-            payload.notifyOnPlaybackStart = chkStart ? chkStart.checked : false;
-            payload.notifyOnPlaybackStop = chkStop ? chkStop.checked : false;
-            payload.notifyOnPlaybackCompletion = chkComp ? chkComp.checked : false;
-            payload.notifyOnPlaybackPauseResume = chkPause ? chkPause.checked : false;
-            payload.notifyOnPlaybackProgress = chkProg ? chkProg.checked : false;
-            payload.playbackProgressIntervalMinutes = numProg ? Math.max(5, Math.min(120, parseInt(numProg.value, 10) || 15)) : 15;
-            payload.includeUserAccountName = chkUser ? chkUser.checked : false;
-            payload.includeClientAndDeviceName = chkDev ? chkDev.checked : false;
+            payload.notifyOnStart = chkStart ? chkStart.checked : false;
+            payload.notifyOnPlaybackStart = payload.notifyOnStart;
+            payload.notifyOnStop = chkStop ? chkStop.checked : false;
+            payload.notifyOnPlaybackStop = payload.notifyOnStop;
+            payload.notifyOnCompletion = chkComp ? chkComp.checked : false;
+            payload.notifyOnPlaybackCompletion = payload.notifyOnCompletion;
+            payload.notifyOnPauseResume = chkPause ? chkPause.checked : false;
+            payload.notifyOnPlaybackPauseResume = payload.notifyOnPauseResume;
+            payload.notifyOnProgress = chkProg ? chkProg.checked : false;
+            payload.notifyOnPlaybackProgress = payload.notifyOnProgress;
+            payload.progressIntervalMinutes = numProg ? Math.max(5, Math.min(120, parseInt(numProg.value, 10) || 15)) : 15;
+            payload.playbackProgressIntervalMinutes = payload.progressIntervalMinutes;
+            payload.usernameDisclosure = chkUser ? chkUser.checked : false;
+            payload.includeUserAccountName = payload.usernameDisclosure;
+            payload.clientDeviceDisclosure = chkDev ? chkDev.checked : false;
+            payload.includeClientAndDeviceName = payload.clientDeviceDisclosure;
         }
 
-        callNotificationApi('PlaybackInfoCard/Notifications/Configuration', {
+        callNotificationApi('PlaybackCard/Notifications/Configuration', {
             method: 'POST',
             body: payload
         }).then(function () {
@@ -2730,6 +2753,7 @@
         if (!page) return;
         var payload = {};
         if (secretType === 'discord') {
+            payload.clearDiscordWebhook = true;
             payload.clearDiscordWebhookUrl = true;
             payload.discordEnabled = false;
         } else if (secretType === 'telegram') {
@@ -2737,7 +2761,7 @@
             payload.telegramEnabled = false;
         }
 
-        callNotificationApi('PlaybackInfoCard/Notifications/Configuration', {
+        callNotificationApi('PlaybackCard/Notifications/Configuration', {
             method: 'POST',
             body: payload
         }).then(function () {
@@ -2752,11 +2776,23 @@
     function sendTestNotification(page, destination) {
         if (!page) return;
         showNotificationFeedback(page, 'Sending test ' + destination + ' notification…', false);
-        callNotificationApi('PlaybackInfoCard/Notifications/Test', {
+        callNotificationApi('PlaybackCard/Notifications/Test', {
             method: 'POST',
             body: { destination: destination }
-        }).then(function () {
-            showNotificationFeedback(page, 'Test ' + destination + ' notification queued successfully.', false);
+        }).then(function (result) {
+            if (result && result.success) {
+                showNotificationFeedback(page, 'Test ' + destination + ' notification delivered successfully!', false);
+            } else {
+                var reason = 'Delivery failed';
+                if (result) {
+                    var parts = [];
+                    if (result.category && result.category !== 'OK') parts.push(result.category);
+                    if (result.statusCode) parts.push('HTTP ' + result.statusCode);
+                    if (result.description) parts.push(result.description);
+                    if (parts.length > 0) reason = parts.join(' - ');
+                }
+                showNotificationFeedback(page, 'Test ' + destination + ' failed: ' + reason, true);
+            }
             fetchNotificationDiagnostics(page);
         }).catch(function (err) {
             console.error('[PlaybackCard] Test notification dispatch error:', err);
@@ -2766,27 +2802,33 @@
 
     function fetchNotificationDiagnostics(page) {
         if (!page) return;
-        callNotificationApi('PlaybackInfoCard/Notifications/Diagnostics', { method: 'GET' })
+        callNotificationApi('PlaybackCard/Notifications/Diagnostics', { method: 'GET' })
             .then(function (data) {
                 if (!data) return;
                 var notifs = diagState.notifications;
+                if (typeof data.notificationsEnabled === 'boolean') notifs.enabled = data.notificationsEnabled;
+                else if (typeof data.enabled === 'boolean') notifs.enabled = data.enabled;
+                if (typeof data.discordEnabled === 'boolean') notifs.discordEnabled = data.discordEnabled;
+                if (typeof data.telegramEnabled === 'boolean') notifs.telegramEnabled = data.telegramEnabled;
                 notifs.discordQueueDepth = data.discordQueueDepth || 0;
                 notifs.telegramQueueDepth = data.telegramQueueDepth || 0;
                 notifs.droppedProgressCount = data.droppedProgressCount || 0;
                 notifs.droppedCriticalCount = data.droppedCriticalCount || 0;
                 notifs.coalescedProgressCount = data.coalescedProgressCount || 0;
                 notifs.rateLimitDropCount = data.rateLimitDropCount || 0;
-                notifs.dedupeCount = data.deduplicatedEventsCount || 0;
-                notifs.retryCount = data.retryAttemptsCount || 0;
+                notifs.dedupeCount = data.deduplicatedEventsCount || data.dedupeCount || 0;
+                notifs.retryCount = data.retryAttemptsCount || data.retryCount || 0;
                 notifs.queueCapacity = data.queueCapacity || 100;
                 notifs.validationFailureCount = data.validationFailureCount || 0;
                 notifs.workerState = data.workerState || 'Idle';
                 notifs.lastHttpStatus = data.lastHttpStatus != null ? data.lastHttpStatus : null;
-                notifs.lastAttempt = data.lastDeliveryAttemptUtc ? formatRelativeTime(Date.now() - new Date(data.lastDeliveryAttemptUtc).getTime()) : 'None';
-                notifs.lastSuccess = data.lastSuccessfulDeliveryUtc ? formatRelativeTime(Date.now() - new Date(data.lastSuccessfulDeliveryUtc).getTime()) : 'None';
-                notifs.lastFailureCategory = data.lastFailureCategory || 'OK';
-                notifs.discordAvailability = data.discordAvailability || 'Available';
-                notifs.telegramAvailability = data.telegramAvailability || 'Available';
+                var attemptTime = data.lastDeliveryAttemptUtc || data.lastAttemptTimestamp;
+                notifs.lastAttempt = attemptTime ? formatRelativeTime(Date.now() - new Date(attemptTime).getTime()) : 'None';
+                var successTime = data.lastSuccessfulDeliveryUtc || data.lastSuccessTimestamp;
+                notifs.lastSuccess = successTime ? formatRelativeTime(Date.now() - new Date(successTime).getTime()) : 'None';
+                notifs.lastFailureCategory = data.lastFailureCategory || data.lastSanitizedFailureCategory || 'OK';
+                notifs.discordAvailability = data.discordAvailability || data.discordAvailabilityState || 'Available';
+                notifs.telegramAvailability = data.telegramAvailability || data.telegramAvailabilityState || 'Available';
                 updateDiagnosticsDisplay();
             })
             .catch(function () {

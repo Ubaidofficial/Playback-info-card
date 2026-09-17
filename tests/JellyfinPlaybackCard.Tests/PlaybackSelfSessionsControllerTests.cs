@@ -21,8 +21,13 @@ namespace JellyfinPlaybackCard.Tests;
 
 public class MockDeliveryService : INotificationDeliveryService
 {
+    public Func<string, Task<DeliveryResult>>? OnSendTest { get; set; }
     public void Enqueue(PlaybackEventRecord record) { }
-    public Task<DeliveryResult> SendTestNotificationAsync(string destination, CancellationToken cancellationToken) => Task.FromResult(DeliveryResult.Ok());
+    public Task<DeliveryResult> SendTestNotificationAsync(string destination, CancellationToken cancellationToken)
+    {
+        if (OnSendTest != null) return OnSendTest(destination);
+        return Task.FromResult(DeliveryResult.Ok());
+    }
     public NotificationDiagnosticsSnapshot GetDiagnostics() => new();
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -533,6 +538,131 @@ public class PlaybackSelfSessionsControllerTests
         var response = controller.UpdateConfiguration(request);
         var badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public void NotificationsConfigurationController_UpdateConfiguration_PartialSave_PreservesOtherSections()
+    {
+        var adminUser = Guid.NewGuid();
+        var secretStore = new MockSecretStore
+        {
+            DiscordWebhookUrl = "https://discord.com/api/webhooks/123/existingDiscordToken"
+        };
+        var config = new PluginConfiguration
+        {
+            NotificationsEnabled = true,
+            DiscordEnabled = true,
+            NotifyOnStart = true,
+            NotifyOnStop = true,
+            ProgressIntervalMinutes = 20
+        };
+
+        var controller = new NotificationsConfigurationController(new MockDeliveryService(), secretStore, config)
+        {
+            ControllerContext = CreateContextForUser(adminUser, isAdministrator: true)
+        };
+
+        // User saves ONLY Telegram section
+        var request = new UpdateNotificationConfigurationRequest
+        {
+            TelegramEnabled = true,
+            TelegramBotToken = "99999:validTelegramToken",
+            TelegramChatId = "-100123456789"
+        };
+
+        var response = controller.UpdateConfiguration(request);
+        var okResult = Assert.IsType<OkObjectResult>(response.Result);
+        var dto = Assert.IsType<NotificationConfigurationDto>(okResult.Value);
+
+        // Verify Telegram settings applied
+        Assert.True(config.TelegramEnabled);
+        Assert.True(dto.TelegramEnabled);
+        Assert.Equal("-100123456789", config.TelegramChatId);
+
+        // Verify other sections were NOT clobbered or reset to false/defaults
+        Assert.True(config.NotificationsEnabled);
+        Assert.True(dto.NotificationsEnabled);
+        Assert.True(dto.Enabled);
+        Assert.True(config.DiscordEnabled);
+        Assert.True(dto.DiscordEnabled);
+        Assert.True(config.NotifyOnStart);
+        Assert.True(dto.NotifyOnStart);
+        Assert.True(config.NotifyOnStop);
+        Assert.True(dto.NotifyOnStop);
+        Assert.Equal(20, config.ProgressIntervalMinutes);
+        Assert.Equal(20, dto.ProgressIntervalMinutes);
+
+        // Verify existing Discord secret in store is preserved
+        Assert.Equal("https://discord.com/api/webhooks/123/existingDiscordToken", secretStore.GetDiscordWebhookUrl());
+    }
+
+    [Fact]
+    public void NotificationsConfigurationController_Routes_MappedCorrectlyWithDualAliases()
+    {
+        var type = typeof(NotificationsConfigurationController);
+        var routeAttributes = type.GetCustomAttributes(typeof(RouteAttribute), false)
+            .Cast<RouteAttribute>()
+            .Select(r => r.Template)
+            .ToList();
+
+        Assert.Contains("PlaybackCard/Notifications", routeAttributes);
+        Assert.Contains("PlaybackInfoCard/Notifications", routeAttributes);
+    }
+
+    [Fact]
+    public void PlaybackSelfSessionsController_Routes_MappedCorrectlyWithDualAliases()
+    {
+        var type = typeof(PlaybackSelfSessionsController);
+        var routeAttributes = type.GetCustomAttributes(typeof(RouteAttribute), false)
+            .Cast<RouteAttribute>()
+            .Select(r => r.Template)
+            .ToList();
+
+        Assert.Contains("PlaybackCard/Self", routeAttributes);
+        Assert.Contains("PlaybackInfoCard/Self", routeAttributes);
+    }
+
+    [Fact]
+    public async Task NotificationsConfigurationController_SendTestNotification_ReturnsDescriptiveFailure_WhenMissingDestination()
+    {
+        var adminUser = Guid.NewGuid();
+        var controller = new NotificationsConfigurationController(new MockDeliveryService(), new MockSecretStore())
+        {
+            ControllerContext = CreateContextForUser(adminUser, isAdministrator: true)
+        };
+
+        var response = await controller.SendTestNotification(new SendTestNotificationRequest { Destination = "" });
+        var badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        var delivery = Assert.IsType<DeliveryResult>(badRequest.Value);
+
+        Assert.False(delivery.Success);
+        Assert.Equal("InvalidConfiguration", delivery.Category);
+        Assert.Equal(StatusCodes.Status400BadRequest, delivery.StatusCode);
+        Assert.NotNull(delivery.Description);
+        Assert.Contains("Missing destination", delivery.Description);
+    }
+
+    [Fact]
+    public async Task NotificationsConfigurationController_SendTestNotification_ReturnsResultFromDeliveryService()
+    {
+        var adminUser = Guid.NewGuid();
+        var mockService = new MockDeliveryService
+        {
+            OnSendTest = dest => Task.FromResult(DeliveryResult.Failed("Unauthorized", 401, permanent: true, description: "Invalid bot token"))
+        };
+        var controller = new NotificationsConfigurationController(mockService, new MockSecretStore())
+        {
+            ControllerContext = CreateContextForUser(adminUser, isAdministrator: true)
+        };
+
+        var response = await controller.SendTestNotification(new SendTestNotificationRequest { Destination = "Telegram" });
+        var okResult = Assert.IsType<OkObjectResult>(response.Result);
+        var delivery = Assert.IsType<DeliveryResult>(okResult.Value);
+
+        Assert.False(delivery.Success);
+        Assert.Equal("Unauthorized", delivery.Category);
+        Assert.Equal(401, delivery.StatusCode);
+        Assert.Equal("Invalid bot token", delivery.Description);
     }
 
     [Fact]

@@ -85,7 +85,13 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             return false;
         }
 
-        if (botToken.Any(char.IsControl) || botToken.Any(char.IsWhiteSpace) ||
+        var trimmedToken = botToken.Trim();
+        if (trimmedToken.StartsWith("bot", StringComparison.OrdinalIgnoreCase) && trimmedToken.Length > 3 && char.IsDigit(trimmedToken[3]))
+        {
+            trimmedToken = trimmedToken.Substring(3);
+        }
+
+        if (trimmedToken.Any(char.IsControl) || trimmedToken.Any(char.IsWhiteSpace) ||
             chatId.Any(char.IsControl) || chatId.Any(char.IsWhiteSpace) ||
             chatId.Contains('?') || chatId.Contains('#') || chatId.Contains('/') || chatId.Contains('\\'))
         {
@@ -93,7 +99,6 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             return false;
         }
 
-        var trimmedToken = botToken.Trim();
         if (!TokenFormatRegex.IsMatch(trimmedToken))
         {
             errorCategory = "InvalidConfiguration";
@@ -252,10 +257,11 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
                     return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
                 }
 
-                if (status == 400) return DeliveryResult.Failed("BadRequest", 400, permanent: true);
-                if (status == 401) return DeliveryResult.Failed("Unauthorized", 401, permanent: true);
-                if (status == 403) return DeliveryResult.Failed("Forbidden", 403, permanent: true);
-                if (status == 404) return DeliveryResult.Failed("NotFound", 404, permanent: true);
+                var errorDesc = ParseTelegramErrorDescription(responseBody);
+                if (status == 400) return DeliveryResult.Failed("BadRequest", 400, permanent: true, description: errorDesc ?? "Bad Request (verify chat ID and bot permissions)");
+                if (status == 401) return DeliveryResult.Failed("Unauthorized", 401, permanent: true, description: errorDesc ?? "Unauthorized (invalid Telegram bot token)");
+                if (status == 403) return DeliveryResult.Failed("Forbidden", 403, permanent: true, description: errorDesc ?? "Forbidden (bot was blocked or lacks chat access)");
+                if (status == 404) return DeliveryResult.Failed("NotFound", 404, permanent: true, description: errorDesc ?? "Not Found (invalid bot token or endpoint on Telegram)");
 
                 if (attempt < maxRetries && (status >= 500 || status == 408 || status == 425))
                 {
@@ -556,5 +562,27 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             idx += pattern.Length;
         }
         return count;
+    }
+
+    private static string? ParseTelegramErrorDescription(string? responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            if (doc.RootElement.TryGetProperty("description", out var descProp) && descProp.ValueKind == JsonValueKind.String)
+            {
+                var desc = descProp.GetString();
+                if (!string.IsNullOrWhiteSpace(desc))
+                {
+                    return SecretRedactor.Redact(desc);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Ignore parse failures
+        }
+        return null;
     }
 }

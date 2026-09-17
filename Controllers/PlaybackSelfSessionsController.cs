@@ -23,6 +23,7 @@ namespace Jellyfin.Plugin.PlaybackCard.Controllers;
 /// </summary>
 [ApiController]
 [Route("PlaybackCard/Self")]
+[Route("PlaybackInfoCard/Self")]
 [Authorize]
 public class PlaybackSelfSessionsController : ControllerBase
 {
