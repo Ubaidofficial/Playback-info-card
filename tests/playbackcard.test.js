@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.5.0 Test Suite', () => {
+describe('Playback Info Card v0.2.5.1 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.5.0', () => {
-            assert.equal(controller.version, '0.2.5.0');
-            assert.equal(controller.diagState.pluginVersion, '0.2.5.0');
+        it('initializes with default waiting state and version 0.2.5.1', () => {
+            assert.equal(controller.version, '0.2.5.1');
+            assert.equal(controller.diagState.pluginVersion, '0.2.5.1');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -177,7 +177,7 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.5.0');
+            assert.equal(report.pluginVersion, '0.2.5.1');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -225,7 +225,7 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.5.0',
+                pluginVersion: '0.2.5.1',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -656,7 +656,7 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
             assert.ok(!controller.openInfoSessionIds['monitor-persist-1'], 'Open-info state is pruned once its session is gone');
         });
 
-        it('mirrors the v0.2.5.0 additions on this page too (ETA, Atmos, audio language, subtitle delivery method, avatar)', () => {
+        it('mirrors the v0.2.5.1 additions on this page too (ETA, Atmos, audio language, subtitle delivery method, avatar)', () => {
             const session = {
                 Id: 'monitor-additions-1', UserId: 'u-1', UserName: 'X',
                 PlayState: { IsPaused: false, SubtitleStreamIndex: 2 },
@@ -677,7 +677,7 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.5.0)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.5.1)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -715,10 +715,10 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.5.0', () => {
+        it('initializes with version 0.2.5.1', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.5.0');
-            assert.equal(dash.state.version, '0.2.5.0');
+            assert.equal(dash.version, '0.2.5.1');
+            assert.equal(dash.state.version, '0.2.5.1');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -2062,7 +2062,7 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
         });
     });
 
-    describe('22. v0.2.5.0 additions (ETA, Atmos/DTS:X, audio language, subtitle delivery method, avatar)', () => {
+    describe('22. v0.2.5.1 additions (ETA, Atmos/DTS:X, audio language, subtitle delivery method, avatar)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
         function createMockDashboard() {

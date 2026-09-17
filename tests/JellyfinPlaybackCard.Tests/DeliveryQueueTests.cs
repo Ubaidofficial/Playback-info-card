@@ -229,4 +229,75 @@ public class DeliveryQueueTests
         Assert.Equal(1, results.Count(deduped => !deduped));
         Assert.Equal(concurrency - 1, results.Count(deduped => deduped));
     }
+
+    // The following exercise NotificationDeliveryService's public API directly (previously
+    // untested against the real class -- only hand-written INotificationDeliveryService fakes
+    // were used elsewhere). Plugin.Instance is never constructed anywhere in this test process
+    // (constructing the real Plugin singleton requires IApplicationPaths/IXmlSerializer and,
+    // being a shared static, would risk leaking state into every other test in the assembly),
+    // so these cover the graceful "plugin not yet initialized" code paths, which are exactly
+    // what a fresh Jellyfin server sees before its configuration is first saved.
+
+    [Fact]
+    public void GetDiagnostics_PluginInstanceNotInitialized_ReturnsSafeDisabledDefaults()
+    {
+        using var service = new NotificationDeliveryService(
+            new TestLogger<NotificationDeliveryService>(),
+            new NoOpDiscordWebhookSender(),
+            new NoOpTelegramBotApiSender(),
+            new NoOpNotificationSecretStore());
+
+        var snapshot = service.GetDiagnostics();
+
+        Assert.False(snapshot.NotificationsEnabled);
+        Assert.False(snapshot.DiscordEnabled);
+        Assert.False(snapshot.TelegramEnabled);
+        Assert.Equal("Unconfigured", snapshot.DiscordAvailabilityState);
+        Assert.Equal("Unconfigured", snapshot.TelegramAvailabilityState);
+        Assert.Equal(100, snapshot.QueueCapacity);
+        Assert.Equal(0, snapshot.DiscordQueueDepth);
+        Assert.Equal(0, snapshot.TelegramQueueDepth);
+        Assert.Equal(0, snapshot.DedupeCount);
+        Assert.Equal(0, snapshot.RetryCount);
+    }
+
+    [Theory]
+    [InlineData("discord")]
+    [InlineData("telegram")]
+    [InlineData("Discord")]
+    [InlineData("TELEGRAM")]
+    public async Task SendTestNotificationAsync_PluginInstanceNotInitialized_ReturnsInvalidConfigurationFailure(string destination)
+    {
+        using var service = new NotificationDeliveryService(
+            new TestLogger<NotificationDeliveryService>(),
+            new NoOpDiscordWebhookSender(),
+            new NoOpTelegramBotApiSender(),
+            new NoOpNotificationSecretStore());
+
+        var result = await service.SendTestNotificationAsync(destination, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("InvalidConfiguration", result.Category);
+        Assert.True(result.IsPermanentFailure);
+        Assert.Contains("not initialized", result.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Enqueue_PluginInstanceNotInitialized_NoOpsSafelyWithoutThrowing()
+    {
+        using var service = new NotificationDeliveryService(
+            new TestLogger<NotificationDeliveryService>(),
+            new NoOpDiscordWebhookSender(),
+            new NoOpTelegramBotApiSender(),
+            new NoOpNotificationSecretStore());
+
+        var record = CreateRecord(NotificationEventType.Start, $"enqueue-noop-{Guid.NewGuid():N}");
+
+        var exception = Record.Exception(() => service.Enqueue(record));
+
+        Assert.Null(exception);
+        // Nothing was actually queued -- there's no live plugin configuration to enqueue against.
+        Assert.Equal(0, service.GetDiagnostics().DiscordQueueDepth);
+        Assert.Equal(0, service.GetDiagnostics().TelegramQueueDepth);
+    }
 }
