@@ -96,7 +96,7 @@ public class NotificationsConfigurationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "PluginNotLoaded" });
         }
 
-        // 1. Handle Discord Webhook Credential
+        // 1. Handle Discord Webhook Credential (Omitted, Masked, New, or Clear)
         if (request.ClearDiscordWebhook == true || string.Equals(request.DiscordWebhookUrl, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
         {
             _secretStore.ClearDiscordWebhookUrl();
@@ -104,27 +104,33 @@ public class NotificationsConfigurationController : ControllerBase
         else if (!string.IsNullOrWhiteSpace(request.DiscordWebhookUrl))
         {
             var trimmed = request.DiscordWebhookUrl.Trim();
-            if (!DiscordWebhookSender.ValidateWebhookUrl(trimmed, out _, out var errCategory))
+            if (!SecretRedactor.IsMasked(trimmed))
             {
-                return BadRequest(new { error = errCategory, message = "Invalid Discord webhook URL format, scheme, host, or path." });
+                if (!DiscordWebhookSender.ValidateWebhookUrl(trimmed, out _, out var errCategory))
+                {
+                    return BadRequest(new { error = errCategory, message = "Invalid Discord webhook URL format, scheme, host, or path." });
+                }
+                _secretStore.SetDiscordWebhookUrl(trimmed);
             }
-            _secretStore.SetDiscordWebhookUrl(trimmed);
         }
 
-        // 2. Handle Telegram Bot Token Credential
+        // 2. Handle Telegram Bot Token Credential (Omitted, Masked, New, or Clear)
         if (request.ClearTelegramBotToken == true || string.Equals(request.TelegramBotToken, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
         {
             _secretStore.ClearTelegramBotToken();
         }
         else if (!string.IsNullOrWhiteSpace(request.TelegramBotToken))
         {
-            var trimmedToken = request.TelegramBotToken.Trim();
-            var targetChatId = request.TelegramChatId ?? config.TelegramChatId;
-            if (!TelegramBotApiSender.ValidateEndpoint(trimmedToken, targetChatId, out _, out var errCategory))
+            var trimmedToken = TelegramBotApiSender.NormalizeToken(request.TelegramBotToken);
+            if (!SecretRedactor.IsMasked(trimmedToken))
             {
-                return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format or endpoint." });
+                var targetChatId = request.TelegramChatId ?? config.TelegramChatId;
+                if (!TelegramBotApiSender.ValidateEndpoint(trimmedToken, targetChatId, out _, out var errCategory))
+                {
+                    return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format or endpoint." });
+                }
+                _secretStore.SetTelegramBotToken(trimmedToken);
             }
-            _secretStore.SetTelegramBotToken(trimmedToken);
         }
 
         if (request.TelegramChatId != null)
@@ -132,7 +138,7 @@ public class NotificationsConfigurationController : ControllerBase
             config.TelegramChatId = request.TelegramChatId.Trim();
         }
 
-        // 3. Update switches and event preferences (only overwrite when supplied)
+        // 3. Update switches and event preferences (only overwrite when explicitly supplied)
         var notifsEnabled = request.NotificationsEnabled ?? request.Enabled;
         if (notifsEnabled.HasValue)
         {
@@ -142,19 +148,11 @@ public class NotificationsConfigurationController : ControllerBase
         if (request.DiscordEnabled.HasValue)
         {
             config.DiscordEnabled = request.DiscordEnabled.Value;
-            if (config.DiscordEnabled && !notifsEnabled.HasValue && !config.NotificationsEnabled)
-            {
-                config.NotificationsEnabled = true;
-            }
         }
 
         if (request.TelegramEnabled.HasValue)
         {
             config.TelegramEnabled = request.TelegramEnabled.Value;
-            if (config.TelegramEnabled && !notifsEnabled.HasValue && !config.NotificationsEnabled)
-            {
-                config.NotificationsEnabled = true;
-            }
         }
 
         var onStart = request.NotifyOnStart ?? request.NotifyOnPlaybackStart;

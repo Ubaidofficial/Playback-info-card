@@ -426,6 +426,17 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
     public NotificationDiagnosticsSnapshot GetDiagnostics()
     {
         var config = Plugin.Instance?.Configuration;
+        var discordWebhook = _secretStore.GetDiscordWebhookUrl();
+        var discordConfigured = !string.IsNullOrWhiteSpace(discordWebhook) && DiscordWebhookSender.ValidateWebhookUrl(discordWebhook, out _, out _);
+
+        var telegramToken = _secretStore.GetTelegramBotToken();
+        var telegramConfigured = !string.IsNullOrWhiteSpace(telegramToken) &&
+                                 !string.IsNullOrWhiteSpace(config?.TelegramChatId) &&
+                                 TelegramBotApiSender.ValidateEndpoint(telegramToken, config.TelegramChatId, out _, out _);
+
+        var discordState = !discordConfigured ? "Unconfigured" : _discordAvailability;
+        var telegramState = !telegramConfigured ? "Unconfigured" : _telegramAvailability;
+
         return new NotificationDiagnosticsSnapshot
         {
             NotificationsEnabled = config?.NotificationsEnabled ?? false,
@@ -446,8 +457,8 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             RateLimitDropCount = _rateLimitDropCount,
             ValidationFailureCount = _validationFailureCount,
             WorkerState = _workerState,
-            DiscordAvailabilityState = _discordAvailability,
-            TelegramAvailabilityState = _telegramAvailability
+            DiscordAvailabilityState = discordState,
+            TelegramAvailabilityState = telegramState
         };
     }
 

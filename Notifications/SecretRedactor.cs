@@ -168,6 +168,20 @@ public static class SecretRedactor
     }
 
     /// <summary>
+    /// Determines whether a string is a masked credential from UI placeholders or responses.
+    /// Prevents writing masked values back into the encrypted secret store.
+    /// </summary>
+    public static bool IsMasked(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Contains('•') || value.Contains("****") || value.Contains("••••");
+    }
+
+    /// <summary>
     /// Sanitizes an exception message to guarantee no tokens or webhook URLs are leaked.
     /// Recursively scrubs inner exception messages.
     /// </summary>

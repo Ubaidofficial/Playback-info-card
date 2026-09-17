@@ -31,4 +31,12 @@ public sealed class NotificationDiagnosticsSnapshot
     public string WorkerState { get; init; } = "Running";
     public string DiscordAvailabilityState { get; init; } = "Available";
     public string TelegramAvailabilityState { get; init; } = "Available";
+
+    // Aliases for seamless frontend state synchronization
+    public bool Enabled => NotificationsEnabled;
+    public string DiscordAvailability => DiscordAvailabilityState;
+    public string TelegramAvailability => TelegramAvailabilityState;
+    public DateTimeOffset? LastDeliveryAttemptUtc => LastAttemptTimestamp;
+    public DateTimeOffset? LastSuccessfulDeliveryUtc => LastSuccessTimestamp;
+    public string? LastFailureCategory => LastSanitizedFailureCategory;
 }

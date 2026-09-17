@@ -2,7 +2,7 @@
 
 **Stable Version: v0.2.3.3**
 
-Real-time, cinema-grade visual stream telemetry and playback monitoring for Jellyfin Media Server.
+Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 

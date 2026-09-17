@@ -597,6 +597,98 @@ public class PlaybackSelfSessionsControllerTests
     }
 
     [Fact]
+    public void NotificationsConfigurationController_UpdateConfiguration_PreservesDisabledMasterSwitch_WhenSavingTelegram()
+    {
+        var adminUser = Guid.NewGuid();
+        var secretStore = new MockSecretStore();
+        var config = new PluginConfiguration
+        {
+            NotificationsEnabled = false, // Master switch DISABLED
+            DiscordEnabled = false,
+            TelegramEnabled = false
+        };
+
+        var controller = new NotificationsConfigurationController(new MockDeliveryService(), secretStore, config)
+        {
+            ControllerContext = CreateContextForUser(adminUser, isAdministrator: true)
+        };
+
+        var request = new UpdateNotificationConfigurationRequest
+        {
+            TelegramEnabled = true,
+            TelegramBotToken = "99999:validTelegramToken",
+            TelegramChatId = "-100123456789"
+        };
+
+        var response = controller.UpdateConfiguration(request);
+        var okResult = Assert.IsType<OkObjectResult>(response.Result);
+        var dto = Assert.IsType<NotificationConfigurationDto>(okResult.Value);
+
+        // Telegram is enabled in its section
+        Assert.True(config.TelegramEnabled);
+        Assert.True(dto.TelegramEnabled);
+
+        // CRITICAL: Master switch must NOT have been silently flipped to true!
+        Assert.False(config.NotificationsEnabled);
+        Assert.False(dto.NotificationsEnabled);
+        Assert.False(dto.Enabled);
+    }
+
+    [Fact]
+    public void NotificationsConfigurationController_UpdateConfiguration_MaskedSecrets_NeverOverwriteExistingSecrets()
+    {
+        var adminUser = Guid.NewGuid();
+        var secretStore = new MockSecretStore
+        {
+            DiscordWebhookUrl = "https://discord.com/api/webhooks/111111/RealDiscordSecretToken",
+            TelegramBotToken = "22222:RealTelegramSecretToken"
+        };
+        var config = new PluginConfiguration();
+        var controller = new NotificationsConfigurationController(new MockDeliveryService(), secretStore, config)
+        {
+            ControllerContext = CreateContextForUser(adminUser, isAdministrator: true)
+        };
+
+        // Form post containing masked strings reflected from UI
+        var request = new UpdateNotificationConfigurationRequest
+        {
+            DiscordWebhookUrl = "https://discord.com/api/webhooks/••••••••",
+            TelegramBotToken = "22222:••••••••••••••••"
+        };
+
+        var response = controller.UpdateConfiguration(request);
+        Assert.IsType<OkObjectResult>(response.Result);
+
+        // Must NOT overwrite stored secrets with mask
+        Assert.Equal("https://discord.com/api/webhooks/111111/RealDiscordSecretToken", secretStore.GetDiscordWebhookUrl());
+        Assert.Equal("22222:RealTelegramSecretToken", secretStore.GetTelegramBotToken());
+    }
+
+    [Fact]
+    public void NotificationsConfigurationController_UpdateConfiguration_NormalizesTelegramToken_WithBotPrefix()
+    {
+        var adminUser = Guid.NewGuid();
+        var secretStore = new MockSecretStore();
+        var config = new PluginConfiguration();
+        var controller = new NotificationsConfigurationController(new MockDeliveryService(), secretStore, config)
+        {
+            ControllerContext = CreateContextForUser(adminUser, isAdministrator: true)
+        };
+
+        var request = new UpdateNotificationConfigurationRequest
+        {
+            TelegramBotToken = "bot33333:SecretTokenWithPrefix",
+            TelegramChatId = "-100123456"
+        };
+
+        var response = controller.UpdateConfiguration(request);
+        Assert.IsType<OkObjectResult>(response.Result);
+
+        // Verify stored token has "bot" prefix stripped
+        Assert.Equal("33333:SecretTokenWithPrefix", secretStore.GetTelegramBotToken());
+    }
+
+    [Fact]
     public void NotificationsConfigurationController_Routes_MappedCorrectlyWithDualAliases()
     {
         var type = typeof(NotificationsConfigurationController);

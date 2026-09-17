@@ -304,7 +304,20 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                return DeliveryResult.Failed("Cancelled", 0, permanent: true);
+                return DeliveryResult.Failed("Cancelled", 0, permanent: true, description: "Delivery cancelled by request.");
+            }
+            catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+            {
+                if (attempt < maxRetries)
+                {
+                    var backoff = ComputeBackoff(attempt);
+                    _logger.LogWarning("[DiscordSender] Timeout contacting Discord API; retrying in {Backoff}ms", backoff);
+                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                _logger.LogError("[DiscordSender] Delivery timed out after {Max} attempts", maxRetries + 1);
+                return DeliveryResult.Failed("Timeout", 408, permanent: false, description: "Request timed out while connecting to Discord Webhook.");
             }
             catch (Exception ex)
             {
@@ -318,7 +331,7 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
                 }
 
                 _logger.LogError("[DiscordSender] Delivery failed after retries: {Error}", sanitized);
-                return DeliveryResult.Failed("NetworkError", 0, permanent: false);
+                return DeliveryResult.Failed("NetworkError", 0, permanent: false, description: $"Network error connecting to Discord Webhook: {sanitized}");
             }
         }
 

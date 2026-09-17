@@ -73,6 +73,25 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
     }
 
     /// <summary>
+    /// Normalizes a Telegram bot token by trimming whitespace and stripping any optional leading "bot" prefix.
+    /// </summary>
+    public static string NormalizeToken(string? botToken)
+    {
+        if (string.IsNullOrWhiteSpace(botToken))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = botToken.Trim();
+        if (trimmed.StartsWith("bot", StringComparison.OrdinalIgnoreCase) && trimmed.Length > 3 && char.IsDigit(trimmed[3]))
+        {
+            trimmed = trimmed.Substring(3);
+        }
+
+        return trimmed;
+    }
+
+    /// <summary>
     /// Validates Telegram Bot API parameters and builds strict endpoint URI.
     /// Rejects arbitrary hosts, non-HTTPS schemes, non-443 ports, userinfo, invalid tokens, and malformed chat IDs.
     /// </summary>
@@ -85,11 +104,7 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             return false;
         }
 
-        var trimmedToken = botToken.Trim();
-        if (trimmedToken.StartsWith("bot", StringComparison.OrdinalIgnoreCase) && trimmedToken.Length > 3 && char.IsDigit(trimmedToken[3]))
-        {
-            trimmedToken = trimmedToken.Substring(3);
-        }
+        var trimmedToken = NormalizeToken(botToken);
 
         if (trimmedToken.Any(char.IsControl) || trimmedToken.Any(char.IsWhiteSpace) ||
             chatId.Any(char.IsControl) || chatId.Any(char.IsWhiteSpace) ||
@@ -275,7 +290,20 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                return DeliveryResult.Failed("Cancelled", 0, permanent: true);
+                return DeliveryResult.Failed("Cancelled", 0, permanent: true, description: "Delivery cancelled by request.");
+            }
+            catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+            {
+                if (attempt < maxRetries)
+                {
+                    var backoff = ComputeBackoff(attempt);
+                    _logger.LogWarning("[TelegramSender] Timeout contacting Telegram API; retrying in {Backoff}ms", backoff);
+                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                _logger.LogError("[TelegramSender] Delivery timed out after {Max} attempts", maxRetries + 1);
+                return DeliveryResult.Failed("Timeout", 408, permanent: false, description: "Request timed out while connecting to Telegram Bot API.");
             }
             catch (Exception ex)
             {
@@ -289,7 +317,7 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
                 }
 
                 _logger.LogError("[TelegramSender] Delivery failed after retries: {Error}", sanitized);
-                return DeliveryResult.Failed("NetworkError", 0, permanent: false);
+                return DeliveryResult.Failed("NetworkError", 0, permanent: false, description: $"Network error connecting to Telegram Bot API: {sanitized}");
             }
         }
 

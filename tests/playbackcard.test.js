@@ -528,6 +528,23 @@ describe('Playback Info Card v0.2.3.3 Test Suite', () => {
             assert.equal(typeof controller.diagState.notifications.discordEnabled, 'boolean');
             assert.equal(typeof controller.diagState.notifications.telegramEnabled, 'boolean');
         });
+
+        it('contains clear feedback message when notifications remain disabled after saving a destination', () => {
+            assert.ok(htmlContent.includes('Settings saved. Notifications remain disabled until the Master Switch is enabled.'));
+        });
+
+        it('ensures saving telegram or discord does not force-enable the master switch', () => {
+            // Verify source code does not contain chkMaster.checked = true inside discord or telegram sections
+            const discordSectionMatch = htmlContent.match(/else if \(section === 'discord'\) {([\s\S]*?)} else if/);
+            assert.ok(discordSectionMatch);
+            assert.ok(!discordSectionMatch[1].includes('chkMaster.checked = true'));
+            assert.ok(!discordSectionMatch[1].includes('payload.notificationsEnabled = true'));
+
+            const telegramSectionMatch = htmlContent.match(/else if \(section === 'telegram'\) {([\s\S]*?)} else if/);
+            assert.ok(telegramSectionMatch);
+            assert.ok(!telegramSectionMatch[1].includes('chkMaster.checked = true'));
+            assert.ok(!telegramSectionMatch[1].includes('payload.notificationsEnabled = true'));
+        });
     });
 
     describe('17. Stream Details, Info Toggle, and My Playback View', () => {

@@ -2114,12 +2114,26 @@
                 elNotifFeature.className = 'diagValue ' + (notifs.enabled ? 'status-ok' : 'status-disabled');
             }
             if (elDiscordStatus) {
-                elDiscordStatus.textContent = notifs.discordEnabled ? (notifs.discordAvailability || 'Available') : 'Disabled';
-                elDiscordStatus.className = 'diagValue ' + (notifs.discordEnabled ? 'status-ok' : 'status-disabled');
+                var dcText = notifs.discordEnabled ? (notifs.discordAvailability || 'Available') : 'Disabled';
+                elDiscordStatus.textContent = dcText;
+                var dcClass = 'status-disabled';
+                if (notifs.discordEnabled) {
+                    if (dcText === 'Available' || dcText === 'Reachable') dcClass = 'status-ok';
+                    else if (dcText === 'Degraded' || dcText === 'Unconfigured') dcClass = 'status-waiting';
+                    else dcClass = 'status-error';
+                }
+                elDiscordStatus.className = 'diagValue ' + dcClass;
             }
             if (elTelegramStatus) {
-                elTelegramStatus.textContent = notifs.telegramEnabled ? (notifs.telegramAvailability || 'Available') : 'Disabled';
-                elTelegramStatus.className = 'diagValue ' + (notifs.telegramEnabled ? 'status-ok' : 'status-disabled');
+                var tgText = notifs.telegramEnabled ? (notifs.telegramAvailability || 'Available') : 'Disabled';
+                elTelegramStatus.textContent = tgText;
+                var tgClass = 'status-disabled';
+                if (notifs.telegramEnabled) {
+                    if (tgText === 'Available' || tgText === 'Reachable') tgClass = 'status-ok';
+                    else if (tgText === 'Degraded' || tgText === 'Unconfigured') tgClass = 'status-waiting';
+                    else tgClass = 'status-error';
+                }
+                elTelegramStatus.className = 'diagValue ' + tgClass;
             }
             if (elNotifQueues) elNotifQueues.textContent = 'Discord: ' + (notifs.discordQueueDepth || 0) + ', Telegram: ' + (notifs.telegramQueueDepth || 0);
             if (elNotifDropped) elNotifDropped.textContent = String(notifs.droppedProgressCount || 0);
@@ -2682,13 +2696,7 @@
         } else if (section === 'discord') {
             var chkDiscord = page.querySelector('#chkDiscordEnabled');
             var txtWebhook = page.querySelector('#txtDiscordWebhookUrl');
-            var chkMaster = page.querySelector('#chkNotificationsEnabled');
             payload.discordEnabled = chkDiscord ? chkDiscord.checked : false;
-            if (payload.discordEnabled && chkMaster && !chkMaster.checked) {
-                chkMaster.checked = true;
-                payload.notificationsEnabled = true;
-                payload.enabled = true;
-            }
             if (txtWebhook && txtWebhook.value.trim().length > 0) {
                 payload.discordWebhookUrl = txtWebhook.value.trim();
             }
@@ -2696,13 +2704,7 @@
             var chkTelegram = page.querySelector('#chkTelegramEnabled');
             var txtToken = page.querySelector('#txtTelegramBotToken');
             var txtChat = page.querySelector('#txtTelegramChatId');
-            var chkMaster = page.querySelector('#chkNotificationsEnabled');
             payload.telegramEnabled = chkTelegram ? chkTelegram.checked : false;
-            if (payload.telegramEnabled && chkMaster && !chkMaster.checked) {
-                chkMaster.checked = true;
-                payload.notificationsEnabled = true;
-                payload.enabled = true;
-            }
             if (txtToken && txtToken.value.trim().length > 0) {
                 payload.telegramBotToken = txtToken.value.trim();
             }
@@ -2740,8 +2742,20 @@
         callNotificationApi('PlaybackCard/Notifications/Configuration', {
             method: 'POST',
             body: payload
-        }).then(function () {
-            showNotificationFeedback(page, 'Notification configuration saved successfully.', false);
+        }).then(function (data) {
+            var isMasterEnabled = data && typeof data.notificationsEnabled === 'boolean' ? data.notificationsEnabled : false;
+            if (!isMasterEnabled && (section === 'discord' || section === 'telegram')) {
+                showNotificationFeedback(page, 'Settings saved. Notifications remain disabled until the Master Switch is enabled.', false);
+            } else {
+                var sectionNames = {
+                    master: 'Master switch',
+                    discord: 'Discord settings',
+                    telegram: 'Telegram settings',
+                    preferences: 'Preferences'
+                };
+                var name = sectionNames[section] || 'Notification settings';
+                showNotificationFeedback(page, name + ' saved successfully.', false);
+            }
             loadNotificationSettings(page);
         }).catch(function (err) {
             console.error('[PlaybackCard] Failed to save notification settings:', err);
