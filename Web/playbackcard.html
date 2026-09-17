@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.5.2</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.5.3</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -263,7 +263,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.5.2</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.5.3</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -1769,7 +1769,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.5.2';
+    var PLUGIN_VERSION = '0.2.5.3';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -3206,27 +3206,29 @@
         }
     }
 
-    function isMyPlaybackView(page) {
-        if (!page) return false;
-        if (page.getAttribute('data-name') === 'myplayback' || page.getAttribute('data-title') === 'My Playback') {
-            return true;
+    // One sidebar page serves every user: admins see all active sessions, everyone else
+    // sees only their own (via the Self/Sessions endpoint). Role, not route, decides.
+    function applyRoleView(page, isAdmin) {
+        if (!page) return;
+        var descEl = page.querySelector('.playbackMonitorDescription');
+        if (descEl) {
+            descEl.textContent = isAdmin
+                ? 'Real-time playback telemetry imported by Jellyfin. Local & privacy-first.'
+                : 'Real-time playback telemetry for your active sessions. Local & privacy-first.';
         }
-        if (typeof window !== 'undefined' && window.location) {
-            var href = (window.location.href || '').toLowerCase();
-            if (href.indexOf('myplayback') !== -1) {
-                return true;
-            }
+        if (!isAdmin) {
+            var notifSection = page.querySelector('#playbackNotificationsSection');
+            if (notifSection) notifSection.style.display = 'none';
         }
-        return false;
     }
 
-    function fetchSessions(page, capturedGen) {
+    function fetchSessions(page, capturedGen, isAdmin) {
         if (!isStateValid(page, capturedGen)) return;
 
         var elements = getElements(page);
         if (!elements) return;
 
-        if (isMyPlaybackView(page)) {
+        if (!isAdmin) {
             callNotificationApi('PlaybackCard/Self/Sessions', { method: 'GET' })
                 .then(function (sessions) {
                     if (!isStateValid(page, capturedGen)) return;
@@ -3819,16 +3821,6 @@
 
         setupControls(page);
 
-        var isMyPlayback = isMyPlaybackView(page);
-        if (isMyPlayback) {
-            var titleEl = page.querySelector('.playbackMonitorTitle');
-            if (titleEl) titleEl.textContent = 'My Playback';
-            var descEl = page.querySelector('.playbackMonitorDescription');
-            if (descEl) descEl.textContent = 'Real-time playback telemetry for your active sessions. Local & privacy-first.';
-            var notifSection = page.querySelector('#playbackNotificationsSection');
-            if (notifSection) notifSection.style.display = 'none';
-        }
-
         elements.gridEl.innerHTML = '';
         elements.emptyEl.style.display = 'none';
         updateSummaryStrip(elements.summaryStripEl, []);
@@ -3844,20 +3836,9 @@
                 return;
             }
 
-            if (!isAdmin && !isMyPlayback) {
-                elements.gridEl.innerHTML = '';
-                elements.emptyEl.style.display = 'none';
-                updateSummaryStrip(elements.summaryStripEl, []);
-                elements.statusEl.textContent = 'Administrator privileges are required to view playback telemetry.';
-                elements.statusEl.className = 'playbackMonitorStatusMsg error';
-                elements.statusEl.style.display = 'block';
-                diagState.pollingState = 'stopped';
-                diagState.lastErrorCategory = 'Administrator privileges required';
-                updateDiagnosticsDisplay();
-                return;
-            }
+            applyRoleView(page, isAdmin);
 
-            if (isAdmin && !isMyPlayback) {
+            if (isAdmin) {
                 var notifSection = page.querySelector('#playbackNotificationsSection');
                 if (notifSection) {
                     notifSection.style.display = 'block';
@@ -3866,7 +3847,7 @@
                 loadNotificationSettings(page);
             }
 
-            fetchSessions(page, capturedGen);
+            fetchSessions(page, capturedGen, isAdmin);
 
             if (pollTimer != null) {
                 clearInterval(pollTimer);
@@ -3875,28 +3856,28 @@
 
             pollTimer = setInterval(function () {
                 currentGeneration++;
-                fetchSessions(page, currentGeneration);
-                if (isAdmin && !isMyPlayback) {
+                fetchSessions(page, currentGeneration, isAdmin);
+                if (isAdmin) {
                     fetchNotificationDiagnostics(page);
                 }
             }, POLL_INTERVAL_MS);
         }).catch(function (err) {
-            console.error('[PlaybackCard] Unexpected error during administrator check:', err);
+            console.error('[PlaybackCard] Unexpected error during administrator check, falling back to personal view:', err);
             if (!isStateValid(page, capturedGen)) {
                 return;
             }
-            if (isMyPlayback) {
-                fetchSessions(page, capturedGen);
-                return;
+            applyRoleView(page, false);
+            fetchSessions(page, capturedGen, false);
+
+            if (pollTimer != null) {
+                clearInterval(pollTimer);
+                pollTimer = null;
             }
-            elements.gridEl.innerHTML = '';
-            elements.emptyEl.style.display = 'none';
-            updateSummaryStrip(elements.summaryStripEl, []);
-            elements.statusEl.textContent = 'Administrator privileges are required to view playback telemetry.';
-            elements.statusEl.className = 'playbackMonitorStatusMsg error';
-            elements.statusEl.style.display = 'block';
-            diagState.pollingState = 'stopped';
-            updateDiagnosticsDisplay();
+
+            pollTimer = setInterval(function () {
+                currentGeneration++;
+                fetchSessions(page, currentGeneration, false);
+            }, POLL_INTERVAL_MS);
         });
     }
 

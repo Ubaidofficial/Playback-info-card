@@ -14,7 +14,8 @@ namespace Jellyfin.Plugin.PlaybackCard;
 /// <summary>
 /// Core entry point for the Playback Info Card plugin.
 /// Implements <see cref="BasePlugin{TConfiguration}"/> and <see cref="IHasWebPages"/> to serve
-/// the administrator Playback Monitor page and the authenticated user "My Playback" page.
+/// a single Playback Monitor page: admins see every active session, and non-admin users
+/// see only their own.
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
@@ -58,6 +59,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         return new[]
         {
+            // Single sidebar entry for every user. The page itself decides what to show:
+            // admins see every active session (the old "Playback Monitor" behavior), and
+            // non-admins see only their own (the old "My Playback" behavior) -- so one menu
+            // item now covers both roles instead of registering the same page twice.
             new PluginPageInfo
             {
                 Name = "playbackcard",
@@ -67,20 +72,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                     "{0}.Web.playbackcard.html",
                     GetType().Namespace),
                 EnableInMainMenu = true,
-                MenuSection = "server",
-                MenuIcon = "play_circle"
-            },
-            new PluginPageInfo
-            {
-                Name = "myplayback",
-                DisplayName = "My Playback",
-                EmbeddedResourcePath = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}.Web.playbackcard.html",
-                    GetType().Namespace),
-                EnableInMainMenu = true,
                 MenuSection = "playback",
-                MenuIcon = "tv"
+                MenuIcon = "play_circle"
             }
         };
     }

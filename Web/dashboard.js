@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.5.2)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.5.3)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,13 +7,10 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.5.2';
-    var ASSET_REVISION = '0.2.5.2';
+    var VERSION = '0.2.5.3';
+    var ASSET_REVISION = '0.2.5.3';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
-    var DRAWER_OVERLAY_ID = 'playback-drawer-overlay';
-    var DRAWER_PANEL_ID = 'playback-drawer-panel';
     var POLL_INTERVAL_MS = 3000;
-    var DRAWER_MISSING_POLL_TOLERANCE = 2;
 
     var state = {
         version: VERSION,
@@ -29,13 +26,9 @@
         artworkFallbackCount: 0,
         renderErrors: 0,
         cardSessionMap: {},
-        drawer: {
-            open: false,
-            sessionId: null,
-            cardDomId: null,
-            missingPolls: 0,
-            lastFocusEl: null
-        }
+        // Info toggle state per card, keyed by stable session ID (not card position) so
+        // it survives the next poll's full re-render instead of silently closing again.
+        openInfoSessionIds: {}
     };
 
     function escapeHtml(str) {
@@ -1129,8 +1122,8 @@
             }
 
             // Canonical telemetry model (section 8) -- single source of truth shared with
-            // the "Show Details" grid below and the singleton Info drawer, so all three
-            // always agree.
+            // the extended-mode rows and the inline "Show Details"/Info grid below, so all
+            // three always agree.
             var model = buildTelemetryModel(session);
 
             // Extended mode: icon-led summary rows (section 11), truthful values only --
@@ -1164,24 +1157,24 @@
                 '</div>';
             }
 
-            // "Show Details" (global toggle, section 10): the full per-field grid, same
-            // canonical fields as the Info drawer minus the identity rows already in the header.
-            var showDetailsGridHtml = showAllDetails ? buildInlineDetailGridHtml(model) : '';
+            // Info button and "Show Details" (global toggle, section 10) both reveal the
+            // same full per-field grid inline on the card -- never a separate side panel.
+            // Info is per-card (tracked by stable session ID so it survives the next
+            // poll's full re-render); Show Details opens it on every card at once.
+            state.cardSessionMap = state.cardSessionMap || {};
+            state.cardSessionMap[cardDomId] = session.Id || null;
+            state.openInfoSessionIds = state.openInfoSessionIds || {};
+            var infoIsOpenForThisCard = Boolean(session.Id && state.openInfoSessionIds[session.Id]);
 
-            var isSummaryOpen = (displayMode === 'extended') || Boolean(showAllDetails);
+            var showDetailsGridHtml = (showAllDetails || infoIsOpenForThisCard) ? buildInlineDetailGridHtml(model) : '';
+
+            var isSummaryOpen = (displayMode === 'extended') || Boolean(showAllDetails) || infoIsOpenForThisCard;
             var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isSummaryOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
                 extendedRowsHtml +
                 showDetailsGridHtml +
             '</div>';
 
-            // Info button: opens the singleton modal Info drawer (section 14), never an inline panel.
-            state.cardSessionMap = state.cardSessionMap || {};
-            state.cardSessionMap[cardDomId] = session.Id || null;
-            // Compared by stable session ID, not the positional cardDomId -- if session
-            // ordering shifts while the drawer is open, the highlighted Info button must
-            // still track the actual open session, not whichever card now sits in that slot.
-            var infoIsOpenForThisCard = Boolean(state.drawer && state.drawer.open && session.Id && state.drawer.sessionId === session.Id);
-            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-haspopup="dialog" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="playback-drawer-panel" id="btn-info-' + cardDomId + '" title="View full technical stream details">' +
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle full technical stream details">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
             // Artwork
@@ -1260,7 +1253,8 @@
 
     /**
      * Canonical telemetry model (section 8): normalizes a session exactly once so the
-     * Info drawer's full 26-field breakdown always agrees with the card/header.
+     * inline "Show Details"/Info grid's full 26-field breakdown always agrees with the
+     * card/header.
      */
     function buildTelemetryModel(session) {
         var item = (session && session.NowPlayingItem) || {};
@@ -1379,14 +1373,9 @@
     }
 
     /**
-     * Builds the Info drawer's full, grouped 26-field technical breakdown (section 14) for one session.
-     * Pure function of the session -- safe to call independently of any card render/DOM state.
-     */
-    /**
      * Single source of truth for the canonical field list (section 8/14), grouped.
-     * Consumed by both the singleton Info drawer (all 26 fields, grouped with headers)
-     * and the inline per-card "Show Details" grid (same fields minus the identity rows
-     * already shown in the card header, flattened with no group headers).
+     * Consumed by the inline per-card "Show Details"/Info grid (all fields minus the
+     * identity rows already shown in the card header, flattened with no group headers).
      */
     function buildFieldGroups(m) {
         var c = m.classification;
@@ -1450,39 +1439,23 @@
         ];
     }
 
-    function fieldRowHtml(r, withDrawerAttr) {
-        return '<div class="playback-info-row"' + (withDrawerAttr ? ' data-drawer-field="' + slugifyFieldKey(r.key) + '"' : '') + '>' +
+    function fieldRowHtml(r) {
+        return '<div class="playback-info-row">' +
             '<span class="playback-info-key">' + escapeHtml(r.key) + '</span>' +
             '<span class="playback-info-val">' + r.val + '</span>' +
         '</div>';
     }
 
-    function buildDrawerContentHtml(session) {
-        if (!session || typeof session !== 'object') {
-            return '<div class="playback-drawer-empty">No session selected.</div>';
-        }
-
-        var groups = buildFieldGroups(buildTelemetryModel(session));
-
-        return groups.map(function (group) {
-            var rowsHtml = group.rows.map(function (r) { return fieldRowHtml(r, true); }).join('');
-            return '<div class="playback-drawer-group">' +
-                '<h4 class="playback-drawer-group-title">' + escapeHtml(group.title) + '</h4>' +
-                '<div class="playback-info-grid">' + rowsHtml + '</div>' +
-            '</div>';
-        }).join('');
-    }
-
     var INLINE_GRID_SKIP_KEYS = { 'User': true, 'Client': true, 'Client Version': true, 'Device': true };
 
-    // The "Show Details" inline per-card grid: the same 22 non-identity fields as the
-    // drawer (User/Client/Client Version/Device are omitted -- already shown in the card
-    // header), flattened into one grid with no group headers.
+    // The "Show Details"/Info inline per-card grid: the full field set minus the identity
+    // rows already shown in the card header (User/Client/Client Version/Device), flattened
+    // into one grid with no group headers.
     function buildInlineDetailGridHtml(model) {
         var groups = buildFieldGroups(model);
         var rowsHtml = groups.reduce(function (acc, group) {
             group.rows.forEach(function (r) {
-                if (!INLINE_GRID_SKIP_KEYS[r.key]) acc.push(fieldRowHtml(r, false));
+                if (!INLINE_GRID_SKIP_KEYS[r.key]) acc.push(fieldRowHtml(r));
             });
             return acc;
         }, []);
@@ -1593,14 +1566,24 @@
             ? allSessions
             : (Array.isArray(state.allSessions) && state.allSessions.length > 0 ? state.allSessions : activeSessions);
 
-        // Keep state in sync with whatever was just rendered, so the Info drawer (which
-        // looks sessions up by ID via state, independent of the calling render pass) can
-        // always find the currently-open session regardless of which code path rendered it.
         state.activeSessions = activeSessions;
         state.allSessions = connectedSessions;
 
         // Reset per-render card->session correlation map (rebuilt below as each card renders).
         state.cardSessionMap = {};
+
+        // Drop any per-card Info state for sessions that are no longer present, otherwise
+        // openInfoSessionIds would grow forever as sessions start and stop.
+        state.openInfoSessionIds = state.openInfoSessionIds || {};
+        var stillPresent = {};
+        for (var si = 0; si < activeSessions.length; si++) {
+            if (activeSessions[si] && activeSessions[si].Id) stillPresent[activeSessions[si].Id] = true;
+        }
+        for (var openId in state.openInfoSessionIds) {
+            if (Object.prototype.hasOwnProperty.call(state.openInfoSessionIds, openId) && !stillPresent[openId]) {
+                delete state.openInfoSessionIds[openId];
+            }
+        }
 
         var counts = calculateSessionCounts(activeSessions);
         var isCompact = (state.displayMode === 'compact');
@@ -1663,242 +1646,6 @@
         }
 
         container.innerHTML = headerHtml + summaryStripHtml + contentHtml + connectedDevicesHtml;
-
-        // The Info drawer is a singleton mounted outside this container's innerHTML,
-        // so it must be (re)synced explicitly on every render/poll cycle instead of
-        // being torn down and rebuilt with the cards above it.
-        ensureDrawerMounted();
-        updateDrawerIfOpen(activeSessions, connectedSessions);
-    }
-
-    function findSessionById(sessionId) {
-        if (!sessionId) return null;
-        var pools = [state.activeSessions, state.allSessions];
-        for (var p = 0; p < pools.length; p++) {
-            var arr = pools[p];
-            if (!Array.isArray(arr)) continue;
-            for (var i = 0; i < arr.length; i++) {
-                if (arr[i] && arr[i].Id === sessionId) return arr[i];
-            }
-        }
-        return null;
-    }
-
-    function renderDrawerContent(panel, session) {
-        if (!panel || typeof panel.querySelector !== 'function') return;
-        var identityEl = panel.querySelector('#playback-drawer-identity');
-        var bodyEl = panel.querySelector('#playback-drawer-body');
-        if (!session) {
-            if (bodyEl) bodyEl.innerHTML = '<div class="playback-drawer-empty">This session has ended.</div>';
-            if (identityEl) identityEl.innerHTML = '';
-            return;
-        }
-        var brand = resolveClientBrand({ client: session.Client, deviceName: session.DeviceName });
-        if (identityEl) {
-            identityEl.innerHTML =
-                '<span class="playback-platform-icon" data-client-brand="' + escapeHtml(brand.key) + '">' + brand.svg + '</span>' +
-                '<span class="playback-drawer-identity-text">' + escapeHtml(session.UserName || 'Unknown User') + ' &bull; ' + escapeHtml(session.Client || 'Playback Client') + '</span>';
-        }
-        if (bodyEl) bodyEl.innerHTML = buildDrawerContentHtml(session);
-    }
-
-    function lockBodyScroll() {
-        if (typeof document === 'undefined' || !document.body || !document.body.style) return;
-        if (state.drawerBodyOverflowSaved == null) {
-            state.drawerBodyOverflowSaved = document.body.style.overflow || '';
-        }
-        document.body.style.overflow = 'hidden';
-    }
-
-    function unlockBodyScroll() {
-        if (typeof document === 'undefined' || !document.body || !document.body.style) return;
-        document.body.style.overflow = state.drawerBodyOverflowSaved || '';
-        state.drawerBodyOverflowSaved = null;
-    }
-
-    function trapDrawerFocus(e) {
-        if (typeof document === 'undefined') return;
-        var panel = document.getElementById(DRAWER_PANEL_ID);
-        if (!panel || typeof panel.querySelectorAll !== 'function') return;
-        var focusable = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-        if (!focusable || focusable.length === 0) return;
-        var first = focusable[0];
-        var last = focusable[focusable.length - 1];
-        var active = document.activeElement;
-        if (e.shiftKey) {
-            if (active === first || active === panel) {
-                e.preventDefault();
-                if (typeof last.focus === 'function') last.focus();
-            }
-        } else if (active === last) {
-            e.preventDefault();
-            if (typeof first.focus === 'function') first.focus();
-        }
-    }
-
-    /**
-     * Mounts the singleton Info drawer (overlay + dialog panel) under document.body exactly once.
-     * Idempotent: safe to call on every render. The overlay/panel nodes are never recreated --
-     * only their content is refreshed in place -- so the drawer survives polling re-renders.
-     */
-    function ensureDrawerMounted() {
-        if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return null;
-
-        var panel = document.getElementById(DRAWER_PANEL_ID);
-        if (panel) return panel;
-        if (typeof document.createElement !== 'function' || !document.body || typeof document.body.appendChild !== 'function') {
-            return null;
-        }
-
-        var overlay = document.createElement('div');
-        overlay.id = DRAWER_OVERLAY_ID;
-
-        panel = document.createElement('div');
-        panel.id = DRAWER_PANEL_ID;
-        if (typeof panel.setAttribute === 'function') {
-            panel.setAttribute('role', 'dialog');
-            panel.setAttribute('aria-modal', 'true');
-            panel.setAttribute('aria-labelledby', 'playback-drawer-title-label');
-            panel.setAttribute('tabindex', '-1');
-        }
-        panel.innerHTML =
-            '<div class="playback-drawer-header">' +
-                '<div class="playback-drawer-title-wrap">' +
-                    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
-                    '<span class="playback-drawer-title" id="playback-drawer-title-label">Technical Stream Details</span>' +
-                '</div>' +
-                '<button type="button" class="playback-drawer-close" data-action="close-info" aria-label="Close details">&times;</button>' +
-            '</div>' +
-            '<div class="playback-drawer-identity" id="playback-drawer-identity"></div>' +
-            '<div class="playback-drawer-body" id="playback-drawer-body"></div>';
-
-        document.body.appendChild(overlay);
-        document.body.appendChild(panel);
-
-        if (typeof panel.addEventListener === 'function') {
-            panel.addEventListener('keydown', function (e) {
-                if (e.key === 'Tab' || e.keyCode === 9) trapDrawerFocus(e);
-            });
-        }
-
-        return panel;
-    }
-
-    /**
-     * Opens the singleton Info drawer for the session bound to a given card. Only one session
-     * can be shown at a time; opening a different card's Info re-targets the same drawer.
-     */
-    function openInfoDrawer(cardDomId, triggerEl) {
-        var sessionId = state.cardSessionMap && state.cardSessionMap[cardDomId];
-        if (!sessionId) return false;
-
-        var panel = ensureDrawerMounted();
-        var overlay = (typeof document !== 'undefined' && typeof document.getElementById === 'function') ? document.getElementById(DRAWER_OVERLAY_ID) : null;
-
-        state.drawer.open = true;
-        state.drawer.sessionId = sessionId;
-        state.drawer.cardDomId = cardDomId;
-        state.drawer.missingPolls = 0;
-        state.drawer.lastFocusEl = triggerEl ||
-            (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('btn-info-' + cardDomId) : null);
-
-        renderDrawerContent(panel, findSessionById(sessionId));
-
-        if (panel && panel.classList && typeof panel.classList.add === 'function') panel.classList.add('open');
-        if (overlay && overlay.classList && typeof overlay.classList.add === 'function') overlay.classList.add('open');
-
-        lockBodyScroll();
-
-        if (panel && typeof panel.focus === 'function') {
-            try { panel.focus(); } catch (_) {}
-        }
-
-        return true;
-    }
-
-    /**
-     * Closes the Info drawer. Only called from: the close button, a backdrop click, Escape,
-     * or confirmed session disappearance after DRAWER_MISSING_POLL_TOLERANCE consecutive polls.
-     * Never called as a side effect of normal polling/rerendering while the session still exists.
-     */
-    function closeInfoDrawer(restoreFocus) {
-        if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-            var panel = document.getElementById(DRAWER_PANEL_ID);
-            var overlay = document.getElementById(DRAWER_OVERLAY_ID);
-            if (panel && panel.classList && typeof panel.classList.remove === 'function') panel.classList.remove('open');
-            if (overlay && overlay.classList && typeof overlay.classList.remove === 'function') overlay.classList.remove('open');
-        }
-        unlockBodyScroll();
-
-        var storedFocusEl = state.drawer.lastFocusEl;
-        var sessionId = state.drawer.sessionId;
-        state.drawer.open = false;
-        state.drawer.sessionId = null;
-        state.drawer.cardDomId = null;
-        state.drawer.missingPolls = 0;
-        state.drawer.lastFocusEl = null;
-
-        if (restoreFocus === false) return;
-
-        // The stored trigger element goes stale the moment a poll/re-render rebuilds the
-        // cards grid (container.innerHTML replaces every node), so prefer it only while
-        // still attached. Otherwise re-resolve the button by the session's CURRENT card
-        // slot (via cardSessionMap), not the positional id captured at open time -- if
-        // session ordering shifted while the drawer was open, that slot may now belong
-        // to a different session entirely.
-        var focusTarget = (storedFocusEl && storedFocusEl.isConnected) ? storedFocusEl : null;
-        if (!focusTarget && sessionId && typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-            var freshCardDomId = null;
-            var map = state.cardSessionMap || {};
-            for (var key in map) {
-                if (Object.prototype.hasOwnProperty.call(map, key) && map[key] === sessionId) {
-                    freshCardDomId = key;
-                    break;
-                }
-            }
-            if (freshCardDomId) {
-                focusTarget = document.getElementById('btn-info-' + freshCardDomId);
-            }
-        }
-        if (focusTarget && typeof focusTarget.focus === 'function') {
-            try { focusTarget.focus(); } catch (_) {}
-        }
-    }
-
-    /**
-     * Re-syncs the open drawer's content on every poll/render cycle. Session still present ->
-     * update values in place (fields only, never the overlay/panel nodes). Session missing ->
-     * increment a tolerance counter and only close after it is exceeded, so one dropped poll
-     * or reordering of the sessions array can never silently close the drawer.
-     */
-    function updateDrawerIfOpen(activeSessions, allSessions) {
-        if (!state.drawer.open) return;
-
-        var session = null;
-        var pools = [activeSessions, allSessions];
-        for (var p = 0; p < pools.length && !session; p++) {
-            var arr = pools[p];
-            if (!Array.isArray(arr)) continue;
-            for (var i = 0; i < arr.length; i++) {
-                if (arr[i] && arr[i].Id === state.drawer.sessionId) {
-                    session = arr[i];
-                    break;
-                }
-            }
-        }
-
-        if (session) {
-            state.drawer.missingPolls = 0;
-            if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-                renderDrawerContent(document.getElementById(DRAWER_PANEL_ID), session);
-            }
-            return;
-        }
-
-        state.drawer.missingPolls++;
-        if (state.drawer.missingPolls > DRAWER_MISSING_POLL_TOLERANCE) {
-            closeInfoDrawer(true);
-        }
     }
 
     function attachContainerEvents(container) {
@@ -1930,44 +1677,24 @@
                 return;
             }
 
-            // Info button always opens (or refocuses) the singleton modal Info drawer for this card.
+            // Info toggles that one card's own inline details grid (session-ID keyed, so
+            // it survives the next poll's re-render) -- never a separate side panel.
             var infoBtn = target.closest('[data-action="toggle-info"]');
             if (infoBtn) {
                 var cardId = infoBtn.getAttribute('data-card-id');
-                if (cardId) {
-                    openInfoDrawer(cardId, infoBtn);
+                var sessionId = cardId && state.cardSessionMap ? state.cardSessionMap[cardId] : null;
+                if (sessionId) {
+                    state.openInfoSessionIds = state.openInfoSessionIds || {};
+                    if (state.openInfoSessionIds[sessionId]) {
+                        delete state.openInfoSessionIds[sessionId];
+                    } else {
+                        state.openInfoSessionIds[sessionId] = true;
+                    }
                     renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 }
                 return;
             }
-
-            // Drawer close button (delegated -- the drawer itself lives outside this container).
-            var drawerCloseBtn = target.closest('[data-action="close-info"]');
-            if (drawerCloseBtn) {
-                closeInfoDrawer(true);
-                renderDashboardContainer(container, state.activeSessions, state.allSessions);
-                return;
-            }
         });
-
-        // Drawer backdrop click-to-close and Escape-to-close are bound once globally,
-        // not per container, since the drawer is a page-level singleton.
-        if (typeof document !== 'undefined' && !global.__playbackCardDrawerEventsBound) {
-            global.__playbackCardDrawerEventsBound = true;
-            document.addEventListener('click', function (e) {
-                if (!state.drawer.open) return;
-                var t = e.target;
-                if (t && typeof t.closest === 'function' && t.id === DRAWER_OVERLAY_ID) {
-                    closeInfoDrawer(true);
-                }
-            });
-            document.addEventListener('keydown', function (e) {
-                if (!state.drawer.open) return;
-                if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
-                    closeInfoDrawer(true);
-                }
-            });
-        }
     }
 
     async function pollSessions() {
@@ -2157,12 +1884,7 @@
         formatEta: formatEta,
         resolveUserAvatarUrl: resolveUserAvatarUrl,
         buildTelemetryModel: buildTelemetryModel,
-        buildDrawerContentHtml: buildDrawerContentHtml,
-        ensureDrawerMounted: ensureDrawerMounted,
-        openInfoDrawer: openInfoDrawer,
-        closeInfoDrawer: closeInfoDrawer,
-        updateDrawerIfOpen: updateDrawerIfOpen,
-        findSessionById: findSessionById,
+        buildInlineDetailGridHtml: buildInlineDetailGridHtml,
         startPolling: startPolling,
         stopPolling: stopPolling,
         pollSessions: pollSessions,
