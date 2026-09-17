@@ -1,42 +1,35 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.3**
+**Stable Version: v0.2.3.4**
 
 Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 
-## What Changed in v0.2.3.3
+## What Changed in v0.2.3.4
 
-Version `0.2.3.3` provides a critical reliability patch for native Discord and Telegram notifications:
+Version `0.2.3.4` restores the primary intended product experience for Jellyfin 10.9+ and 12.1+:
 
-* **Dual Route Aliasing**: Resolved HTTP 404 route mismatch on notification and self-session endpoints by supporting both `PlaybackCard/Notifications` and `PlaybackInfoCard/Notifications` (and `/Self`) routes.
-* **Non-Destructive Partial Configuration Updates**: Saving Telegram or Discord configuration independently now safely preserves master notification state and other destination settings without clobbering existing configuration.
-* **Flexible Telegram Token Parsing**: Gracefully accepts Bot API tokens with or without the optional leading `bot` prefix (`bot123...` and `123...`).
-* **Descriptive Diagnostic Results**: Outbound test dispatches now return actionable, privacy-redacted error descriptions and status codes directly in the web UI.
-* **UI State Synchronization**: Diagnostics panel and notification switches now stay synchronized in real time.
-
-* **Plugin-Owned Web Page**: The monitor is now served via Jellyfin's official `IHasWebPages` interface as a dedicated internal admin page (`Dashboard -> Server -> Playback Monitor`).
-* **Zero Host Injection**: Completely eliminated ASP.NET Core middleware, response-stream HTML rewriting, startup pipeline filters (`IStartupFilter`), and disk file manipulation.
-* **No Network or Location Classification**: Removed all IP address parsing, WAN/LAN/Cellular heuristics, and geolocation inference.
-* **No Remote-Control Actions**: Removed all stream termination, pause, or remote control hooks. The monitor is strictly a read-only telemetry dashboard.
-* **No Custom Server APIs**: Queries Jellyfin's standard, authenticated `/Sessions` API client directly in browser memory.
-* **Built-In Local Diagnostics**: Added a small, administrator-visible diagnostics panel with an automated privacy-redacting **"Copy diagnostic report"** tool.
-* **User-Initiated Issue Reporting**: Added pre-formatted GitHub issue templates with privacy guidelines and confirmation checkboxes.
+* **Primary Dashboard Integration**: Telemetry cards appear automatically on Jellyfin's standard default **Dashboard/devices** view, placed directly above the stock Jellyfin Devices table.
+* **Preserved Stock Devices Table**: The existing Jellyfin Devices section remains completely visible and untouched directly below the NOW PLAYING grid.
+* **Autonomous Loading**: Initializes automatically upon visiting the default Dashboard, browser refresh, Jellyfin server restart, and user login—without requiring any visit to Plugin Settings.
+* **Header Telemetry & Session Counts**: Live activity banner featuring a pulsing refresh indicator, session count breakdown (Direct Play, Direct Stream / Remux, Transcode, Paused), density toggle (Compact mode default vs Extended mode), and quick "Show Details" toggle.
+* **Mobile-Optimized Compact Badges**: Enforces a strict 5-badge priority cap on compact viewports: Resolution, Play Method, Video Codec, Audio Channels, and Container.
+* **Truthful Transcode Diagnostics**: Displays video/audio conversion status, hardware acceleration engine (`NVENC`, `QSV`, `VAAPI`, `AMF`, `Software`), and active transcode reasons with exact fallback text `"Reason not reported by server"`.
+* **Zero Disk Modification**: In-memory response stream transformation ensures 100% read-only container and permission safety with zero disk writes.
+* **Admin Detail / Fallback Page**: The dedicated `/playbackcard` page remains available as an admin detail/fallback view.
+* **Native Discord & Telegram Notifications**: Fully retains the background notifications engine, server-local restricted secret store, masked credential security, and user filtering.
 
 ---
 
 ## Where to Find the Monitor
 
-In earlier releases (`0.2.3.0` and prior), the plugin injected cards directly into the default Jellyfin Dashboard "Devices" section.
-
-In `0.2.3.1`, the monitor has moved to a dedicated, plugin-owned page:
-
-1. Log into **Jellyfin Web** as an **Administrator**.
-2. Open the **Dashboard** (Settings &rarr; Dashboard).
-3. In the left navigation sidebar under the **Server** section, click **Playback Monitor**.
-
-Direct URL route: `/web/#/configurationpage?name=playbackcard`
+1. **Primary Default Dashboard (Automatic)**:
+   Navigate to Jellyfin's standard **Dashboard** (`#/dashboard` or `#/devices`). The **NOW PLAYING** grid automatically appears directly above the Devices section.
+2. **Dedicated Fallback / Admin Detail Page**:
+   In the left sidebar under **Server**, click **Playback Monitor** (direct URL route: `/web/#/configurationpage?name=playbackcard`).
+3. **Personal User View**:
+   Users can navigate to **My Playback** (`/web/#/configurationpage?name=myplayback`) to view their own active sessions via authenticated claims-based filtering.
 
 ---
 

@@ -133,12 +133,14 @@ public class SecurityAndPrivacyTests
     {
         var asm = typeof(Jellyfin.Plugin.PlaybackCard.Plugin).Assembly;
 
-        // Strict 0.2.3.3 version check
-        Assert.Equal(new Version(0, 2, 3, 3), asm.GetName().Version);
+        // Strict 0.2.3.4 version check
+        Assert.Equal(new Version(0, 2, 3, 4), asm.GetName().Version);
 
         // Embedded resources
         var resources = asm.GetManifestResourceNames();
         Assert.Contains("Jellyfin.Plugin.PlaybackCard.Web.playbackcard.html", resources);
+        Assert.Contains("Jellyfin.Plugin.PlaybackCard.Web.dashboard.js", resources);
+        Assert.Contains("Jellyfin.Plugin.PlaybackCard.Web.dashboard.css", resources);
 
         // Embedded HTML resource content check
         using var stream = asm.GetManifestResourceStream("Jellyfin.Plugin.PlaybackCard.Web.playbackcard.html");
@@ -146,7 +148,7 @@ public class SecurityAndPrivacyTests
         using var reader = new System.IO.StreamReader(stream);
         var html = reader.ReadToEnd();
         Assert.NotEmpty(html);
-        Assert.Contains("v0.2.3.3", html);
+        Assert.Contains("v0.2.3.4", html);
         Assert.Contains("playbackCardContainer", html);
     }
 }

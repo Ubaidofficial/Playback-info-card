@@ -34,5 +34,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddScoped<IEventConsumer<PlaybackStartEventArgs>, PlaybackStartConsumer>();
         serviceCollection.AddScoped<IEventConsumer<PlaybackStopEventArgs>, PlaybackStopConsumer>();
         serviceCollection.AddScoped<IEventConsumer<PlaybackProgressEventArgs>, PlaybackProgressConsumer>();
+
+        // Register dashboard script injection startup filter
+        serviceCollection.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter, PlaybackCardStartupFilter>();
     }
 }

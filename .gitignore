@@ -32,3 +32,5 @@ scratch/
 *.log
 .local/
 Library/
+output/
+*.zip

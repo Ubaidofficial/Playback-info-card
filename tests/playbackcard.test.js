@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.3.3 Test Suite', () => {
+describe('Playback Info Card v0.2.3.4 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.3.3 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.3.3', () => {
-            assert.equal(controller.version, '0.2.3.3');
-            assert.equal(controller.diagState.pluginVersion, '0.2.3.3');
+        it('initializes with default waiting state and version 0.2.3.4', () => {
+            assert.equal(controller.version, '0.2.3.4');
+            assert.equal(controller.diagState.pluginVersion, '0.2.3.4');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.3.3 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.3.3');
+            assert.equal(report.pluginVersion, '0.2.3.4');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.3.3 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.3.3',
+                pluginVersion: '0.2.3.4',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -628,4 +628,310 @@ describe('Playback Info Card v0.2.3.3 Test Suite', () => {
             assert.ok(html.includes('Video: Direct'));
         });
     });
+
+    describe('18. Primary Dashboard Integration (v0.2.3.4)', () => {
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+
+        function createMockDashboard(env = {}) {
+            const mockModule = { exports: {} };
+            const mockWindow = {
+                location: { hash: '#/dashboard', pathname: '/web/index.html' },
+                addEventListener: () => {},
+                removeEventListener: () => {},
+                setInterval: () => 123,
+                clearInterval: () => {},
+                ...env.window
+            };
+            const mockDocument = {
+                getElementById: (id) => null,
+                querySelector: (sel) => null,
+                querySelectorAll: (sel) => [],
+                createElement: (tag) => ({
+                    id: '',
+                    tagName: tag.toUpperCase(),
+                    style: {},
+                    classList: { contains: () => false, add: () => {}, remove: () => {} },
+                    setAttribute: () => {},
+                    getAttribute: () => null,
+                    appendChild: () => {},
+                    insertBefore: () => {}
+                }),
+                addEventListener: () => {},
+                removeEventListener: () => {},
+                readyState: 'complete',
+                ...env.document
+            };
+            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+            return mockModule.exports;
+        }
+
+        it('initializes with version 0.2.3.4', () => {
+            const dash = createMockDashboard();
+            assert.equal(dash.version, '0.2.3.4');
+            assert.equal(dash.state.version, '0.2.3.4');
+            assert.equal(dash.state.displayMode, 'compact');
+        });
+
+        it('identifies Dashboard and Devices views autonomously without opening plugin settings', () => {
+            const dashDashboard = createMockDashboard({
+                window: { location: { hash: '#/dashboard', pathname: '/web/index.html' } }
+            });
+            assert.equal(dashDashboard.isDashboardPage(), true);
+
+            const dashDevices = createMockDashboard({
+                window: { location: { hash: '#/devices', pathname: '/web/index.html' } }
+            });
+            assert.equal(dashDevices.isDashboardPage(), true);
+
+            const dashSettings = createMockDashboard({
+                window: { location: { hash: '#/settings/plugins', pathname: '/web/index.html' } }
+            });
+            assert.equal(dashSettings.isDashboardPage(), false);
+        });
+
+        it('renders the NOW PLAYING section directly above the stock Devices section', () => {
+            let insertBeforeCalledWith = null;
+            let referenceChildNode = null;
+
+            const stockDevicesElement = {
+                id: 'activeDevices',
+                className: 'activeDevices section',
+                style: { display: 'block' },
+                parentNode: {
+                    insertBefore: (newNode, refNode) => {
+                        insertBeforeCalledWith = newNode;
+                        referenceChildNode = refNode;
+                    }
+                }
+            };
+
+            const mockDoc = {
+                getElementById: (id) => (id === 'playback-card-nowplaying-container' ? null : null),
+                querySelector: (sel) => (sel.includes('.activeDevices') || sel.includes('#activeDevices') ? stockDevicesElement : null),
+                querySelectorAll: () => [],
+                createElement: (tag) => ({
+                    id: '',
+                    setAttribute: () => {},
+                    getAttribute: () => null,
+                    addEventListener: () => {}
+                }),
+                addEventListener: () => {}
+            };
+
+            const dash = createMockDashboard({ document: mockDoc });
+            const container = dash.ensureContainerInserted();
+
+            assert.ok(container, 'Container should be created');
+            assert.equal(container.id, 'playback-card-nowplaying-container');
+            assert.strictEqual(insertBeforeCalledWith, container, 'Container must be inserted before stock devices');
+            assert.strictEqual(referenceChildNode, stockDevicesElement, 'Reference child must be the stock devices element');
+            assert.notEqual(stockDevicesElement.style.display, 'none', 'Stock devices section must remain visible');
+        });
+
+        it('calculates session count breakdown accurately for Direct Play, Direct Stream, Transcode, and Paused', () => {
+            const dash = createMockDashboard();
+            const mockSessions = [
+                {
+                    Id: 's1',
+                    PlayMethod: 'DirectPlay',
+                    IsPaused: false,
+                    NowPlayingItem: { Name: 'Direct Stream Video' }
+                },
+                {
+                    Id: 's2',
+                    PlayMethod: 'DirectStream',
+                    IsPaused: false,
+                    NowPlayingItem: { Name: 'Direct Stream Audio' }
+                },
+                {
+                    Id: 's3',
+                    PlayMethod: 'Transcode',
+                    IsPaused: false,
+                    TranscodingInfo: { IsVideoDirect: false },
+                    NowPlayingItem: { Name: 'Transcoded Video' }
+                },
+                {
+                    Id: 's4',
+                    PlayMethod: 'DirectPlay',
+                    IsPaused: true,
+                    NowPlayingItem: { Name: 'Paused Video' }
+                }
+            ];
+
+            const counts = dash.calculateSessionCounts(mockSessions);
+            assert.equal(counts.directPlay, 1, 'Direct Play count');
+            assert.equal(counts.directStream, 1, 'Direct Stream count');
+            assert.equal(counts.transcode, 1, 'Transcode count');
+            assert.equal(counts.paused, 1, 'Paused count');
+        });
+
+        it('reports exact fallback text "Reason not reported by server" when transcode reasons are missing', () => {
+            const dash = createMockDashboard();
+            const transcodeSessionNoReasons = {
+                Id: 's-no-reasons',
+                UserName: 'TestUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome',
+                PlayMethod: 'Transcode',
+                TranscodingInfo: {
+                    IsVideoDirect: false,
+                    IsAudioDirect: true,
+                    HardwareAccelerationType: 'nvenc',
+                    TranscodeReasons: [] // Empty reasons
+                },
+                NowPlayingItem: { Name: 'Transcoded Movie', Container: 'mkv' }
+            };
+
+            const html = dash.renderSessionCard(transcodeSessionNoReasons, 1, 'compact', false);
+            assert.ok(html.includes('Reason not reported by server'), 'Must render exact fallback text');
+            assert.ok(html.includes('Why:'), 'Must include Why transcode row');
+            assert.ok(html.includes('Engine: NVENC'), 'Must include NVENC hardware acceleration badge');
+        });
+
+        it('reports truthful human-readable transcode reasons when reported by server', () => {
+            const dash = createMockDashboard();
+            const transcodeSessionWithReasons = {
+                Id: 's-with-reasons',
+                UserName: 'TestUser',
+                Client: 'Moonfin',
+                DeviceName: 'Android TV',
+                PlayMethod: 'Transcode',
+                TranscodingInfo: {
+                    IsVideoDirect: false,
+                    IsAudioDirect: false,
+                    TranscodeReasons: ['ContainerNotSupported', 'VideoCodecNotSupported']
+                },
+                NowPlayingItem: { Name: 'Moonfin Test Media', Container: 'avi' }
+            };
+
+            const html = dash.renderSessionCard(transcodeSessionWithReasons, 1, 'compact', false);
+            assert.ok(html.includes('Container not supported'));
+            assert.ok(html.includes('Video codec not supported'));
+            assert.ok(!html.includes('Reason not reported by server'));
+        });
+
+        it('enforces mobile layout constraints by capping compact mode to top 5 essential badges', () => {
+            const dash = createMockDashboard();
+            const richMediaSession = {
+                Id: 's-rich',
+                UserName: 'MobileUser',
+                Client: 'Jellyfin Mobile',
+                DeviceName: 'iPhone 15 Pro',
+                PlayMethod: 'DirectPlay',
+                NowPlayingItem: {
+                    Name: 'Feature Film',
+                    Width: 3840,
+                    Height: 2160,
+                    Container: 'mkv',
+                    MediaStreams: [
+                        { Type: 'Video', Codec: 'hevc', Width: 3840, Height: 2160, VideoRange: 'HDR' },
+                        { Type: 'Audio', Codec: 'truehd', Channels: 8, ChannelLayout: '7.1' },
+                        { Type: 'Subtitle', Index: 2, Language: 'eng' }
+                    ]
+                }
+            };
+
+            // Compact mode
+            const compactHtml = dash.renderSessionCard(richMediaSession, 1, 'compact', false);
+            const compactPills = (compactHtml.match(/<span class="playback-pill/g) || []).length;
+            assert.ok(compactPills <= 5, 'Compact mode must cap visible badges to 5 max, got: ' + compactPills);
+            assert.ok(compactHtml.includes('4K'), 'Must include 1. Resolution');
+            assert.ok(compactHtml.includes('Direct Play'), 'Must include 2. Play Method');
+            assert.ok(compactHtml.includes('HEVC'), 'Must include 3. Video Codec');
+            assert.ok(compactHtml.includes('7.1'), 'Must include 4. Audio Channels');
+            assert.ok(compactHtml.includes('MKV'), 'Must include 5. Container');
+
+            // Extended mode renders secondary badges as well
+            const extendedHtml = dash.renderSessionCard(richMediaSession, 1, 'extended', false);
+            const extendedPills = (extendedHtml.match(/<span class="playback-pill/g) || []).length;
+            assert.ok(extendedPills >= 5, 'Extended mode renders all badges');
+            assert.ok(extendedHtml.includes('HDR'), 'Extended mode includes HDR');
+        });
+
+        it('guarantees non-admin user isolation via PlaybackCard/Self/Sessions', async () => {
+            let calledSelfSessions = false;
+            let calledAdminSessions = false;
+
+            const mockApiClient = {
+                getSessions: async () => {
+                    calledAdminSessions = true;
+                    const err = new Error('Forbidden');
+                    err.status = 403;
+                    throw err;
+                },
+                getUrl: (subpath) => '/' + subpath,
+                getJSON: async (url) => {
+                    if (url.includes('PlaybackCard/Self/Sessions')) {
+                        calledSelfSessions = true;
+                        return [
+                            {
+                                MediaTitle: 'Isolated User Stream',
+                                PlayMethod: 'DirectPlay',
+                                IsVideoDirect: true,
+                                IsAudioDirect: true,
+                                PlaybackPercentage: 25
+                            }
+                        ];
+                    }
+                    return [];
+                }
+            };
+
+            let renderedHtml = '';
+            const mockContainer = {
+                innerHTML: '',
+                setAttribute: () => {},
+                getAttribute: () => null,
+                addEventListener: () => {}
+            };
+
+            const mockDoc = {
+                getElementById: () => null,
+                querySelector: () => ({
+                    id: 'activeDevices',
+                    parentNode: { insertBefore: () => {} }
+                }),
+                querySelectorAll: () => [],
+                createElement: () => mockContainer,
+                addEventListener: () => {}
+            };
+
+            const dash = createMockDashboard({
+                window: {
+                    location: { hash: '#/dashboard', pathname: '/web/index.html' },
+                    ApiClient: mockApiClient
+                },
+                document: mockDoc
+            });
+
+            await dash.pollSessions();
+
+            assert.equal(calledSelfSessions, true, 'Must fall back to PlaybackCard/Self/Sessions when non-admin');
+            assert.equal(dash.state.isNonAdmin, true, 'Controller flags user as non-admin');
+            assert.equal(dash.state.activeSessions.length, 1, 'Contains 1 isolated session');
+            assert.equal(dash.state.activeSessions[0].MediaTitle, 'Isolated User Stream');
+        });
+
+        it('renders accessible [Info] toggle button with aria-expanded and aria-controls', () => {
+            const dash = createMockDashboard();
+            const session = {
+                Id: 's-aria',
+                UserName: 'AriaUser',
+                Client: 'Android',
+                DeviceName: 'Pixel 8',
+                PlayMethod: 'DirectPlay',
+                NowPlayingItem: { Name: 'Accessible Stream' }
+            };
+
+            const html = dash.renderSessionCard(session, 1, 'compact', false);
+            assert.ok(html.includes('aria-expanded="false"'), 'Info button has initial aria-expanded false');
+            assert.ok(html.includes('aria-controls="details-dash-card-2"'), 'Info button has deterministic aria-controls');
+            assert.ok(html.includes('id="details-dash-card-2"'), 'Details panel has matching ID');
+            assert.ok(html.includes('role="region"'), 'Details panel has role region');
+            assert.ok(html.includes('aria-label="Stream Details"'), 'Details panel has accessible label');
+        });
+    });
 });
+

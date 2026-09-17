@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JellyfinPlaybackCard", "Jel
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{76752070-07C8-46B9-B1B8-EBEA41AD3B72}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JellyfinPlaybackCard.Tests", "tests\JellyfinPlaybackCard.Tests\JellyfinPlaybackCard.Tests.csproj", "{8E633DF8-1A99-4588-BDD3-99DF38F3A921}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JellyfinPlaybackCard.Tests", "tests/JellyfinPlaybackCard.Tests/JellyfinPlaybackCard.Tests.csproj", "{8E633DF8-1A99-4588-BDD3-99DF38F3A921}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
