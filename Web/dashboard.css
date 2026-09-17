@@ -619,6 +619,16 @@
     flex-shrink: 0;
 }
 
+/* Icon-led pills read as small badges (bolder weight, tighter tracking) so they stand
+   apart from the plain codec/bit-depth/container text pills next to them. */
+.playback-pill.res,
+.playback-pill.hdr,
+.playback-pill.audio,
+.playback-pill.sub {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
 .playback-pill.res {
     background: rgba(0, 164, 220, 0.15);
     border-color: rgba(0, 164, 220, 0.35);
