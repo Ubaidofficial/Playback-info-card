@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.5.1)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.5.2)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,8 +7,8 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.5.1';
-    var ASSET_REVISION = '0.2.5.1';
+    var VERSION = '0.2.5.2';
+    var ASSET_REVISION = '0.2.5.2';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var DRAWER_OVERLAY_ID = 'playback-drawer-overlay';
     var DRAWER_PANEL_ID = 'playback-drawer-panel';
@@ -150,6 +150,20 @@
         if (!audioStream || !audioStream.Language) return '';
         var lang = String(audioStream.Language).toUpperCase();
         return lang.length > 3 ? lang.substring(0, 3) : lang;
+    }
+
+    // Small leading glyphs for the highest-signal compact pills (resolution, dynamic
+    // range, audio, subtitle) so they scan at a glance instead of reading as plain text.
+    // Codec/bit-depth/container pills stay icon-free to avoid visual noise.
+    var PILL_ICONS = {
+        res: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>',
+        hdr: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M12 2l2.2 6.6L21 10l-5.2 4.1L17.4 21 12 17.3 6.6 21 8.2 14.1 3 10l6.8-1.4z"/></svg>',
+        audio: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+        sub: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15h4M13 15h5"/></svg>'
+    };
+
+    function pillIconSvg(cls) {
+        return PILL_ICONS[cls] || '';
     }
 
     // Estimated finish time, computed from real remaining playback duration -- never
@@ -1091,7 +1105,7 @@
             }
 
             var pillHtml = pills.map(function (p) {
-                return '<span class="playback-pill ' + p.cls + '">' + escapeHtml(p.text) + '</span>';
+                return '<span class="playback-pill ' + p.cls + '">' + pillIconSvg(p.cls) + escapeHtml(p.text) + '</span>';
             }).join('');
 
             // Progress calculations
@@ -1211,17 +1225,17 @@
                         '<div class="playback-card-body">' +
                             '<div class="playback-card-title">' + title + '</div>' +
                             (subtitle ? '<div class="playback-card-subtitle">' + subtitle + '</div>' : '') +
+                            '<div class="playback-card-progress">' +
+                                '<div class="playback-progress-bar-track">' +
+                                    '<div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div>' +
+                                '</div>' +
+                                '<div class="playback-progress-times">' +
+                                    '<span>' + formatTicks(positionTicks) + '</span>' +
+                                    (model.etaText ? '<span class="playback-eta">ETA ' + escapeHtml(model.etaText) + '</span>' : '') +
+                                    '<span>' + formatTicks(runtimeTicks) + '</span>' +
+                                '</div>' +
+                            '</div>' +
                             (pillHtml ? '<div class="playback-pill-row">' + pillHtml + '</div>' : '') +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="playback-card-progress">' +
-                        '<div class="playback-progress-bar-track">' +
-                            '<div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div>' +
-                        '</div>' +
-                        '<div class="playback-progress-times">' +
-                            '<span>' + formatTicks(positionTicks) + '</span>' +
-                            (model.etaText ? '<span class="playback-eta">ETA ' + escapeHtml(model.etaText) + '</span>' : '') +
-                            '<span>' + formatTicks(runtimeTicks) + '</span>' +
                         '</div>' +
                     '</div>' +
                     detailsPanelHtml +
@@ -1495,6 +1509,43 @@
         return counts;
     }
 
+    // Prominent "at a glance" glass strip shown above the grid: total active streams
+    // plus a genuine Direct/Transcoding split so admins don't have to scan every card
+    // to see whether anything is actually being transcoded right now. Classified by
+    // real method regardless of pause state -- unlike the header's mutually-exclusive
+    // Direct Play/Direct Stream/Remux/Transcode/Paused chips, a paused Transcode session
+    // must still count as "Transcoding" here, or the two totals would silently omit it.
+    function buildSummaryStripHtml(activeSessions) {
+        var sessions = Array.isArray(activeSessions) ? activeSessions : [];
+        if (sessions.length <= 0) return '';
+        var directTotal = 0;
+        var transcodingTotal = 0;
+        for (var i = 0; i < sessions.length; i++) {
+            var m = classifyPlaybackSession(sessions[i]).method;
+            if (m === 'Remux' || m === 'Transcode') transcodingTotal++;
+            else directTotal++;
+        }
+        var streamIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>';
+        var directIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>';
+        var transcodeIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-3.5-7.11"/><path d="M21 3v6h-6"/></svg>';
+        return '<div class="playback-summary-strip">' +
+            '<div class="playback-summary-stat">' + streamIcon +
+                '<span class="playback-summary-value">' + sessions.length + '</span>' +
+                '<span class="playback-summary-label">' + (sessions.length === 1 ? 'Active Stream' : 'Active Streams') + '</span>' +
+            '</div>' +
+            '<div class="playback-summary-divider"></div>' +
+            '<div class="playback-summary-stat stat-direct">' + directIcon +
+                '<span class="playback-summary-value">' + directTotal + '</span>' +
+                '<span class="playback-summary-label">Direct</span>' +
+            '</div>' +
+            '<div class="playback-summary-divider"></div>' +
+            '<div class="playback-summary-stat stat-transcode' + (transcodingTotal > 0 ? ' active' : '') + '">' + transcodeIcon +
+                '<span class="playback-summary-value">' + transcodingTotal + '</span>' +
+                '<span class="playback-summary-label">Transcoding</span>' +
+            '</div>' +
+        '</div>';
+    }
+
     function renderConnectedDeviceItem(session) {
         if (!session || typeof session !== 'object') return '';
         var client = escapeHtml(session.Client || 'Playback Client');
@@ -1580,6 +1631,8 @@
             '</div>' +
         '</div>';
 
+        var summaryStripHtml = buildSummaryStripHtml(activeSessions);
+
         var contentHtml = '';
         if (activeSessions.length === 0) {
             contentHtml = '<div class="playback-dashboard-empty">' +
@@ -1609,7 +1662,7 @@
             }
         }
 
-        container.innerHTML = headerHtml + contentHtml + connectedDevicesHtml;
+        container.innerHTML = headerHtml + summaryStripHtml + contentHtml + connectedDevicesHtml;
 
         // The Info drawer is a singleton mounted outside this container's innerHTML,
         // so it must be (re)synced explicitly on every render/poll cycle instead of
@@ -2080,6 +2133,7 @@
         ensureContainerInserted: ensureContainerInserted,
         renderSessionCard: renderSessionCard,
         calculateSessionCounts: calculateSessionCounts,
+        buildSummaryStripHtml: buildSummaryStripHtml,
         renderDashboardContainer: renderDashboardContainer,
         formatTicks: formatTicks,
         formatRelativeTime: formatRelativeTime,

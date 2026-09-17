@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.5.1 Test Suite', () => {
+describe('Playback Info Card v0.2.5.2 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.5.1', () => {
-            assert.equal(controller.version, '0.2.5.1');
-            assert.equal(controller.diagState.pluginVersion, '0.2.5.1');
+        it('initializes with default waiting state and version 0.2.5.2', () => {
+            assert.equal(controller.version, '0.2.5.2');
+            assert.equal(controller.diagState.pluginVersion, '0.2.5.2');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -177,7 +177,7 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.5.1');
+            assert.equal(report.pluginVersion, '0.2.5.2');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -225,7 +225,7 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.5.1',
+                pluginVersion: '0.2.5.2',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -656,7 +656,7 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
             assert.ok(!controller.openInfoSessionIds['monitor-persist-1'], 'Open-info state is pruned once its session is gone');
         });
 
-        it('mirrors the v0.2.5.1 additions on this page too (ETA, Atmos, audio language, subtitle delivery method, avatar)', () => {
+        it('mirrors the v0.2.5.2 additions on this page too (ETA, Atmos, audio language, subtitle delivery method, avatar)', () => {
             const session = {
                 Id: 'monitor-additions-1', UserId: 'u-1', UserName: 'X',
                 PlayState: { IsPaused: false, SubtitleStreamIndex: 2 },
@@ -677,7 +677,7 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.5.1)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.5.2)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -715,10 +715,10 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.5.1', () => {
+        it('initializes with version 0.2.5.2', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.5.1');
-            assert.equal(dash.state.version, '0.2.5.1');
+            assert.equal(dash.version, '0.2.5.2');
+            assert.equal(dash.state.version, '0.2.5.2');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -2062,7 +2062,7 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
         });
     });
 
-    describe('22. v0.2.5.1 additions (ETA, Atmos/DTS:X, audio language, subtitle delivery method, avatar)', () => {
+    describe('22. v0.2.5.2 additions (ETA, Atmos/DTS:X, audio language, subtitle delivery method, avatar)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
         function createMockDashboard() {
@@ -2117,6 +2117,130 @@ describe('Playback Info Card v0.2.5.1 Test Suite', () => {
             assert.equal(dash.resolveUserAvatarUrl(session, apiClient), '/Users/user-123/Images/Primary?tag=tag1');
             assert.equal(dash.resolveUserAvatarUrl(session, {}), '', 'No getUserImageUrl support -> empty, never throws');
             assert.equal(dash.resolveUserAvatarUrl({}, apiClient), '', 'No UserId -> empty');
+        });
+    });
+
+    describe('23. v0.2.5.2 additions (summary strip, pill icons, progress-under-title layout)', () => {
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+        function createMockDashboard() {
+            const mockModule = { exports: {} };
+            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
+            const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
+            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+            return mockModule.exports;
+        }
+
+        it('summary strip shows the real active/direct/transcoding split and is absent when there is nothing playing', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+            const directSession = { Id: 's-sum-1', NowPlayingItem: { Name: 'Direct Movie' }, PlayMethod: 'DirectPlay' };
+            const transcodeSession = { Id: 's-sum-2', NowPlayingItem: { Name: 'Transcode Movie' }, PlayMethod: 'Transcode', TranscodingInfo: { IsVideoDirect: false, IsAudioDirect: false } };
+
+            dash.renderDashboardContainer(container, [directSession, transcodeSession], [directSession, transcodeSession]);
+            assert.ok(container.innerHTML.includes('playback-summary-strip'), 'Summary strip renders when sessions are active');
+            assert.match(container.innerHTML, /playback-summary-value">2<\/span><span class="playback-summary-label">Active Streams/, 'Total reflects both active sessions');
+            assert.ok(container.innerHTML.includes('stat-transcode active'), 'Transcoding stat is marked active when at least one session is transcoding');
+
+            const emptyContainer = { innerHTML: '' };
+            dash.renderDashboardContainer(emptyContainer, [], []);
+            assert.ok(!emptyContainer.innerHTML.includes('playback-summary-strip'), 'Summary strip is omitted entirely when nothing is playing, not shown at zero');
+        });
+
+        it('summary strip never marks Transcoding as active when every session is a genuine direct stream', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+            const session = { Id: 's-sum-3', NowPlayingItem: { Name: 'Direct Movie' }, PlayMethod: 'DirectPlay' };
+            dash.renderDashboardContainer(container, [session], [session]);
+            assert.ok(container.innerHTML.includes('class="playback-summary-stat stat-transcode">'), 'stat-transcode has no "active" class when transcoding count is zero');
+        });
+
+        it('still counts a paused Transcode session as Transcoding, not as neither bucket (Direct + Transcoding must always sum to the total)', () => {
+            const dash = createMockDashboard();
+            const pausedTranscode = {
+                Id: 's-sum-paused-tc', IsPaused: true, NowPlayingItem: { Name: 'Paused Transcode' },
+                TranscodingInfo: { IsVideoDirect: false, IsAudioDirect: false }
+            };
+            const html = dash.buildSummaryStripHtml([pausedTranscode]);
+            assert.match(html, /playback-summary-value">1<\/span><span class="playback-summary-label">Active Stream</, 'Total is 1');
+            assert.match(html, /stat-direct">[\s\S]*?playback-summary-value">0</, 'Direct bucket is 0 -- this session is not direct');
+            assert.ok(html.includes('stat-transcode active') && /stat-transcode active">[\s\S]*?playback-summary-value">1</.test(html), 'Transcoding bucket is 1 even though the session is paused, since it is still genuinely transcoding');
+        });
+
+        it('high-signal pills (resolution, dynamic range, audio, subtitle) carry a leading icon; codec/bit-depth/container pills stay icon-free', () => {
+            const dash = createMockDashboard();
+            const session = {
+                Id: 's-pill-icons', NowPlayingItem: {
+                    Name: 'Icon Test', Width: 3840, Height: 2160, Container: 'mkv',
+                    MediaStreams: [
+                        { Type: 'Video', Codec: 'hevc', VideoRange: 'HDR', BitDepth: 10, Width: 3840, Height: 2160 },
+                        { Type: 'Audio', Codec: 'eac3', Channels: 6, ChannelLayout: '5.1', Profile: 'Dolby Atmos' }
+                    ]
+                }
+            };
+            const html = dash.renderSessionCard(session, 0, 'extended', false);
+            assert.ok(/<span class="playback-pill res"><svg class="pill-icon"/.test(html), 'Resolution pill leads with an icon');
+            assert.ok(/<span class="playback-pill hdr"><svg class="pill-icon"/.test(html), 'HDR pill leads with an icon');
+            assert.ok(/<span class="playback-pill audio"><svg class="pill-icon"/.test(html), 'Audio pill leads with an icon');
+            assert.ok(!/<span class="playback-pill "><svg/.test(html), 'Plain codec/bit-depth/container pills stay icon-free');
+        });
+
+        it('places the progress bar directly under the title/subtitle, above the technical pill row', () => {
+            const dash = createMockDashboard();
+            const session = {
+                Id: 's-layout', NowPlayingItem: { Name: 'Layout Test', Container: 'mkv', MediaStreams: [{ Type: 'Video', Codec: 'h264', Width: 1920, Height: 1080 }] },
+                RunTimeTicks: 3600 * 10000000, PositionTicks: 1800 * 10000000
+            };
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            const titleIdx = html.indexOf('playback-card-title');
+            const progressIdx = html.indexOf('playback-card-progress');
+            const pillRowIdx = html.indexOf('playback-pill-row');
+            assert.ok(titleIdx > -1 && progressIdx > -1 && pillRowIdx > -1, 'All three sections are present');
+            assert.ok(titleIdx < progressIdx, 'Progress bar comes after the title');
+            assert.ok(progressIdx < pillRowIdx, 'Progress bar comes before the technical pill row, not after it');
+            assert.ok(html.indexOf('playback-card-main') < titleIdx, 'Title still lives inside the poster/body row');
+        });
+    });
+
+    describe('24. playbackcard.html parity: summary strip, pill icons, progress-under-title layout', () => {
+        it('high-signal pills carry a leading icon on the standalone My Playback page too', () => {
+            controller.setDisplayMode('extended');
+            const session = {
+                Id: 's-html-icons', NowPlayingItem: {
+                    Name: 'Icon Parity Test', Width: 3840, Height: 2160, Container: 'mkv',
+                    MediaStreams: [
+                        { Type: 'Video', Codec: 'hevc', VideoRange: 'HDR', Width: 3840, Height: 2160 },
+                        { Type: 'Audio', Codec: 'eac3', Channels: 6, ChannelLayout: '5.1' }
+                    ]
+                }
+            };
+            const html = controller.renderSessionCard(session, 0);
+            assert.ok(/<span class="playback-pill res"><svg class="pill-icon"/.test(html), 'Resolution pill leads with an icon');
+            assert.ok(/<span class="playback-pill audio"><svg class="pill-icon"/.test(html), 'Audio pill leads with an icon');
+        });
+
+        it('places the progress bar directly under the title/subtitle, above the pill row, on the standalone page', () => {
+            controller.setDisplayMode('compact');
+            const session = {
+                Id: 's-html-layout', NowPlayingItem: { Name: 'Layout Parity Test', Container: 'mkv', MediaStreams: [{ Type: 'Video', Codec: 'h264', Width: 1920, Height: 1080 }] },
+                RunTimeTicks: 3600 * 10000000, PositionTicks: 1800 * 10000000
+            };
+            const html = controller.renderSessionCard(session, 0);
+            const titleIdx = html.indexOf('playback-card-title');
+            const progressIdx = html.indexOf('playback-card-progress');
+            const pillRowIdx = html.indexOf('playback-pill-row');
+            assert.ok(titleIdx > -1 && progressIdx > -1 && pillRowIdx > -1, 'All three sections are present');
+            assert.ok(titleIdx < progressIdx && progressIdx < pillRowIdx, 'Progress bar sits between the title and the technical pill row');
+        });
+
+        it('summary strip reflects a real Direct/Transcoding split and hides itself for zero sessions', () => {
+            const directSession = { Id: 's-html-sum-1', NowPlayingItem: { Name: 'Direct' }, PlayMethod: 'DirectPlay' };
+            const transcodeSession = { Id: 's-html-sum-2', NowPlayingItem: { Name: 'Transcode' }, PlayMethod: 'Transcode', TranscodingInfo: { IsVideoDirect: false, IsAudioDirect: false } };
+            const html = controller.buildSummaryStripHtml([directSession, transcodeSession]);
+            assert.match(html, /playback-summary-value">2<\/span><span class="playback-summary-label">Active Streams/);
+            assert.ok(html.includes('stat-transcode active'), 'Transcoding stat is active when at least one session is transcoding');
+            assert.equal(controller.buildSummaryStripHtml([]), '', 'No markup at all when there are zero sessions');
         });
     });
 });

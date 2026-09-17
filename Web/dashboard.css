@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Dashboard Integration Styles (v0.2.5.1)
+ * Playback Info Card - Dashboard Integration Styles (v0.2.5.2)
  * Liquid Glass Dark Theme & Responsive Telemetry Cards
  */
 
@@ -103,8 +103,68 @@
     padding: 0.2rem 0.55rem;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(8px) saturate(150%);
+    -webkit-backdrop-filter: blur(8px) saturate(150%);
     border: 1px solid rgba(255, 255, 255, 0.08);
     color: #94a3b8;
+}
+
+/* Summary Strip: prominent "at a glance" glass bar above the grid */
+.playback-summary-strip {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 1.1rem;
+    margin-bottom: 1rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 100%);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    flex-wrap: wrap;
+}
+
+.playback-summary-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #94a3b8;
+}
+
+.playback-summary-stat svg {
+    flex-shrink: 0;
+}
+
+.playback-summary-value {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #f8fafc;
+    font-variant-numeric: tabular-nums;
+}
+
+.playback-summary-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.playback-summary-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
+
+.playback-summary-stat.stat-direct svg,
+.playback-summary-stat.stat-direct .playback-summary-value {
+    color: #4ade80;
+}
+
+.playback-summary-stat.stat-transcode.active svg,
+.playback-summary-stat.stat-transcode.active .playback-summary-value {
+    color: #f87171;
 }
 
 .playback-count-chip .count-val {
@@ -145,6 +205,8 @@
 .playback-mode-toggle {
     display: inline-flex;
     background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 6px;
     padding: 2px;
@@ -174,6 +236,8 @@
 
 .playback-btn-toggle-details {
     background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(10px) saturate(160%);
+    -webkit-backdrop-filter: blur(10px) saturate(160%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 6px;
     color: #cbd5e1;
@@ -211,22 +275,48 @@
     gap: 1rem;
 }
 
-/* Individual Card Anatomy */
+/* Individual Card Anatomy -- "Liquid Glass": deep blur + saturation boost behind a
+   translucent gradient, a specular highlight riding the top surface, and a bright/dim
+   edge split (inset highlight on top, inset shadow on bottom) so the card reads as a
+   lit sheet of glass rather than a flat tinted rectangle. */
 .playback-card {
     position: relative;
-    border-radius: 10px;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 50%, rgba(13, 17, 23, 0.85) 100%), #0d1117;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(13, 17, 23, 0.78) 100%), #0d1117;
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+        0 8px 24px -4px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.3);
     overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     box-sizing: border-box;
+    isolation: isolate;
+}
+
+.playback-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: radial-gradient(120% 60% at 18% -12%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 55%);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
 }
 
 .playback-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.65), inset 0 1px 0 0 rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+        0 12px 32px -4px rgba(0, 0, 0, 0.65),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.playback-card:hover::before {
+    background: radial-gradient(120% 60% at 18% -12%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 55%);
 }
 
 .playback-card-backdrop {
@@ -343,6 +433,8 @@
     letter-spacing: 0.04em;
     white-space: nowrap;
     flex-shrink: 0;
+    backdrop-filter: blur(8px) saturate(160%);
+    -webkit-backdrop-filter: blur(8px) saturate(160%);
 }
 
 .playback-badge.direct-play {
@@ -397,6 +489,8 @@
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px) saturate(160%);
+    -webkit-backdrop-filter: blur(8px) saturate(160%);
     border: 1px solid rgba(255, 255, 255, 0.14);
     color: #cbd5e1;
     cursor: pointer;
@@ -506,14 +600,23 @@
 }
 
 .playback-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     font-size: 0.68rem;
     font-weight: 600;
     padding: 0.15rem 0.4rem;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(8px) saturate(150%);
+    -webkit-backdrop-filter: blur(8px) saturate(150%);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: #cbd5e1;
     white-space: nowrap;
+}
+
+.pill-icon {
+    flex-shrink: 0;
 }
 
 .playback-pill.res {
@@ -540,12 +643,13 @@
     color: #f472b6;
 }
 
-/* Progress Bar */
+/* Progress Bar -- lives directly under the title/subtitle so playback position is
+   read at a glance, not buried at the bottom of the card. */
 .playback-card-progress {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    margin-top: auto;
+    margin-top: 0.15rem;
 }
 
 .playback-progress-bar-track {
@@ -755,9 +859,11 @@
     height: 100dvh;
     width: 480px;
     max-width: 90vw;
-    background: #0d1117;
-    border-left: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+    background: rgba(13, 17, 23, 0.82);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45), inset 1px 0 0 0 rgba(255, 255, 255, 0.06);
     transform: translateX(100%);
     transition: transform 0.25s ease;
     z-index: 4001;
@@ -775,7 +881,9 @@
     padding: 0.9rem 1rem;
     position: sticky;
     top: 0;
-    background: #0d1117;
+    background: rgba(13, 17, 23, 0.75);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     z-index: 1;
 }
 
