@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Dashboard Integration Styles (v0.2.3.4)
+ * Playback Info Card - Dashboard Integration Styles (v0.2.3.5)
  * Liquid Glass Dark Theme & Responsive Telemetry Cards
  */
 
@@ -11,6 +11,16 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: #e2e8f0;
     -webkit-font-smoothing: antialiased;
+}
+
+/* Safety suppression: ensure stock devices table is completely absent */
+#playback-card-nowplaying-container + .activeDevices,
+#playback-card-nowplaying-container + .dashboardDevices,
+#playback-card-nowplaying-container + .devicesSection,
+#playback-card-nowplaying-container ~ .activeDevices,
+#playback-card-nowplaying-container ~ .dashboardDevices,
+#playback-card-nowplaying-container ~ .devicesSection {
+    display: none !important;
 }
 
 /* Header Section */

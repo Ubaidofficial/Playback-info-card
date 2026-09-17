@@ -1,13 +1,13 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.3.4)
- * Automatically injects the NOW PLAYING telemetry grid directly above Jellyfin's
- * standard stock Devices table on the default Dashboard.
+ * Playback Info Card - Primary Dashboard Integration (v0.2.3.5)
+ * Completely replaces Jellyfin's standard stock Devices section on the default
+ * Dashboard with the NOW PLAYING telemetry grid.
  */
 
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.3.4';
+    var VERSION = '0.2.3.5';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -193,14 +193,23 @@
 
     function isDashboardPage() {
         if (typeof window === 'undefined') return false;
-        var hash = (window.location && window.location.hash) || '';
-        var path = (window.location && window.location.pathname) || '';
+        var hash = ((window.location && window.location.hash) || '').toLowerCase();
+        var path = ((window.location && window.location.pathname) || '').toLowerCase();
         var isHashMatch = hash.indexOf('dashboard') !== -1 || hash.indexOf('devices') !== -1;
         var isPathMatch = path.indexOf('dashboard') !== -1 || path.indexOf('devices') !== -1;
 
+        if (isHashMatch || isPathMatch) {
+            return true;
+        }
+
+        // If hash or path explicitly points to another view (e.g. #/settings, #/home), it is not dashboard
+        if (hash && hash.length > 2 && !isHashMatch) {
+            return false;
+        }
+
         if (typeof document !== 'undefined') {
             if (typeof document.querySelector === 'function') {
-                var activeView = document.querySelector('.page.page-current, .page:not(.hide), [data-role="page"]:not(.hide)');
+                var activeView = document.querySelector('.page.page-current:not(.hide), [data-role="page"].page-current:not(.hide), .page:not(.hide), [data-role="page"]:not(.hide)');
                 if (activeView) {
                     var id = (activeView.id || '').toLowerCase();
                     var cls = (activeView.className || '').toLowerCase();
@@ -208,16 +217,19 @@
                         cls.indexOf('dashboard') !== -1 || cls.indexOf('devices') !== -1) {
                         return true;
                     }
+                    return false;
                 }
             }
-            if (typeof document.getElementById === 'function' && (document.getElementById('dashboardPage') || document.getElementById('devicesPage'))) {
+            var dashPage = typeof document.getElementById === 'function' ? document.getElementById('dashboardPage') : null;
+            if (dashPage && !dashPage.classList.contains('hide')) {
                 return true;
             }
-            if (typeof document.querySelector === 'function' && document.querySelector('.dashboardPage, .devicesPage, .activeDevices, .dashboardDevices')) {
+            var devPage = typeof document.getElementById === 'function' ? document.getElementById('devicesPage') : null;
+            if (devPage && !devPage.classList.contains('hide')) {
                 return true;
             }
         }
-        return isHashMatch || isPathMatch;
+        return false;
     }
 
     function findStockDevicesSection(root) {
@@ -237,16 +249,40 @@
 
         for (var i = 0; i < selectors.length; i++) {
             var el = scope.querySelector(selectors[i]);
-            if (el) return el;
+            if (el && el.id !== CONTAINER_ID) {
+                if (typeof el.closest === 'function' && el.closest('#' + CONTAINER_ID)) {
+                    continue;
+                }
+                // Check if el is contained within an enclosing section container
+                if (typeof el.closest === 'function') {
+                    var sec = el.closest('.verticalSection, .section, .dashboardSection');
+                    if (sec && sec !== scope && !sec.classList.contains('content-primary') && (!sec.id || sec.id.indexOf('Page') === -1)) {
+                        var titles = sec.querySelectorAll('.sectionTitle, h2, h3');
+                        if (titles.length <= 1) {
+                            return sec;
+                        }
+                    }
+                }
+                return el;
+            }
         }
 
         // Search for a section header titled "Devices"
         var headings = scope.querySelectorAll('h2.sectionTitle, h3.sectionTitle, .sectionTitle');
         for (var j = 0; j < headings.length; j++) {
             var h = headings[j];
+            if (typeof h.closest === 'function' && h.closest('#' + CONTAINER_ID)) {
+                continue;
+            }
             var text = (h.textContent || '').trim().toLowerCase();
             if (text === 'devices' || text === 'active devices') {
-                return h.closest('.section, .verticalSection') || h.parentNode;
+                if (typeof h.closest === 'function') {
+                    var hSec = h.closest('.section, .verticalSection, .dashboardSection');
+                    if (hSec && hSec !== scope && !hSec.classList.contains('content-primary') && (!hSec.id || hSec.id.indexOf('Page') === -1)) {
+                        return hSec;
+                    }
+                }
+                return h.parentNode;
             }
         }
 
@@ -263,32 +299,51 @@
             if (!existing) {
                 existing = document.createElement('div');
                 existing.id = CONTAINER_ID;
-                devicesSection.parentNode.insertBefore(existing, devicesSection);
                 attachContainerEvents(existing);
-            } else if (existing.nextSibling !== devicesSection) {
-                // Relocate directly above devices section if DOM reordered
-                devicesSection.parentNode.insertBefore(existing, devicesSection);
             }
+
+            // Mount the NOW PLAYING container in the Devices section's location
+            devicesSection.parentNode.insertBefore(existing, devicesSection);
+
+            // Do not remove the original Devices section until NOW PLAYING has mounted successfully
+            var isMounted = false;
+            try {
+                isMounted = Boolean(existing.parentNode && (typeof document.contains !== 'function' || document.contains(existing)));
+            } catch (_) {
+                isMounted = Boolean(existing.parentNode);
+            }
+
+            if (isMounted) {
+                // Completely replace / remove original stock Devices section
+                devicesSection.style.display = 'none';
+                if (devicesSection.parentNode) {
+                    devicesSection.parentNode.removeChild(devicesSection);
+                }
+            }
+
+            return existing;
+        }
+
+        // If existing is already mounted and no stock devices section is found
+        if (existing) {
             return existing;
         }
 
         // Fallback: If stock devices section not yet in DOM, insert into main dashboard content
-        if (!existing) {
-            var mainContent = document.querySelector('#dashboardPage .content-primary, #devicesPage .content-primary, .dashboardContent, .content-primary, [data-role="content"]');
-            if (mainContent) {
-                existing = document.createElement('div');
-                existing.id = CONTAINER_ID;
-                if (mainContent.firstChild) {
-                    mainContent.insertBefore(existing, mainContent.firstChild);
-                } else {
-                    mainContent.appendChild(existing);
-                }
-                attachContainerEvents(existing);
-                return existing;
+        var mainContent = document.querySelector('#dashboardPage .content-primary, #devicesPage .content-primary, .dashboardContent, .content-primary, [data-role="content"]');
+        if (mainContent) {
+            existing = document.createElement('div');
+            existing.id = CONTAINER_ID;
+            if (mainContent.firstChild) {
+                mainContent.insertBefore(existing, mainContent.firstChild);
+            } else {
+                mainContent.appendChild(existing);
             }
+            attachContainerEvents(existing);
+            return existing;
         }
 
-        return existing;
+        return null;
     }
 
     function renderSessionCard(session, index, displayMode, showAllDetails) {
@@ -646,8 +701,8 @@
         var contentHtml = '';
         if (sessions.length === 0) {
             contentHtml = '<div class="playback-dashboard-empty">' +
-                '<p>No active playback streams currently on this server.</p>' +
-            '</div>';
+                '<p>No active playback</p>' +
+                '</div>';
         } else {
             var cardsHtml = sessions.map(function (s, idx) {
                 return renderSessionCard(s, idx, state.displayMode, state.showAllDetails);
@@ -814,17 +869,30 @@
         if (typeof document.addEventListener === 'function') {
             document.addEventListener('viewshow', handleRouteOrDomChange);
             document.addEventListener('pageshow', handleRouteOrDomChange);
+            document.addEventListener('viewhide', handleRouteOrDomChange);
         }
 
         // MutationObserver to detect dynamic page changes
         var targetNode = (typeof document.getElementById === 'function' ? document.getElementById('mainContainer') : null) || (typeof document.body !== 'undefined' ? document.body : null);
         if (targetNode && typeof MutationObserver !== 'undefined') {
+            var observerTimeout = null;
             var observer = new MutationObserver(function (mutations) {
                 if (isDashboardPage()) {
                     var container = typeof document.getElementById === 'function' ? document.getElementById(CONTAINER_ID) : null;
-                    if (!container) {
-                        ensureContainerInserted();
-                        startPolling();
+                    var stockDevices = findStockDevicesSection();
+                    if (!container || stockDevices) {
+                        if (observerTimeout) clearTimeout(observerTimeout);
+                        observerTimeout = setTimeout(function () {
+                            if (isDashboardPage()) {
+                                var inserted = ensureContainerInserted();
+                                if (inserted && state.activeSessions) {
+                                    renderDashboardContainer(inserted, state.activeSessions);
+                                }
+                                if (!state.isPolling) {
+                                    startPolling();
+                                }
+                            }
+                        }, 50);
                     }
                 }
             });

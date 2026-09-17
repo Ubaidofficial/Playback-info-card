@@ -21,7 +21,7 @@ public class PlaybackCardDashboardMiddleware
 
     private const string DashboardScriptTag =
         "<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css\">\n" +
-        "<script plugin=\"PlaybackCard\" version=\"0.2.3.4\" src=\"/PlaybackCard/dashboard.js\" defer></script>\n";
+        "<script plugin=\"PlaybackCard\" version=\"0.2.3.5\" src=\"/PlaybackCard/dashboard.js\" defer></script>\n";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaybackCardDashboardMiddleware"/> class.

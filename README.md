@@ -1,18 +1,18 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.4**
+**Stable Version: v0.2.3.5**
 
 Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 
-## What Changed in v0.2.3.4
+## What Changed in v0.2.3.5
 
-Version `0.2.3.4` restores the primary intended product experience for Jellyfin 10.9+ and 12.1+:
+Version `0.2.3.5` delivers the focused corrective patch for Jellyfin 10.9+ and 12.1+:
 
-* **Primary Dashboard Integration**: Telemetry cards appear automatically on Jellyfin's standard default **Dashboard/devices** view, placed directly above the stock Jellyfin Devices table.
-* **Preserved Stock Devices Table**: The existing Jellyfin Devices section remains completely visible and untouched directly below the NOW PLAYING grid.
-* **Autonomous Loading**: Initializes automatically upon visiting the default Dashboard, browser refresh, Jellyfin server restart, and user login—without requiring any visit to Plugin Settings.
+* **Complete Devices Section Replacement**: Telemetry cards completely replace Jellyfin's standard stock **Devices** section on the default Dashboard/devices view in-place. The stock Devices table is removed entirely from that location and is not visible below or beside NOW PLAYING.
+* **Empty State**: When no active playback sessions are active, the replaced area displays `No active playback`—and the original stock Devices table remains completely absent.
+* **Autonomous Loading**: Initializes automatically upon visiting the default Dashboard, browser refresh, Jellyfin server restart, and user login—without requiring any visit to Plugin Settings or Playback Monitor.
 * **Header Telemetry & Session Counts**: Live activity banner featuring a pulsing refresh indicator, session count breakdown (Direct Play, Direct Stream / Remux, Transcode, Paused), density toggle (Compact mode default vs Extended mode), and quick "Show Details" toggle.
 * **Mobile-Optimized Compact Badges**: Enforces a strict 5-badge priority cap on compact viewports: Resolution, Play Method, Video Codec, Audio Channels, and Container.
 * **Truthful Transcode Diagnostics**: Displays video/audio conversion status, hardware acceleration engine (`NVENC`, `QSV`, `VAAPI`, `AMF`, `Software`), and active transcode reasons with exact fallback text `"Reason not reported by server"`.
@@ -25,7 +25,7 @@ Version `0.2.3.4` restores the primary intended product experience for Jellyfin 
 ## Where to Find the Monitor
 
 1. **Primary Default Dashboard (Automatic)**:
-   Navigate to Jellyfin's standard **Dashboard** (`#/dashboard` or `#/devices`). The **NOW PLAYING** grid automatically appears directly above the Devices section.
+   Navigate to Jellyfin's standard **Dashboard** (`#/dashboard` or `#/devices`). The **NOW PLAYING** grid completely replaces the stock Devices section in-place.
 2. **Dedicated Fallback / Admin Detail Page**:
    In the left sidebar under **Server**, click **Playback Monitor** (direct URL route: `/web/#/configurationpage?name=playbackcard`).
 3. **Personal User View**:

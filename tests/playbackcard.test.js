@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.3.4 Test Suite', () => {
+describe('Playback Info Card v0.2.3.5 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.3.4', () => {
-            assert.equal(controller.version, '0.2.3.4');
-            assert.equal(controller.diagState.pluginVersion, '0.2.3.4');
+        it('initializes with default waiting state and version 0.2.3.5', () => {
+            assert.equal(controller.version, '0.2.3.5');
+            assert.equal(controller.diagState.pluginVersion, '0.2.3.5');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.3.4');
+            assert.equal(report.pluginVersion, '0.2.3.5');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.3.4',
+                pluginVersion: '0.2.3.5',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -629,7 +629,7 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.3.4)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.3.5)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -667,10 +667,10 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.3.4', () => {
+        it('initializes with version 0.2.3.5', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.3.4');
-            assert.equal(dash.state.version, '0.2.3.4');
+            assert.equal(dash.version, '0.2.3.5');
+            assert.equal(dash.state.version, '0.2.3.5');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -691,24 +691,35 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
             assert.equal(dashSettings.isDashboardPage(), false);
         });
 
-        it('renders the NOW PLAYING section directly above the stock Devices section', () => {
-            let insertBeforeCalledWith = null;
-            let referenceChildNode = null;
+        it('completely replaces the stock Devices section with NOW PLAYING and removes stock Devices from DOM', () => {
+            let insertBeforeCalled = false;
+            let removeChildCalled = false;
+            let removedNode = null;
+            let insertedNode = null;
 
             const stockDevicesElement = {
                 id: 'activeDevices',
                 className: 'activeDevices section',
                 style: { display: 'block' },
-                parentNode: {
-                    insertBefore: (newNode, refNode) => {
-                        insertBeforeCalledWith = newNode;
-                        referenceChildNode = refNode;
-                    }
-                }
+                parentNode: null
             };
 
+            const parent = {
+                insertBefore: (newNode, refNode) => {
+                    insertBeforeCalled = true;
+                    insertedNode = newNode;
+                    newNode.parentNode = parent;
+                },
+                removeChild: (childNode) => {
+                    removeChildCalled = true;
+                    removedNode = childNode;
+                    childNode.parentNode = null;
+                }
+            };
+            stockDevicesElement.parentNode = parent;
+
             const mockDoc = {
-                getElementById: (id) => (id === 'playback-card-nowplaying-container' ? null : null),
+                getElementById: (id) => null,
                 querySelector: (sel) => (sel.includes('.activeDevices') || sel.includes('#activeDevices') ? stockDevicesElement : null),
                 querySelectorAll: () => [],
                 createElement: (tag) => ({
@@ -723,11 +734,166 @@ describe('Playback Info Card v0.2.3.4 Test Suite', () => {
             const dash = createMockDashboard({ document: mockDoc });
             const container = dash.ensureContainerInserted();
 
-            assert.ok(container, 'Container should be created');
+            assert.ok(container, 'NOW PLAYING container must be created');
             assert.equal(container.id, 'playback-card-nowplaying-container');
-            assert.strictEqual(insertBeforeCalledWith, container, 'Container must be inserted before stock devices');
-            assert.strictEqual(referenceChildNode, stockDevicesElement, 'Reference child must be the stock devices element');
-            assert.notEqual(stockDevicesElement.style.display, 'none', 'Stock devices section must remain visible');
+            assert.equal(insertBeforeCalled, true, 'Container must be mounted in Devices location');
+            assert.strictEqual(insertedNode, container, 'Mounted node must be the NOW PLAYING container');
+            assert.equal(removeChildCalled, true, 'Stock Devices section must be removed from the DOM');
+            assert.strictEqual(removedNode, stockDevicesElement, 'Removed node must be the stock Devices element');
+            assert.equal(stockDevicesElement.style.display, 'none', 'Stock Devices element style must be hidden');
+            assert.equal(stockDevicesElement.parentNode, null, 'Stock Devices element must have null parentNode after removal');
+        });
+
+        it('does not create duplicate NOW PLAYING containers during repeated calls or SPA navigation', () => {
+            let createdCount = 0;
+            let existingContainer = null;
+
+            const mockDoc = {
+                getElementById: (id) => (id === 'playback-card-nowplaying-container' ? existingContainer : null),
+                querySelector: () => null,
+                querySelectorAll: () => [],
+                createElement: (tag) => {
+                    createdCount++;
+                    existingContainer = {
+                        id: '',
+                        setAttribute: () => {},
+                        getAttribute: () => null,
+                        addEventListener: () => {}
+                    };
+                    return existingContainer;
+                },
+                addEventListener: () => {}
+            };
+
+            // First call with mainContent fallback
+            const mainContent = {
+                firstChild: null,
+                insertBefore: () => {},
+                appendChild: () => {}
+            };
+            mockDoc.querySelector = (sel) => (sel.includes('.content-primary') ? mainContent : null);
+
+            const dash = createMockDashboard({ document: mockDoc });
+            const container1 = dash.ensureContainerInserted();
+            assert.ok(container1, 'First container created');
+            assert.equal(createdCount, 1);
+
+            // Second call: existing container is returned without creating another
+            const container2 = dash.ensureContainerInserted();
+            assert.strictEqual(container2, container1, 'Must return same container singleton');
+            assert.equal(createdCount, 1, 'No duplicate container element created');
+        });
+
+        it('survives Jellyfin DOM rerenders and replaces stock Devices when re-rendered', () => {
+            let removeChildCalled = false;
+            let removedNode = null;
+
+            const existingContainer = {
+                id: 'playback-card-nowplaying-container',
+                parentNode: { insertBefore: () => {}, removeChild: () => {} }
+            };
+
+            const newlyRerenderedDevices = {
+                id: 'activeDevices',
+                className: 'activeDevices',
+                style: { display: 'block' },
+                parentNode: {
+                    insertBefore: (newNode, refNode) => {
+                        newNode.parentNode = newlyRerenderedDevices.parentNode;
+                    },
+                    removeChild: (childNode) => {
+                        removeChildCalled = true;
+                        removedNode = childNode;
+                        childNode.parentNode = null;
+                    }
+                }
+            };
+
+            const mockDoc = {
+                getElementById: (id) => (id === 'playback-card-nowplaying-container' ? existingContainer : null),
+                querySelector: (sel) => (sel.includes('.activeDevices') ? newlyRerenderedDevices : null),
+                querySelectorAll: () => [],
+                createElement: () => ({ id: '' }),
+                addEventListener: () => {}
+            };
+
+            const dash = createMockDashboard({ document: mockDoc });
+            const container = dash.ensureContainerInserted();
+
+            assert.strictEqual(container, existingContainer, 'Must reuse existing container');
+            assert.equal(removeChildCalled, true, 'Re-rendered stock devices must be removed');
+            assert.strictEqual(removedNode, newlyRerenderedDevices, 'Removed element must be the re-rendered devices section');
+            assert.equal(newlyRerenderedDevices.style.display, 'none');
+        });
+
+        it('renders empty state "No active playback" when there are no active sessions and keeps stock Devices absent', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+
+            dash.renderDashboardContainer(container, []);
+
+            assert.ok(container.innerHTML.includes('No active playback'), 'Empty state must show exact text "No active playback"');
+            assert.ok(!container.innerHTML.includes('No active playback streams currently on this server'), 'Old empty text removed');
+            assert.ok(!container.innerHTML.includes('activeDevices'), 'Stock devices table must not appear');
+            assert.ok(!container.innerHTML.includes('devicesList'), 'Stock devices list must not appear');
+        });
+
+        it('renders Moonfin Android TV session card with poster, client, device, badges, and Info toggle', () => {
+            const dash = createMockDashboard();
+            const moonfinSession = {
+                Id: 'moonfin-1',
+                UserName: 'LivingRoom',
+                Client: 'Moonfin',
+                DeviceName: 'Android TV',
+                ApplicationVersion: '1.0.4',
+                PlayMethod: 'DirectPlay',
+                IsPaused: false,
+                PositionTicks: 12000000000, // 20 mins
+                RunTimeTicks: 72000000000,  // 120 mins
+                PlaybackPercentage: 16.7,
+                NowPlayingItem: {
+                    Name: 'Interstellar',
+                    ProductionYear: 2014,
+                    Width: 3840,
+                    Height: 2160,
+                    Container: 'mkv',
+                    MediaStreams: [
+                        { Type: 'Video', Codec: 'hevc', Width: 3840, Height: 2160, VideoRange: 'HDR' },
+                        { Type: 'Audio', Codec: 'truehd', Channels: 8, ChannelLayout: '7.1' }
+                    ]
+                }
+            };
+
+            // Active Playing State
+            const activeHtml = dash.renderSessionCard(moonfinSession, 0, 'compact', false);
+            assert.ok(activeHtml.includes('LivingRoom'), 'Shows username');
+            assert.ok(activeHtml.includes('Moonfin &mdash; Android TV (v1.0.4)'), 'Shows Moonfin client, device, and version');
+            assert.ok(activeHtml.includes('Interstellar'), 'Shows media title');
+            assert.ok(activeHtml.includes('2014'), 'Shows production year');
+            assert.ok(activeHtml.includes('Direct Play'), 'Shows Direct Play badge');
+            assert.ok(activeHtml.includes('4K'), 'Shows 4K resolution badge');
+            assert.ok(activeHtml.includes('HEVC'), 'Shows HEVC video codec badge');
+            assert.ok(activeHtml.includes('7.1'), 'Shows 7.1 audio channels badge');
+            assert.ok(activeHtml.includes('MKV'), 'Shows MKV container badge');
+            assert.ok(activeHtml.includes('data-action="toggle-info"'), 'Shows Info toggle button');
+            assert.ok(activeHtml.includes('aria-expanded="false"'), 'Info toggle has aria-expanded false');
+            assert.ok(activeHtml.includes('aria-controls="details-dash-card-1"'), 'Info toggle has aria-controls');
+
+            // Paused State
+            moonfinSession.IsPaused = true;
+            const pausedHtml = dash.renderSessionCard(moonfinSession, 0, 'compact', false);
+            assert.ok(pausedHtml.includes('Paused'), 'Shows Paused badge when paused');
+
+            // Resumed State
+            moonfinSession.IsPaused = false;
+            const resumedHtml = dash.renderSessionCard(moonfinSession, 0, 'compact', false);
+            assert.ok(resumedHtml.includes('Direct Play'), 'Shows Direct Play when resumed');
+
+            // Stopped State (cleanup to empty state)
+            const emptyContainer = { innerHTML: '' };
+            dash.renderDashboardContainer(emptyContainer, []);
+            assert.ok(emptyContainer.innerHTML.includes('No active playback'), 'Reverts cleanly to No active playback');
+            assert.ok(!emptyContainer.innerHTML.includes('Interstellar'), 'Playback card removed on stop');
         });
 
         it('calculates session count breakdown accurately for Direct Play, Direct Stream, Transcode, and Paused', () => {
