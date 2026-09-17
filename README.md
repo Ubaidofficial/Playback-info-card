@@ -1,51 +1,19 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.4.0**
+**Current Version: v0.2.5.0**
 
-Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
-
----
-
-## What Changed in v0.2.4.0
-
-Version `0.2.4.0` delivers the definitive in-place replacement fix for Jellyfin Server 12.1+ and 10.9+:
-
-* **Strict Navigation Drawer & Sidebar Exclusion**: Eliminates false matches against navigation links (`nav.MuiDrawer-root a[href*="/dashboard/devices"]` and sidebar drawer headers) that previously caused `NOW PLAYING` to be placed at the top of the dashboard.
-* **Scoping to Active Dashboard Content**: Scopes all widget detection to the active dashboard content root (`main`, `#dashboardPage`, `.content-primary`), ensuring only the true dashboard Devices widget is replaced.
-* **In-Place DOM Swap & Complete Removal**: Mounts `#playback-card-nowplaying-container` in the exact slot of the stock Devices widget, unparents and hides stock elements, and cleans up any lingering stock device cards.
-* **Zero Top-of-Page Fallback**: Telemetry cards are never mounted at the top of the dashboard. If the Devices widget is rendering asynchronously, the observer waits without mounting elsewhere.
-* **Connected Devices Preservation**: Retains active and idle connected client cards (`Connected Devices`), and displays `No active playback` when no streams are playing.
-* **Accessible 22-Field Technical Breakdown Drawer**: Separates `Source Resolution` vs `Output Resolution`, and `Source Container` vs `Output Container`, with full keyboard accessibility (Escape to close, focus restoration, `aria-expanded`, `aria-controls`), and `prefers-reduced-motion` compliance. Missing technical fields display `"Not reported"`.
+Real-time, privacy-safe stream telemetry and playback monitoring for Jellyfin Media Server — a Now Playing grid that replaces the stock Devices widget on the admin Dashboard, plus a self-service "My Playback" page for regular users.
 
 ---
 
-## What Changed in v0.2.3.7
+## What's in v0.2.5.0
 
-Version `0.2.3.7` corrects playback telemetry inaccuracies, stream classification consistency, and technical details:
-
-* **Header Count & Card Badge Agreement**: Unified playback session classification so header counters and card badges always agree. Remux (`REMUX`) and Direct Stream streams are separated and never counted as Transcodes.
-* **Truthful Hardware Engine Reporting**: Hardware acceleration engines (`QSV`, `NVENC`, `VAAPI`, `AMF`, `VideoToolbox`) are strictly suppressed when video is direct (`isVideoDirect === true`, such as in Remux or audio-only transcode) and only shown when video is actively transcoded.
-* **Truthful Media Frame Rate**: Sourced truthful stream framerates (`RealFrameRate`, `AverageFrameRate`) and strictly rejected impossible ffmpeg throughput counters (e.g. `2191 fps`). Normalizes standard film and broadcast framerates (`23.976 fps`, `24 fps`, `25 fps`, `29.97 fps`, `30 fps`, `50 fps`, `59.94 fps`, `60 fps`).
-* **Server-Reported Transcode Reasons**: Only displays transcode reasons explicitly provided by the Jellyfin server without speculative inference (no guessing `Container not supported`). Defaults to `"Reason not reported by server"` when reasons are omitted.
-* **Poster Artwork Fallback**: Automatically falls back to TV Series poster art when episode primary artwork is absent, and displays a clean slate-film placeholder instead of an empty black box when no image is available.
-* **Accessible 21-Field Info Drawer**: Streamlined technical breakdown grid with full keyboard accessibility (Escape to close, focus restoration, `aria-expanded`, `aria-controls`), and `prefers-reduced-motion` compliance. Missing technical fields display `"Not reported"`.
-
----
-
-## What Changed in v0.2.3.6
-
-Version `0.2.3.6` delivers the verified live acceptance fix for Windows Jellyfin Server 12.1+ and 10.9+:
-
-* **In-Place Devices Widget Replacement**: Accurately targets the modern React/MUI Devices widget (`<Widget href="/dashboard/devices">`) and replaces it in-place in the dashboard column stack. The "Devices" heading button and stock device cards are completely removed from the DOM.
-* **Zero Top-of-Page Fallback**: Completely eliminates all top-of-page fallback code (`mainContent.firstChild`). Telemetry cards are never mounted at the top of the dashboard.
-* **Connected Devices Visibility**: Connected clients (e.g. active Chrome / Jellyfin Web, Moonfin, mobile) remain visible inside the replacement container with device name, platform icon, client & version, user name, and last activity time, preserving device visibility whether media is currently playing or not.
-* **Empty Playback State**: When no active playback streams are running, the playback area displays the exact text `No active playback`, while connected devices are displayed cleanly below it and the stock Devices section remains completely removed.
-* **Autonomous Loading**: Initializes automatically upon visiting the default Dashboard, browser refresh, Jellyfin server restart, and user login—without requiring any visit to Plugin Settings or Playback Monitor.
-* **Header Telemetry & Session Counts**: Live activity banner featuring a pulsing refresh indicator, session count breakdown (Direct Play, Direct Stream / Remux, Transcode, Paused), density toggle (Compact mode default vs Extended mode), and quick "Show Details" toggle.
-* **Mobile-Optimized Compact Badges**: Enforces a strict 5-badge priority cap on compact viewports: Resolution, Play Method, Video Codec, Audio Channels, and Container.
-* **Truthful Transcode Diagnostics**: Displays video/audio conversion status, hardware acceleration engine (`NVENC`, `QSV`, `VAAPI`, `AMF`, `Software`), and active transcode reasons with exact fallback text `"Reason not reported by server"`.
-* **Zero Disk Modification**: In-memory response stream transformation ensures 100% read-only container and permission safety with zero disk writes.
-* **Strict Privacy Guarantee**: Never outputs client IP addresses, auth tokens, device IDs, or filesystem paths in rendered telemetry or diagnostics.
+* **Truthful transcode diagnostics** — separate Video/Audio direct-vs-transcode status, hardware engine, and transcode reason, all read only from what the server actually reports (never guessed, never fabricated). Rejects impossible values outright (e.g. an `2191 fps` ffmpeg throughput counter, or a hardware engine badge on direct video).
+* **New real, non-guessed fields**: estimated finish time (ETA), Dolby Atmos/DTS:X detection, audio track language, and subtitle delivery method (surfaces burned-in subtitles as a genuine, factual reason a video is being transcoded).
+* **Singleton Info drawer** that survives polling — clicking Info opens one accessible modal dialog (desktop: right-side panel, mobile: bottom sheet) with a full 26-field grouped breakdown, and it no longer silently closes itself every 3 seconds.
+* **Real, brand-accurate client logos** — Chrome, Safari, Edge, Firefox, Brave, and ~25 official/third-party Jellyfin clients and streaming devices, replacing single-color placeholder icons.
+* **Security hardening**: no guessable fallback encryption key for notification secrets, no silently-swallowed permission-hardening failures, no silent secret wipe on a key mismatch, and a fixed race condition that could double-fire a Discord/Telegram notification.
+* Full history: see [GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases).
 
 ---
 
@@ -73,8 +41,9 @@ Version `0.2.3.6` delivers the verified live acceptance fix for Windows Jellyfin
   - Active Subtitles &amp; Closed Captions: Language and subtitle stream type
   - Framerate (FPS) &amp; Stream Bitrate
 * **Transcoding Engine Details**: In extended mode, view active hardware acceleration engine (`QSV`, `NVENC`, `VAAPI`, `AMF`, `VideoToolbox`, or `Software CPU`), container conversion, and transcode reasons reported by the server.
-* **Artwork & Visuals**: Poster artwork and subtle blurred backdrop with automatic error fallback.
-* **Platform Icons**: Self-contained inline SVGs for Android, Apple, Windows, Linux, Roku, LG webOS, Samsung Tizen, Chrome/Web, and Fire TV.
+* **Artwork & Visuals**: Poster artwork with a layered "cinema poster" shadow and hover lift, plus a subtle blurred backdrop with automatic error fallback.
+* **Real Client Logos**: Self-contained, brand-accurate inline SVGs — Chrome, Safari, Edge, Firefox, Brave, Jellyfin Web/Android/Android TV/iOS/tvOS/Media Player, Swiftfin, Finamp, Findroid, Streamyfin, Moonfin, Infuse, Kodi, Roku, Fire TV, Chromecast, Apple TV, Samsung Tizen, LG webOS, Xbox, PlayStation, and DLNA. No CDN, no emoji, no runtime fetches.
+* **User Avatar**: Shows the viewer's own Jellyfin profile picture next to their name when available.
 
 ---
 
@@ -86,7 +55,7 @@ Version `0.2.3.6` delivers the verified live acceptance fix for Windows Jellyfin
 
 ### Safe Diagnostics & Redacted Reports
 The diagnostics card at the bottom of the monitor displays:
-* Plugin version (`0.2.3.1`)
+* Plugin version (`0.2.5.0`)
 * Jellyfin server and web client versions (if available)
 * Current monitor route
 * Sessions API health category (`OK`, `Waiting for sessions`, `Sessions unavailable`)
@@ -98,7 +67,7 @@ The diagnostics card at the bottom of the monitor displays:
 Clicking **Copy diagnostic report** produces a clean JSON structure:
 ```json
 {
-  "pluginVersion": "0.2.3.1",
+  "pluginVersion": "0.2.5.0",
   "jellyfinVersion": "10.9.11",
   "webVersion": "Available",
   "route": "/playbackcard",
@@ -118,18 +87,17 @@ Before copying, an automated redaction check scans for sensitive keywords (`Remo
 ## Installation
 
 ### Method 1: Jellyfin Plugin Repository (Catalog Delivery)
-> [!NOTE]
-> Method 1 delivery requires the plugin repository URL to be configured in your Jellyfin server. Until catalog updates are released to production, install via Method 2 (Manual ZIP).
-
 1. In Jellyfin Web, navigate to **Dashboard** &rarr; **Plugins** &rarr; **Repositories**.
 2. Add the custom repository:
    - **Repository Name**: `Playback Info Card`
    - **Repository URL**: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
-3. Navigate to **Catalog**, find **Playback Info Card**, and select version **0.2.3.3**.
+3. Navigate to **Catalog**, find **Playback Info Card**, and select the latest version (currently **0.2.5.0**).
 4. Click **Install** and restart Jellyfin server.
 
+> The catalog (`manifest.json`) lists the 5 most recent releases. Older releases remain permanently available on the [Releases page](https://github.com/Ubaidofficial/Playback-info-card/releases) for manual installation.
+
 ### Method 2: Manual Installation (ZIP / Binary)
-1. Download `jellyfin-plugin-playbackcard.zip` from [v0.2.3.3 GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases/tag/v0.2.3.3).
+1. Download `jellyfin-plugin-playbackcard.zip` from the [latest GitHub Release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest).
 2. Locate your Jellyfin `plugins` directory:
    - **Linux (systemd)**: `/var/lib/jellyfin/plugins/PlaybackCard/`
    - **Docker**: `<path-to-config>/plugins/PlaybackCard/`
@@ -184,8 +152,8 @@ Before copying, an automated redaction check scans for sensitive keywords (`Remo
 
 ## Migration from v0.2.3.0
 
-1. **Uninstall Legacy Injection**: If you previously installed `0.2.3.0`, replace the plugin DLL and `plugin.json` in your server's `plugins/PlaybackCard/` directory with `0.2.3.1`.
-2. **Remove Host Modifications**: If you previously inserted `<script>` tags into `index.html` or used custom CSS tweaks for earlier versions, remove them. Version `0.2.3.1` requires zero host file modifications.
+1. **Uninstall Legacy Injection**: If you previously installed `0.2.3.0`, replace the plugin DLL and `plugin.json` in your server's `plugins/PlaybackCard/` directory with `0.2.5.0`.
+2. **Remove Host Modifications**: If you previously inserted `<script>` tags into `index.html` or used custom CSS tweaks for earlier versions, remove them. Version `0.2.5.0` requires zero host file modifications.
 3. **Restart Jellyfin**: Restart the server to initialize the updated assembly.
 4. **Access the New Location**: Open Jellyfin Web &rarr; Dashboard &rarr; Server &rarr; **Playback Monitor**.
 
@@ -193,15 +161,17 @@ Before copying, an automated redaction check scans for sensitive keywords (`Remo
 
 ## Rollback Instructions
 
-If you need to revert to `0.2.3.0` for any reason:
+Every release, including versions no longer listed in the plugin catalog, stays permanently downloadable from [GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases) — the catalog (`manifest.json`) only shows the 5 most recent for update purposes; nothing is ever deleted from Releases itself.
+
+To roll back to any specific version (replace `vX.Y.Z.W` below):
 
 1. Stop Jellyfin Server:
    ```bash
    sudo systemctl stop jellyfin
    ```
-2. Download the preserved `0.2.3.0` release package:
+2. Download that release's package directly:
    ```bash
-   curl -L -O https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3/jellyfin-plugin-playbackcard.zip
+   curl -L -O https://github.com/Ubaidofficial/Playback-info-card/releases/download/vX.Y.Z.W/jellyfin-plugin-playbackcard.zip
    ```
 3. Extract into your plugins directory:
    ```bash
@@ -211,7 +181,6 @@ If you need to revert to `0.2.3.0` for any reason:
    ```bash
    sudo systemctl start jellyfin
    ```
-The previous `0.2.3.0` release artifact and repository manifest entry remain preserved for immediate rollback.
 
 ---
 
@@ -238,7 +207,7 @@ The previous `0.2.3.0` release artifact and repository manifest entry remain pre
 ## Known Unverified Scenarios
 
 * **Live Server Environments**: Manual verification matrix across all physical native clients (Moonfin, Android TV, Jellyfin Enhanced) and live Windows host deployments remains to be verified by administrators on their respective servers.
-* **Method 1 Catalog**: The repository catalog (`manifest.json`) on `main` provides version `0.2.3.1` with verified MD5 checksums, while retaining `0.2.3.0` for safe rollback.
+* **Method 1 Catalog**: The repository catalog (`manifest.json`) on `main` provides version `0.2.5.0` with verified MD5 checksums, while retaining `0.2.3.0` for safe rollback.
 
 ---
 
