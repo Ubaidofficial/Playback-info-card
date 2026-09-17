@@ -35,7 +35,7 @@ public class PlaybackCardDashboardMiddlewareTests
         using var reader = new StreamReader(bodyStream, Encoding.UTF8);
         var content = await reader.ReadToEndAsync();
         Assert.NotEmpty(content);
-        Assert.Contains("0.2.3.5", content);
+        Assert.Contains("0.2.3.6", content);
         Assert.Contains("NOW PLAYING", content);
     }
 
@@ -91,7 +91,7 @@ public class PlaybackCardDashboardMiddlewareTests
         using var reader = new StreamReader(bodyStream, Encoding.UTF8);
         var modifiedHtml = await reader.ReadToEndAsync();
 
-        Assert.Contains("<script plugin=\"PlaybackCard\" version=\"0.2.3.5\" src=\"/PlaybackCard/dashboard.js\" defer></script>", modifiedHtml);
+        Assert.Contains("<script plugin=\"PlaybackCard\" version=\"0.2.3.6\" src=\"/PlaybackCard/dashboard.js\" defer></script>", modifiedHtml);
         Assert.Contains("<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css\">", modifiedHtml);
         Assert.EndsWith("</body></html>", modifiedHtml.Trim());
     }
@@ -131,7 +131,7 @@ public class PlaybackCardDashboardMiddlewareTests
 
         Assert.Contains("dashboard.js", decompressedHtml);
         Assert.Contains("dashboard.css", decompressedHtml);
-        Assert.Contains("version=\"0.2.3.5\"", decompressedHtml);
+        Assert.Contains("version=\"0.2.3.6\"", decompressedHtml);
     }
 
     [Fact]

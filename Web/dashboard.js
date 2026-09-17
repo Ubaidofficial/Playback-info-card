@@ -1,19 +1,20 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.3.5)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.3.6)
  * Completely replaces Jellyfin's standard stock Devices section on the default
- * Dashboard with the NOW PLAYING telemetry grid.
+ * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
 
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.3.5';
+    var VERSION = '0.2.3.6';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
     var state = {
         version: VERSION,
         activeSessions: [],
+        allSessions: [],
         displayMode: 'compact', // compact (default) | extended
         showAllDetails: false,
         pollTimer: null,
@@ -47,6 +48,23 @@
             return hours + ':' + paddedMinutes + ':' + paddedSeconds;
         }
         return minutes + ':' + paddedSeconds;
+    }
+
+    function formatRelativeTime(dateStr) {
+        if (!dateStr) return 'Active';
+        var d = new Date(dateStr);
+        var time = d.getTime();
+        if (isNaN(time) || time <= 0) return 'Active';
+        var diffMs = Date.now() - time;
+        if (diffMs < 0) return 'Active now';
+        var diffSec = Math.floor(diffMs / 1000);
+        if (diffSec < 60) return 'Just now';
+        var diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return diffMin + 'm ago';
+        var diffHours = Math.floor(diffMin / 60);
+        if (diffHours < 24) return diffHours + 'h ago';
+        var diffDays = Math.floor(diffHours / 24);
+        return diffDays + 'd ago';
     }
 
     function extractResolutionPill(width, height) {
@@ -232,11 +250,91 @@
         return false;
     }
 
+    function findWidgetContainerFromTarget(targetNode, scope) {
+        if (!targetNode) return null;
+        var cur = targetNode;
+        while (cur && cur !== scope && cur !== document.body && cur !== document.documentElement) {
+            var p = cur.parentElement;
+            if (!p) break;
+            var pCls = (p.className || '').toLowerCase();
+            var pId = (p.id || '').toLowerCase();
+
+            var isParentColumn = pCls.indexOf('muistack') !== -1 ||
+                                 pCls.indexOf('muigrid') !== -1 ||
+                                 pCls.indexOf('content-primary') !== -1 ||
+                                 pCls.indexOf('verticalsection') !== -1 ||
+                                 pCls.indexOf('dashboardsection') !== -1 ||
+                                 pId === 'dashboardpage' ||
+                                 pId === 'devicespage' ||
+                                 (typeof p.getAttribute === 'function' && p.getAttribute('data-role') === 'content');
+
+            var isTooBroad = cur.classList && (
+                cur.classList.contains('content-primary') ||
+                cur.id === 'dashboardPage' ||
+                cur.id === 'devicesPage'
+            );
+
+            if (isParentColumn && !isTooBroad) {
+                var hasOtherWidgets = false;
+                try {
+                    var otherLinks = (typeof cur.querySelectorAll === 'function')
+                        ? cur.querySelectorAll('a[href*="activity"], a[href*="serverinfo"], a[href*="tasks"], a[href*="logs"], a[href*="paths"]')
+                        : [];
+                    if (otherLinks && otherLinks.length > 0) {
+                        hasOtherWidgets = true;
+                    }
+                } catch (_) {}
+
+                if (!hasOtherWidgets) {
+                    return cur;
+                }
+            }
+            cur = cur.parentElement;
+        }
+        return targetNode.parentElement || targetNode;
+    }
+
     function findStockDevicesSection(root) {
         if (typeof document === 'undefined') return null;
         var scope = root || document;
 
-        // Common stock Jellyfin Devices selectors
+        // 1. Modern Jellyfin 12.1 React/MUI: Link or button to devices
+        var deviceLinks = (typeof scope.querySelectorAll === 'function')
+            ? scope.querySelectorAll('a[href*="dashboard/devices"], a[href$="/devices"], a[href*="#/devices"], a[href*="#/dashboard/devices"], button[to*="devices"], a[to*="devices"]')
+            : [];
+
+        for (var l = 0; l < deviceLinks.length; l++) {
+            var link = deviceLinks[l];
+            if (typeof link.closest === 'function' && link.closest('#' + CONTAINER_ID)) {
+                continue;
+            }
+            var container = findWidgetContainerFromTarget(link, scope);
+            if (container && container.id !== CONTAINER_ID) {
+                return container;
+            }
+        }
+
+        // 2. Headings with text "devices" or "active devices"
+        var headings = (typeof scope.querySelectorAll === 'function')
+            ? scope.querySelectorAll('h1, h2, h3, h4, .sectionTitle, [class*="Typography"]')
+            : [];
+
+        for (var j = 0; j < headings.length; j++) {
+            var h = headings[j];
+            if (typeof h.closest === 'function' && h.closest('#' + CONTAINER_ID)) {
+                continue;
+            }
+            var text = (h.textContent || '').trim().toLowerCase();
+            var i18n = typeof h.getAttribute === 'function' ? h.getAttribute('data-i18n-key') : null;
+            if (text === 'devices' || text === 'active devices' || i18n === 'HeaderDevices') {
+                var hContainer = findWidgetContainerFromTarget(h, scope);
+                if (hContainer && hContainer.id !== CONTAINER_ID) {
+                    return hContainer;
+                }
+            }
+        }
+
+        // 3. Classic / legacy stock Jellyfin Devices selectors
         var selectors = [
             '.activeDevices',
             '#activeDevices',
@@ -248,12 +346,11 @@
         ];
 
         for (var i = 0; i < selectors.length; i++) {
-            var el = scope.querySelector(selectors[i]);
+            var el = (typeof scope.querySelector === 'function') ? scope.querySelector(selectors[i]) : null;
             if (el && el.id !== CONTAINER_ID) {
                 if (typeof el.closest === 'function' && el.closest('#' + CONTAINER_ID)) {
                     continue;
                 }
-                // Check if el is contained within an enclosing section container
                 if (typeof el.closest === 'function') {
                     var sec = el.closest('.verticalSection, .section, .dashboardSection');
                     if (sec && sec !== scope && !sec.classList.contains('content-primary') && (!sec.id || sec.id.indexOf('Page') === -1)) {
@@ -264,25 +361,6 @@
                     }
                 }
                 return el;
-            }
-        }
-
-        // Search for a section header titled "Devices"
-        var headings = scope.querySelectorAll('h2.sectionTitle, h3.sectionTitle, .sectionTitle');
-        for (var j = 0; j < headings.length; j++) {
-            var h = headings[j];
-            if (typeof h.closest === 'function' && h.closest('#' + CONTAINER_ID)) {
-                continue;
-            }
-            var text = (h.textContent || '').trim().toLowerCase();
-            if (text === 'devices' || text === 'active devices') {
-                if (typeof h.closest === 'function') {
-                    var hSec = h.closest('.section, .verticalSection, .dashboardSection');
-                    if (hSec && hSec !== scope && !hSec.classList.contains('content-primary') && (!hSec.id || hSec.id.indexOf('Page') === -1)) {
-                        return hSec;
-                    }
-                }
-                return h.parentNode;
             }
         }
 
@@ -302,7 +380,7 @@
                 attachContainerEvents(existing);
             }
 
-            // Mount the NOW PLAYING container in the Devices section's location
+            // Mount the NOW PLAYING container in the Devices section's exact location
             devicesSection.parentNode.insertBefore(existing, devicesSection);
 
             // Do not remove the original Devices section until NOW PLAYING has mounted successfully
@@ -329,20 +407,9 @@
             return existing;
         }
 
-        // Fallback: If stock devices section not yet in DOM, insert into main dashboard content
-        var mainContent = document.querySelector('#dashboardPage .content-primary, #devicesPage .content-primary, .dashboardContent, .content-primary, [data-role="content"]');
-        if (mainContent) {
-            existing = document.createElement('div');
-            existing.id = CONTAINER_ID;
-            if (mainContent.firstChild) {
-                mainContent.insertBefore(existing, mainContent.firstChild);
-            } else {
-                mainContent.appendChild(existing);
-            }
-            attachContainerEvents(existing);
-            return existing;
-        }
-
+        // CRITICAL: Zero fallback to mainContent.firstChild or top of page!
+        // If stock Devices section is not yet rendered, wait for MutationObserver.
+        console.warn('[PlaybackCard] Stock Devices section not found in DOM yet; waiting for render.');
         return null;
     }
 
@@ -669,8 +736,53 @@
         return counts;
     }
 
-    function renderDashboardContainer(container, sessions) {
-        var counts = calculateSessionCounts(sessions);
+    function renderConnectedDeviceItem(session) {
+        if (!session || typeof session !== 'object') return '';
+        var client = escapeHtml(session.Client || 'Playback Client');
+        var device = escapeHtml(session.DeviceName || client);
+        var user = escapeHtml(session.UserName || 'Unknown User');
+        var version = session.ApplicationVersion ? ('v' + escapeHtml(session.ApplicationVersion)) : '';
+        var platformIcon = getPlatformIconSvg(session.Client, session.DeviceName);
+        var lastActive = formatRelativeTime(session.LastActivityDate);
+
+        var isPlaying = Boolean(session.NowPlayingItem || session.MediaTitle);
+        var playStatus = '';
+        if (isPlaying) {
+            var mediaTitle = escapeHtml(session.MediaTitle || (session.NowPlayingItem && session.NowPlayingItem.Name) || 'Media');
+            var isPaused = session.IsPaused != null ? Boolean(session.IsPaused) : Boolean(session.PlayState && session.PlayState.IsPaused);
+            if (isPaused) {
+                playStatus = '<span class="playback-device-status status-paused">Paused: ' + mediaTitle + '</span>';
+            } else {
+                playStatus = '<span class="playback-device-status status-playing">Playing: ' + mediaTitle + '</span>';
+            }
+        } else {
+            playStatus = '<span class="playback-device-status status-idle">Idle &bull; ' + escapeHtml(lastActive) + '</span>';
+        }
+
+        return '<div class="playback-device-card" data-device-id="' + escapeHtml(session.Id || '') + '">' +
+            '<div class="playback-device-icon" title="' + client + '">' + platformIcon + '</div>' +
+            '<div class="playback-device-info">' +
+                '<div class="playback-device-top-row">' +
+                    '<span class="playback-device-name">' + device + '</span>' +
+                    (version ? '<span class="playback-device-ver">' + version + '</span>' : '') +
+                '</div>' +
+                '<div class="playback-device-meta">' +
+                    '<span class="playback-device-client">' + client + '</span>' +
+                    '<span class="playback-meta-sep">&bull;</span>' +
+                    '<span class="playback-device-user">' + user + '</span>' +
+                '</div>' +
+                '<div class="playback-device-status-row">' + playStatus + '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function renderDashboardContainer(container, sessions, allSessions) {
+        var activeSessions = Array.isArray(sessions) ? sessions : [];
+        var connectedSessions = Array.isArray(allSessions)
+            ? allSessions
+            : (Array.isArray(state.allSessions) && state.allSessions.length > 0 ? state.allSessions : activeSessions);
+
+        var counts = calculateSessionCounts(activeSessions);
         var isCompact = (state.displayMode === 'compact');
 
         var headerHtml = '<div class="playback-dashboard-header">' +
@@ -699,18 +811,35 @@
         '</div>';
 
         var contentHtml = '';
-        if (sessions.length === 0) {
+        if (activeSessions.length === 0) {
             contentHtml = '<div class="playback-dashboard-empty">' +
                 '<p>No active playback</p>' +
                 '</div>';
         } else {
-            var cardsHtml = sessions.map(function (s, idx) {
+            var cardsHtml = activeSessions.map(function (s, idx) {
                 return renderSessionCard(s, idx, state.displayMode, state.showAllDetails);
             }).join('');
             contentHtml = '<div class="playback-dashboard-grid">' + cardsHtml + '</div>';
         }
 
-        container.innerHTML = headerHtml + contentHtml;
+        var connectedDevicesHtml = '';
+        if (connectedSessions.length > 0) {
+            var devCards = connectedSessions.map(renderConnectedDeviceItem).filter(Boolean).join('');
+            if (devCards) {
+                connectedDevicesHtml = '<div class="playback-connected-devices">' +
+                    '<div class="playback-devices-header">' +
+                        '<h3 class="playback-devices-title">' +
+                            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>' +
+                            'Connected Devices' +
+                        '</h3>' +
+                        '<span class="playback-devices-count">' + connectedSessions.length + '</span>' +
+                    '</div>' +
+                    '<div class="playback-devices-grid">' + devCards + '</div>' +
+                '</div>';
+            }
+        }
+
+        container.innerHTML = headerHtml + contentHtml + connectedDevicesHtml;
     }
 
     function attachContainerEvents(container) {
@@ -727,7 +856,7 @@
                 var newMode = modeBtn.getAttribute('data-mode');
                 if (newMode && newMode !== state.displayMode) {
                     state.displayMode = newMode;
-                    renderDashboardContainer(container, state.activeSessions);
+                    renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 }
                 return;
             }
@@ -736,7 +865,7 @@
             var allDetailsBtn = target.closest('[data-action="toggle-all-details"]');
             if (allDetailsBtn) {
                 state.showAllDetails = !state.showAllDetails;
-                renderDashboardContainer(container, state.activeSessions);
+                renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 return;
             }
 
@@ -807,6 +936,7 @@
             }
 
             if (Array.isArray(sessions)) {
+                state.allSessions = sessions;
                 // Filter to active playback streams
                 var active = sessions.filter(function (s) {
                     return s && (s.NowPlayingItem != null || s.MediaTitle != null);
@@ -815,7 +945,7 @@
 
                 var container = ensureContainerInserted();
                 if (container) {
-                    renderDashboardContainer(container, active);
+                    renderDashboardContainer(container, active, sessions);
                 }
             }
         } catch (pollErr) {
@@ -885,8 +1015,8 @@
                         observerTimeout = setTimeout(function () {
                             if (isDashboardPage()) {
                                 var inserted = ensureContainerInserted();
-                                if (inserted && state.activeSessions) {
-                                    renderDashboardContainer(inserted, state.activeSessions);
+                                if (inserted && (state.activeSessions || state.allSessions)) {
+                                    renderDashboardContainer(inserted, state.activeSessions, state.allSessions);
                                 }
                                 if (!state.isPolling) {
                                     startPolling();
@@ -923,6 +1053,8 @@
         calculateSessionCounts: calculateSessionCounts,
         renderDashboardContainer: renderDashboardContainer,
         formatTicks: formatTicks,
+        formatRelativeTime: formatRelativeTime,
+        renderConnectedDeviceItem: renderConnectedDeviceItem,
         extractResolutionPill: extractResolutionPill,
         extractDynamicRangePill: extractDynamicRangePill,
         extractAudioBadges: extractAudioBadges,

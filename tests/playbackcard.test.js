@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.3.5 Test Suite', () => {
+describe('Playback Info Card v0.2.3.6 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.3.5', () => {
-            assert.equal(controller.version, '0.2.3.5');
-            assert.equal(controller.diagState.pluginVersion, '0.2.3.5');
+        it('initializes with default waiting state and version 0.2.3.6', () => {
+            assert.equal(controller.version, '0.2.3.6');
+            assert.equal(controller.diagState.pluginVersion, '0.2.3.6');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.3.5');
+            assert.equal(report.pluginVersion, '0.2.3.6');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.3.5',
+                pluginVersion: '0.2.3.6',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -629,7 +629,7 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.3.5)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.3.6)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -667,10 +667,10 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.3.5', () => {
+        it('initializes with version 0.2.3.6', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.3.5');
-            assert.equal(dash.state.version, '0.2.3.5');
+            assert.equal(dash.version, '0.2.3.6');
+            assert.equal(dash.state.version, '0.2.3.6');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -748,9 +748,19 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
             let createdCount = 0;
             let existingContainer = null;
 
+            const stockDevices = {
+                id: 'activeDevices',
+                className: 'activeDevices',
+                style: { display: 'block' },
+                parentNode: {
+                    insertBefore: (newNode) => { newNode.parentNode = stockDevices.parentNode; },
+                    removeChild: (childNode) => { childNode.parentNode = null; }
+                }
+            };
+
             const mockDoc = {
                 getElementById: (id) => (id === 'playback-card-nowplaying-container' ? existingContainer : null),
-                querySelector: () => null,
+                querySelector: (sel) => (stockDevices.parentNode ? stockDevices : null),
                 querySelectorAll: () => [],
                 createElement: (tag) => {
                     createdCount++;
@@ -765,23 +775,116 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
                 addEventListener: () => {}
             };
 
-            // First call with mainContent fallback
-            const mainContent = {
-                firstChild: null,
-                insertBefore: () => {},
-                appendChild: () => {}
-            };
-            mockDoc.querySelector = (sel) => (sel.includes('.content-primary') ? mainContent : null);
-
             const dash = createMockDashboard({ document: mockDoc });
             const container1 = dash.ensureContainerInserted();
-            assert.ok(container1, 'First container created');
+            assert.ok(container1, 'First container created and mounted');
             assert.equal(createdCount, 1);
 
             // Second call: existing container is returned without creating another
             const container2 = dash.ensureContainerInserted();
             assert.strictEqual(container2, container1, 'Must return same container singleton');
             assert.equal(createdCount, 1, 'No duplicate container element created');
+        });
+
+        it('detects and replaces modern Jellyfin 12.1 React/MUI DevicesWidget in-place', () => {
+            let insertBeforeCalled = false;
+            let removeChildCalled = false;
+            let insertedBeforeRef = null;
+
+            const leftColumnStack = {
+                className: 'MuiStack-root css-column',
+                parentElement: null,
+                children: []
+            };
+
+            const serverInfoWidget = {
+                className: 'MuiBox-root',
+                parentElement: leftColumnStack,
+                parentNode: leftColumnStack
+            };
+
+            const devicesWidgetBox = {
+                className: 'MuiBox-root css-devices-widget',
+                parentElement: leftColumnStack,
+                parentNode: leftColumnStack,
+                style: { display: 'block' },
+                querySelector: () => null,
+                querySelectorAll: () => []
+            };
+
+            const devicesButtonLink = {
+                tagName: 'A',
+                href: '/dashboard/devices',
+                className: 'MuiButtonBase-root MuiButton-root MuiButton-text',
+                parentElement: devicesWidgetBox,
+                parentNode: devicesWidgetBox,
+                closest: () => null
+            };
+
+            leftColumnStack.children = [serverInfoWidget, devicesWidgetBox];
+            leftColumnStack.insertBefore = (newNode, refNode) => {
+                insertBeforeCalled = true;
+                insertedBeforeRef = refNode;
+                newNode.parentNode = leftColumnStack;
+            };
+            leftColumnStack.removeChild = (childNode) => {
+                removeChildCalled = true;
+                childNode.parentNode = null;
+            };
+
+            const mockDoc = {
+                getElementById: (id) => null,
+                querySelector: (sel) => null,
+                querySelectorAll: (sel) => {
+                    if (sel.includes('dashboard/devices')) {
+                        return [devicesButtonLink];
+                    }
+                    return [];
+                },
+                createElement: (tag) => ({
+                    id: '',
+                    setAttribute: () => {},
+                    getAttribute: () => null,
+                    addEventListener: () => {}
+                }),
+                addEventListener: () => {}
+            };
+
+            const dash = createMockDashboard({ document: mockDoc });
+            const container = dash.ensureContainerInserted();
+
+            assert.ok(container, 'Container mounted');
+            assert.equal(insertBeforeCalled, true, 'Container inserted into left column Stack');
+            assert.strictEqual(insertedBeforeRef, devicesWidgetBox, 'Inserted before DevicesWidget in-place');
+            assert.equal(removeChildCalled, true, 'Stock 12.1 DevicesWidget removed from DOM');
+            assert.equal(devicesWidgetBox.style.display, 'none', 'Stock 12.1 DevicesWidget display set to none');
+            assert.equal(devicesWidgetBox.parentNode, null, 'Stock 12.1 DevicesWidget unparented');
+        });
+
+        it('NEVER mounts at the top of the dashboard or falls back to mainContent.firstChild when Devices block is not found', () => {
+            let insertedAtTop = false;
+            let appendedToMain = false;
+
+            const mainContent = {
+                firstChild: { id: 'some-top-widget' },
+                insertBefore: () => { insertedAtTop = true; },
+                appendChild: () => { appendedToMain = true; }
+            };
+
+            const mockDoc = {
+                getElementById: () => null,
+                querySelector: (sel) => (sel.includes('.content-primary') ? mainContent : null),
+                querySelectorAll: () => [],
+                createElement: () => ({ id: '' }),
+                addEventListener: () => {}
+            };
+
+            const dash = createMockDashboard({ document: mockDoc });
+            const result = dash.ensureContainerInserted();
+
+            assert.strictEqual(result, null, 'Must return null when devices section is not found yet');
+            assert.equal(insertedAtTop, false, 'MUST NOT mount at the top of the dashboard');
+            assert.equal(appendedToMain, false, 'MUST NOT append to main content without devices section');
         });
 
         it('survives Jellyfin DOM rerenders and replaces stock Devices when re-rendered', () => {
@@ -826,16 +929,110 @@ describe('Playback Info Card v0.2.3.5 Test Suite', () => {
             assert.equal(newlyRerenderedDevices.style.display, 'none');
         });
 
-        it('renders empty state "No active playback" when there are no active sessions and keeps stock Devices absent', () => {
+        it('renders empty state "No active playback" and preserves connected device visibility when no streams are playing', () => {
             const dash = createMockDashboard();
             const container = { innerHTML: '' };
 
-            dash.renderDashboardContainer(container, []);
+            const connectedDevicesOnly = [
+                {
+                    Id: 'chrome-session-windows',
+                    UserName: 'ServerAdmin',
+                    Client: 'Jellyfin Web',
+                    DeviceName: 'Chrome',
+                    ApplicationVersion: '12.1.0',
+                    LastActivityDate: new Date().toISOString(),
+                    NowPlayingItem: null,
+                    PlayState: null
+                }
+            ];
 
+            dash.renderDashboardContainer(container, [], connectedDevicesOnly);
+
+            // Empty playback state
             assert.ok(container.innerHTML.includes('No active playback'), 'Empty state must show exact text "No active playback"');
             assert.ok(!container.innerHTML.includes('No active playback streams currently on this server'), 'Old empty text removed');
+
+            // Connected devices visibility
+            assert.ok(container.innerHTML.includes('Connected Devices'), 'Must render Connected Devices section');
+            assert.ok(container.innerHTML.includes('Chrome'), 'Renders device name Chrome');
+            assert.ok(container.innerHTML.includes('Jellyfin Web'), 'Renders client name Jellyfin Web');
+            assert.ok(container.innerHTML.includes('v12.1.0'), 'Renders application version v12.1.0');
+            assert.ok(container.innerHTML.includes('ServerAdmin'), 'Renders connected user name');
+            assert.ok(container.innerHTML.includes('Idle'), 'Renders Idle status for non-playing device');
+
+            // Stock devices suppression
             assert.ok(!container.innerHTML.includes('activeDevices'), 'Stock devices table must not appear');
             assert.ok(!container.innerHTML.includes('devicesList'), 'Stock devices list must not appear');
+        });
+
+        it('renders both rich playback card and connected devices when active playback is running', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+
+            const moonfinPlayingSession = {
+                Id: 'moonfin-stream',
+                UserName: 'LivingRoom',
+                Client: 'Moonfin',
+                DeviceName: 'Android TV',
+                ApplicationVersion: '1.0.4',
+                PlayMethod: 'DirectPlay',
+                IsPaused: false,
+                PositionTicks: 12000000000,
+                RunTimeTicks: 72000000000,
+                NowPlayingItem: {
+                    Name: 'Interstellar',
+                    ProductionYear: 2014,
+                    Width: 3840,
+                    Height: 2160,
+                    Container: 'mkv'
+                }
+            };
+
+            const chromeIdleSession = {
+                Id: 'chrome-idle',
+                UserName: 'WebUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome',
+                ApplicationVersion: '12.1.0',
+                LastActivityDate: new Date().toISOString(),
+                NowPlayingItem: null
+            };
+
+            dash.renderDashboardContainer(container, [moonfinPlayingSession], [moonfinPlayingSession, chromeIdleSession]);
+
+            // Now Playing area renders rich card
+            assert.ok(container.innerHTML.includes('Interstellar'), 'Renders active playback title');
+            assert.ok(container.innerHTML.includes('Moonfin &mdash; Android TV (v1.0.4)'), 'Renders Moonfin client & device');
+            assert.ok(!container.innerHTML.includes('No active playback'), 'Empty state not shown when playback active');
+
+            // Connected devices area renders both connected clients
+            assert.ok(container.innerHTML.includes('Connected Devices'), 'Renders Connected Devices heading');
+            assert.ok(container.innerHTML.includes('WebUser'), 'Renders connected Chrome user');
+            assert.ok(container.innerHTML.includes('Playing: Interstellar'), 'Renders playing status badge');
+        });
+
+        it('enforces strict privacy in connected devices rendering (zero IP, token, or local path)', () => {
+            const dash = createMockDashboard();
+            const sessionWithSensitiveFields = {
+                Id: 'priv-1',
+                UserName: 'PrivateUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome',
+                ApplicationVersion: '12.1.0',
+                RemoteEndPoint: '192.168.1.100:54321',
+                Token: 'secret-auth-token-xyz',
+                LocalAddress: '10.0.0.5',
+                ServerAddress: 'https://jellyfin.local:8096',
+                Path: 'D:\\Media\\Movies\\Secret.mkv'
+            };
+
+            const html = dash.renderConnectedDeviceItem(sessionWithSensitiveFields);
+            assert.ok(!html.includes('192.168.1.100'), 'Must not leak client IP');
+            assert.ok(!html.includes('secret-auth-token'), 'Must not leak auth token');
+            assert.ok(!html.includes('10.0.0.5'), 'Must not leak local IP');
+            assert.ok(!html.includes('D:\\Media'), 'Must not leak filesystem path');
+            assert.ok(html.includes('Chrome'), 'Device name is present');
+            assert.ok(html.includes('PrivateUser'), 'User is present');
         });
 
         it('renders Moonfin Android TV session card with poster, client, device, badges, and Info toggle', () => {

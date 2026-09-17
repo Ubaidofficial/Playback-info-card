@@ -1,24 +1,25 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.5**
+**Stable Version: v0.2.3.6**
 
 Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
 
 ---
 
-## What Changed in v0.2.3.5
+## What Changed in v0.2.3.6
 
-Version `0.2.3.5` delivers the focused corrective patch for Jellyfin 10.9+ and 12.1+:
+Version `0.2.3.6` delivers the verified live acceptance fix for Windows Jellyfin Server 12.1+ and 10.9+:
 
-* **Complete Devices Section Replacement**: Telemetry cards completely replace Jellyfin's standard stock **Devices** section on the default Dashboard/devices view in-place. The stock Devices table is removed entirely from that location and is not visible below or beside NOW PLAYING.
-* **Empty State**: When no active playback sessions are active, the replaced area displays `No active playback`—and the original stock Devices table remains completely absent.
+* **In-Place Devices Widget Replacement**: Accurately targets the modern React/MUI Devices widget (`<Widget href="/dashboard/devices">`) and replaces it in-place in the dashboard column stack. The "Devices" heading button and stock device cards are completely removed from the DOM.
+* **Zero Top-of-Page Fallback**: Completely eliminates all top-of-page fallback code (`mainContent.firstChild`). Telemetry cards are never mounted at the top of the dashboard.
+* **Connected Devices Visibility**: Connected clients (e.g. active Chrome / Jellyfin Web, Moonfin, mobile) remain visible inside the replacement container with device name, platform icon, client & version, user name, and last activity time, preserving device visibility whether media is currently playing or not.
+* **Empty Playback State**: When no active playback streams are running, the playback area displays the exact text `No active playback`, while connected devices are displayed cleanly below it and the stock Devices section remains completely removed.
 * **Autonomous Loading**: Initializes automatically upon visiting the default Dashboard, browser refresh, Jellyfin server restart, and user login—without requiring any visit to Plugin Settings or Playback Monitor.
 * **Header Telemetry & Session Counts**: Live activity banner featuring a pulsing refresh indicator, session count breakdown (Direct Play, Direct Stream / Remux, Transcode, Paused), density toggle (Compact mode default vs Extended mode), and quick "Show Details" toggle.
 * **Mobile-Optimized Compact Badges**: Enforces a strict 5-badge priority cap on compact viewports: Resolution, Play Method, Video Codec, Audio Channels, and Container.
 * **Truthful Transcode Diagnostics**: Displays video/audio conversion status, hardware acceleration engine (`NVENC`, `QSV`, `VAAPI`, `AMF`, `Software`), and active transcode reasons with exact fallback text `"Reason not reported by server"`.
 * **Zero Disk Modification**: In-memory response stream transformation ensures 100% read-only container and permission safety with zero disk writes.
-* **Admin Detail / Fallback Page**: The dedicated `/playbackcard` page remains available as an admin detail/fallback view.
-* **Native Discord & Telegram Notifications**: Fully retains the background notifications engine, server-local restricted secret store, masked credential security, and user filtering.
+* **Strict Privacy Guarantee**: Never outputs client IP addresses, auth tokens, device IDs, or filesystem paths in rendered telemetry or diagnostics.
 
 ---
 
