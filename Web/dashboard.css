@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Dashboard Integration Styles (v0.2.3.6)
+ * Playback Info Card - Dashboard Integration Styles (v0.2.3.7)
  * Liquid Glass Dark Theme & Responsive Telemetry Cards
  */
 
@@ -115,6 +115,11 @@
 .playback-count-chip.count-dp {
     border-color: rgba(34, 197, 94, 0.3);
     color: #4ade80;
+}
+.playback-count-chip.count-remux {
+    border-color: rgba(168, 85, 247, 0.35);
+    color: #c084fc;
+    background: rgba(168, 85, 247, 0.1);
 }
 .playback-count-chip.count-ds {
     border-color: rgba(56, 189, 248, 0.3);
@@ -395,14 +400,15 @@
 .playback-poster-wrap {
     width: 54px;
     height: 81px;
-    border-radius: 5px;
+    border-radius: 6px;
     overflow: hidden;
-    background: #090c10;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .playback-poster {
@@ -418,7 +424,8 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: #475569;
+    color: #94a3b8;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
 }
 
 .playback-card-body {
@@ -523,29 +530,74 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Expandable Stream Details Drawer */
+/* Expandable Stream Details Drawer / Technical Modal */
 .playback-details-panel {
     display: none;
-    margin-top: 0.5rem;
-    padding: 0.65rem;
-    border-radius: 6px;
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 0.75rem;
-    line-height: 1.4;
-    gap: 0.4rem;
+    margin-top: 0.6rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    gap: 0.5rem;
     flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .playback-details-panel.open {
     display: flex;
 }
 
+.playback-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.playback-drawer-title-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #38bdf8;
+}
+
+.playback-drawer-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #f1f5f9;
+}
+
+.playback-drawer-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.playback-drawer-close:hover,
+.playback-drawer-close:focus {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
 .playback-stream-badges {
     display: flex;
     gap: 0.4rem;
     flex-wrap: wrap;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.1rem;
 }
 
 .stream-badge {
@@ -575,12 +627,68 @@
     word-break: break-word;
 }
 
+.playback-extended-summary {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    padding: 0.2rem 0.4rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+}
+
 .playback-transcode-reasons {
     color: #fca5a5;
     background: rgba(239, 68, 68, 0.08);
     border-left: 2px solid #ef4444;
     padding: 0.25rem 0.45rem;
     border-radius: 2px;
+}
+
+/* 21-Field Technical Breakdown Grid */
+.playback-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.4rem 0.6rem;
+    margin-top: 0.4rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.playback-info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 5px;
+}
+
+.playback-info-row.full-width {
+    grid-column: 1 / -1;
+}
+
+.playback-info-key {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+}
+
+.playback-info-val {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #f8fafc;
+    word-break: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .playback-details-panel,
+    .playback-drawer-close,
+    .playback-card {
+        transition: none !important;
+        animation: none !important;
+    }
 }
 
 /* Mobile & Responsive Breakpoints */

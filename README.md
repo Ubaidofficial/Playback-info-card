@@ -1,8 +1,21 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.6**
+**Stable Version: v0.2.3.7**
 
 Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
+
+---
+
+## What Changed in v0.2.3.7
+
+Version `0.2.3.7` corrects playback telemetry inaccuracies, stream classification consistency, and technical details:
+
+* **Header Count & Card Badge Agreement**: Unified playback session classification so header counters and card badges always agree. Remux (`REMUX`) and Direct Stream streams are separated and never counted as Transcodes.
+* **Truthful Hardware Engine Reporting**: Hardware acceleration engines (`QSV`, `NVENC`, `VAAPI`, `AMF`, `VideoToolbox`) are strictly suppressed when video is direct (`isVideoDirect === true`, such as in Remux or audio-only transcode) and only shown when video is actively transcoded.
+* **Truthful Media Frame Rate**: Sourced truthful stream framerates (`RealFrameRate`, `AverageFrameRate`) and strictly rejected impossible ffmpeg throughput counters (e.g. `2191 fps`). Normalizes standard film and broadcast framerates (`23.976 fps`, `24 fps`, `25 fps`, `29.97 fps`, `30 fps`, `50 fps`, `59.94 fps`, `60 fps`).
+* **Server-Reported Transcode Reasons**: Only displays transcode reasons explicitly provided by the Jellyfin server without speculative inference (no guessing `Container not supported`). Defaults to `"Reason not reported by server"` when reasons are omitted.
+* **Poster Artwork Fallback**: Automatically falls back to TV Series poster art when episode primary artwork is absent, and displays a clean slate-film placeholder instead of an empty black box when no image is available.
+* **Accessible 21-Field Info Drawer**: Streamlined technical breakdown grid with full keyboard accessibility (Escape to close, focus restoration, `aria-expanded`, `aria-controls`), and `prefers-reduced-motion` compliance. Missing technical fields display `"Not reported"`.
 
 ---
 

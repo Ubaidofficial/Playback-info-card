@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.3.6)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.3.7)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,7 +7,7 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.3.6';
+    var VERSION = '0.2.3.7';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -132,15 +132,56 @@
         return null;
     }
 
-    function extractTranscoderEngine(hwType) {
-        if (!hwType) return 'Software';
+    function extractTranscoderEngine(hwType, isVideoDirect) {
+        // Hardware encoders only apply when video is actively transcoded (never for direct video / remux)
+        if (isVideoDirect === true) return null;
+        if (!hwType) return null;
         var hw = String(hwType).toLowerCase();
+        if (hw === 'none' || hw === 'software' || hw === '0') return null;
         if (hw.indexOf('nvenc') !== -1 || hw.indexOf('cuda') !== -1) return 'NVENC';
         if (hw.indexOf('qsv') !== -1 || hw.indexOf('quicksync') !== -1) return 'QSV';
         if (hw.indexOf('vaapi') !== -1) return 'VAAPI';
         if (hw.indexOf('amf') !== -1 || hw.indexOf('vce') !== -1) return 'AMF';
         if (hw.indexOf('videotoolbox') !== -1) return 'VideoToolbox';
         return hwType;
+    }
+
+    function formatFrameRate(fps) {
+        if (typeof fps !== 'number' || !isFinite(fps) || fps <= 0 || fps > 240) {
+            return null;
+        }
+        if (Math.abs(fps - 23.976) < 0.005) return '23.976 fps';
+        if (Math.abs(fps - 29.97) < 0.005) return '29.97 fps';
+        if (Math.abs(fps - 59.94) < 0.005) return '59.94 fps';
+        if (Math.abs(fps - Math.round(fps)) < 0.01) {
+            return Math.round(fps) + ' fps';
+        }
+        var formatted = parseFloat(fps.toFixed(3));
+        return formatted + ' fps';
+    }
+
+    function getTruthfulFrameRate(session, item, videoStream) {
+        if (videoStream) {
+            if (typeof videoStream.RealFrameRate === 'number' && isFinite(videoStream.RealFrameRate)) {
+                var formattedReal = formatFrameRate(videoStream.RealFrameRate);
+                if (formattedReal) return formattedReal;
+            }
+            if (typeof videoStream.AverageFrameRate === 'number' && isFinite(videoStream.AverageFrameRate)) {
+                var formattedAvg = formatFrameRate(videoStream.AverageFrameRate);
+                if (formattedAvg) return formattedAvg;
+            }
+        }
+        var cand = (item && item.Framerate) || (session && session.Framerate);
+        if (typeof cand === 'number' && isFinite(cand)) {
+            var formattedCand = formatFrameRate(cand);
+            if (formattedCand) return formattedCand;
+        }
+        var tInfo = session && session.TranscodingInfo;
+        if (tInfo && typeof tInfo.Framerate === 'number' && isFinite(tInfo.Framerate)) {
+            var formattedTInfo = formatFrameRate(tInfo.Framerate);
+            if (formattedTInfo) return formattedTInfo;
+        }
+        return null;
     }
 
     function formatTranscodeReason(reason) {
@@ -164,6 +205,177 @@
             'DirectPlayError': 'Direct playback error occurred'
         };
         return map[r] || r;
+    }
+
+    function getTruthfulTranscodeReasons(session) {
+        if (!session || typeof session !== 'object') return null;
+        var tInfo = session.TranscodingInfo;
+        var raw = [];
+        if (Array.isArray(session.TranscodeReasons) && session.TranscodeReasons.length > 0) {
+            raw = session.TranscodeReasons;
+        } else if (tInfo && Array.isArray(tInfo.TranscodeReasons) && tInfo.TranscodeReasons.length > 0) {
+            raw = tInfo.TranscodeReasons;
+        } else if (typeof session.TranscodeReasonsWhy === 'string' && session.TranscodeReasonsWhy.trim().length > 0) {
+            return session.TranscodeReasonsWhy.trim();
+        }
+
+        var valid = raw.filter(function (r) {
+            return r != null && String(r).trim().length > 0 && String(r) !== '0' && String(r).toLowerCase() !== 'none';
+        });
+
+        if (valid.length > 0) {
+            return valid.map(formatTranscodeReason).join(', ');
+        }
+        return null;
+    }
+
+    function classifyPlaybackSession(session) {
+        if (!session || typeof session !== 'object') {
+            return {
+                method: 'DirectPlay',
+                badgeText: 'Direct Play',
+                badgeClass: 'direct-play',
+                isPaused: false,
+                isVideoDirect: true,
+                isAudioDirect: true,
+                isRemux: false,
+                isDirectStream: false,
+                isTranscode: false
+            };
+        }
+
+        var ps = session.PlayState || {};
+        var isPaused = session.IsPaused != null ? Boolean(session.IsPaused) : Boolean(ps.IsPaused);
+        var rawMethod = session.PlayMethod || ps.PlayMethod || 'DirectPlay';
+        var tInfo = session.TranscodingInfo;
+        var item = session.NowPlayingItem || {};
+
+        var isVideoDirect = null;
+        var isAudioDirect = null;
+
+        if (typeof session.IsVideoDirect === 'boolean') isVideoDirect = session.IsVideoDirect;
+        else if (tInfo && typeof tInfo.IsVideoDirect === 'boolean') isVideoDirect = tInfo.IsVideoDirect;
+        else if (tInfo && rawMethod === 'Transcode') isVideoDirect = false;
+        else if (rawMethod === 'DirectPlay') isVideoDirect = true;
+
+        if (typeof session.IsAudioDirect === 'boolean') isAudioDirect = session.IsAudioDirect;
+        else if (tInfo && typeof tInfo.IsAudioDirect === 'boolean') isAudioDirect = tInfo.IsAudioDirect;
+        else if (rawMethod === 'DirectPlay') isAudioDirect = true;
+
+        var containerChanged = Boolean(
+            item.Container && tInfo && tInfo.Container &&
+            item.Container.toLowerCase() !== tInfo.Container.toLowerCase()
+        );
+
+        // Remux: Video is Direct AND Audio is Direct, but container changed or explicit Remux
+        var isRemux = Boolean(
+            session.IsContainerRemux ||
+            rawMethod === 'Remux' ||
+            (isVideoDirect === true && isAudioDirect === true && (containerChanged || (tInfo && rawMethod === 'Transcode')))
+        );
+
+        var isDirectStream = (rawMethod === 'DirectStream' && !isRemux);
+
+        var isTranscode = !isRemux && !isDirectStream && (
+            rawMethod === 'Transcode' ||
+            isVideoDirect === false ||
+            isAudioDirect === false ||
+            (tInfo && (tInfo.IsVideoDirect === false || tInfo.IsAudioDirect === false))
+        );
+
+        var method = 'DirectPlay';
+        var badgeText = 'Direct Play';
+        var badgeClass = 'direct-play';
+
+        if (isPaused) {
+            badgeClass = 'paused';
+            badgeText = 'Paused';
+        } else if (isRemux) {
+            method = 'Remux';
+            badgeText = 'Remux';
+            badgeClass = 'remux';
+        } else if (isDirectStream) {
+            method = 'DirectStream';
+            badgeText = 'Direct Stream';
+            badgeClass = 'direct-stream';
+        } else if (isTranscode) {
+            method = 'Transcode';
+            badgeText = 'Transcode';
+            badgeClass = 'transcode';
+        }
+
+        return {
+            method: method,
+            badgeText: badgeText,
+            badgeClass: badgeClass,
+            isPaused: isPaused,
+            isVideoDirect: isVideoDirect,
+            isAudioDirect: isAudioDirect,
+            isRemux: isRemux,
+            isDirectStream: isDirectStream,
+            isTranscode: isTranscode
+        };
+    }
+
+    function isHdrToSdr(videoStream, tInfo) {
+        if (!videoStream || !tInfo) return false;
+        var hdr = extractDynamicRangePill(videoStream);
+        if (!hdr) return false;
+        if (tInfo.IsVideoDirect === false) {
+            return true;
+        }
+        return false;
+    }
+
+    function resolveArtworkUrls(session, item, apiClient) {
+        var posterUrl = '';
+        var backdropUrl = '';
+        if (!apiClient) return { posterUrl: posterUrl, backdropUrl: backdropUrl };
+
+        var token = '';
+        if (typeof apiClient.accessToken === 'function') token = apiClient.accessToken() || '';
+        else if (apiClient.accessToken) token = String(apiClient.accessToken);
+
+        var posterItemId = null;
+        var posterTag = null;
+
+        if (item && (item.SeriesPrimaryImageTag || (item.Type === 'Episode' && item.SeriesId))) {
+            posterItemId = item.SeriesId || session.ItemId || item.Id;
+            posterTag = item.SeriesPrimaryImageTag || session.PrimaryImageTag || item.PrimaryImageTag || null;
+        } else {
+            posterItemId = (session && session.ItemId) || (item && item.Id);
+            posterTag = (session && session.PrimaryImageTag) || (item && item.PrimaryImageTag) || null;
+        }
+
+        if (posterItemId) {
+            var pOpts = { type: 'Primary', maxWidth: 300, quality: 90 };
+            if (posterTag) pOpts.tag = posterTag;
+            if (token) pOpts.api_key = token;
+
+            if (typeof apiClient.getImageUrl === 'function') {
+                posterUrl = apiClient.getImageUrl(posterItemId, pOpts);
+            } else if (typeof apiClient.getUrl === 'function') {
+                posterUrl = apiClient.getUrl('Items/' + posterItemId + '/Images/Primary', pOpts);
+            }
+        }
+
+        var backdropItemId = (session && session.ItemId) || (item && item.Id);
+        var backdropTag = (item && item.BackdropImageTags && item.BackdropImageTags.length > 0)
+            ? item.BackdropImageTags[0]
+            : (item && item.SeriesBackdropImageTags && item.SeriesBackdropImageTags.length > 0 ? item.SeriesBackdropImageTags[0] : null);
+
+        if (backdropItemId && backdropTag) {
+            var bOpts = { type: 'Backdrop', maxWidth: 800, quality: 80, tag: backdropTag };
+            if (token) bOpts.api_key = token;
+
+            if (typeof apiClient.getImageUrl === 'function') {
+                backdropUrl = apiClient.getImageUrl(backdropItemId, bOpts);
+            } else if (typeof apiClient.getUrl === 'function') {
+                backdropUrl = apiClient.getUrl('Items/' + backdropItemId + '/Images/Backdrop', bOpts);
+            }
+        }
+
+        return { posterUrl: posterUrl, backdropUrl: backdropUrl };
     }
 
     function getPlatformIconSvg(clientName, deviceName) {
@@ -434,77 +646,8 @@
             var platformIconSvg = getPlatformIconSvg(session.Client, session.DeviceName);
 
             var item = session.NowPlayingItem || {};
-            var title = escapeHtml(session.MediaTitle || item.Name || 'Unknown Media');
-            var subtitle = '';
-            if (session.SeriesName || item.SeriesName) {
-                subtitle = escapeHtml(session.SeriesName || item.SeriesName);
-                var sNum = session.SeasonNumber != null ? session.SeasonNumber : (item.SeasonName || item.ParentIndexNumber);
-                if (sNum) {
-                    subtitle += ' &bull; ' + (typeof sNum === 'number' ? 'Season ' + sNum : escapeHtml(String(sNum)));
-                }
-                var epNum = session.EpisodeNumber != null ? session.EpisodeNumber : item.IndexNumber;
-                if (epNum != null) {
-                    subtitle += ' &bull; Ep ' + escapeHtml(String(epNum));
-                }
-            } else if (session.ProductionYear || item.ProductionYear) {
-                subtitle = escapeHtml(String(session.ProductionYear || item.ProductionYear));
-            }
-
             var playState = session.PlayState || {};
-            var isPaused = session.IsPaused != null ? Boolean(session.IsPaused) : Boolean(playState.IsPaused);
-            var playMethod = session.PlayMethod || playState.PlayMethod || 'DirectPlay';
-
             var tInfo = session.TranscodingInfo;
-            var isRemux = Boolean(session.IsContainerRemux || (tInfo && tInfo.IsVideoDirect && (!tInfo.IsAudioDirect || (tInfo.Container && item.Container && tInfo.Container.toLowerCase() !== item.Container.toLowerCase()))));
-
-            var badgeClass = 'direct-play';
-            var badgeText = 'Direct Play';
-            var stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
-
-            if (isPaused) {
-                badgeClass = 'paused';
-                badgeText = 'Paused';
-                stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
-            } else if (isRemux || playMethod === 'Remux') {
-                badgeClass = 'remux';
-                badgeText = 'Remux';
-            } else if (playMethod === 'DirectStream') {
-                badgeClass = 'direct-stream';
-                badgeText = 'Direct Stream';
-            } else if (playMethod === 'Transcode' || tInfo) {
-                badgeClass = 'transcode';
-                badgeText = 'Transcode';
-            }
-
-            // Video & Audio Direct/Transcode determination
-            var isVideoDirect = null;
-            var isAudioDirect = null;
-            if (typeof session.IsVideoDirect === 'boolean') {
-                isVideoDirect = session.IsVideoDirect;
-            } else if (tInfo && typeof tInfo.IsVideoDirect === 'boolean') {
-                isVideoDirect = tInfo.IsVideoDirect;
-            } else if (playMethod === 'DirectPlay') {
-                isVideoDirect = true;
-            }
-
-            if (typeof session.IsAudioDirect === 'boolean') {
-                isAudioDirect = session.IsAudioDirect;
-            } else if (tInfo && typeof tInfo.IsAudioDirect === 'boolean') {
-                isAudioDirect = tInfo.IsAudioDirect;
-            } else if (playMethod === 'DirectPlay') {
-                isAudioDirect = true;
-            }
-
-            var videoBadgeText = (isVideoDirect === true) ? 'Video: Direct' : (isVideoDirect === false ? 'Video: Transcode' : 'Video: Direct');
-            var videoBadgeCls = (isVideoDirect === false) ? 'stream-badge video-transcode' : 'stream-badge video-direct';
-
-            var audioBadgeText = (isAudioDirect === true) ? 'Audio: Direct' : (isAudioDirect === false ? 'Audio: Transcode' : 'Audio: Direct');
-            var audioBadgeCls = (isAudioDirect === false) ? 'stream-badge audio-transcode' : 'stream-badge audio-direct';
-
-            // Accessible Info toggle button
-            var isDrawerOpen = (displayMode === 'extended') || Boolean(showAllDetails);
-            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isDrawerOpen ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle stream details">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
             // Media Streams extraction
             var mediaStreams = item.MediaStreams || [];
@@ -515,20 +658,68 @@
                 if (!audioStream && mediaStreams[i].Type === 'Audio') audioStream = mediaStreams[i];
             }
 
-            // Ordered Top 5 Essential Badges for compact/mobile layout:
-            // 1. Resolution
-            // 2. Play Method (Direct Play / Direct Stream / Remux / Transcode)
-            // 3. Video Codec
-            // 4. Audio Channels
-            // 5. Container
+            // Title, Subtitle, Season/Episode metadata
+            var title = '';
+            var subtitle = '';
+            var isEpisode = (item.Type === 'Episode' || Boolean(session.SeriesName || item.SeriesName));
+
+            if (isEpisode) {
+                title = escapeHtml(session.SeriesName || item.SeriesName || session.MediaTitle || item.Name || 'Unknown Series');
+                var epParts = [];
+                var sNum = session.SeasonNumber != null ? session.SeasonNumber : item.ParentIndexNumber;
+                var eNum = session.EpisodeNumber != null ? session.EpisodeNumber : item.IndexNumber;
+                if (sNum != null && eNum != null) {
+                    epParts.push('S' + sNum + ':E' + eNum);
+                } else if (sNum != null) {
+                    epParts.push('Season ' + sNum);
+                } else if (eNum != null) {
+                    epParts.push('Ep ' + eNum);
+                }
+
+                var epTitle = item.Name || session.MediaTitle;
+                if (epTitle && epTitle !== title) {
+                    epParts.push('"' + escapeHtml(epTitle) + '"');
+                }
+
+                var year = session.ProductionYear || item.ProductionYear;
+                if (year) {
+                    epParts.push(String(year));
+                }
+                subtitle = epParts.join(' &bull; ');
+            } else {
+                title = escapeHtml(session.MediaTitle || item.Name || 'Unknown Media');
+                var yearVal = session.ProductionYear || item.ProductionYear;
+                if (yearVal) {
+                    subtitle = escapeHtml(String(yearVal));
+                }
+            }
+
+            // Unified Classification
+            var classification = classifyPlaybackSession(session);
+            var isPaused = classification.isPaused;
+            var badgeClass = classification.badgeClass;
+            var badgeText = classification.badgeText;
+            var isVideoDirect = classification.isVideoDirect;
+            var isAudioDirect = classification.isAudioDirect;
+
+            var stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+            if (isPaused) {
+                stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+            }
+
+            var videoBadgeText = (isVideoDirect === true) ? 'Video: Direct' : (isVideoDirect === false ? 'Video: Transcode' : 'Video: Direct');
+            var videoBadgeCls = (isVideoDirect === false) ? 'stream-badge video-transcode' : 'stream-badge video-direct';
+
+            var audioBadgeText = (isAudioDirect === true) ? 'Audio: Direct' : (isAudioDirect === false ? 'Audio: Transcode' : 'Audio: Direct');
+            var audioBadgeCls = (isAudioDirect === false) ? 'stream-badge audio-transcode' : 'stream-badge audio-direct';
+
+            // Top essential badges
             var pills = [];
             var resPill = extractResolutionPill(item.Width || (videoStream && videoStream.Width), item.Height || (videoStream && videoStream.Height));
             if (resPill) pills.push({ text: resPill, cls: 'res' });
 
-            // Method pill
             pills.push({ text: badgeText, cls: '' });
 
-            // Video codec
             var vCodec = session.VideoCodec || (tInfo && tInfo.VideoCodec) || (videoStream && videoStream.Codec ? videoStream.Codec.toUpperCase() : '');
             if (vCodec) {
                 if (vCodec === 'H264' || vCodec === 'h264') vCodec = 'H.264';
@@ -536,19 +727,17 @@
                 pills.push({ text: vCodec, cls: '' });
             }
 
-            // Audio channels
             var audioBadges = extractAudioBadges(audioStream);
             if (audioBadges.length > 0) {
                 pills.push({ text: audioBadges[0], cls: 'audio' });
             }
 
-            // Container
             var containerVal = (session.Container || (tInfo && tInfo.Container) || item.Container || '').toUpperCase();
             if (containerVal) {
                 pills.push({ text: containerVal, cls: '' });
             }
 
-            // If in extended mode, add additional secondary badges (HDR, secondary audio, subtitle)
+            // Extended mode badges
             if (displayMode === 'extended') {
                 var hdrPill = extractDynamicRangePill(videoStream);
                 if (hdrPill) pills.push({ text: hdrPill, cls: 'hdr' });
@@ -561,9 +750,8 @@
                 if (subBadge) pills.push({ text: subBadge, cls: 'sub' });
             }
 
-            // Mobile/Compact limit: exactly cap at top 5 essential badges
+            // Maximum five badges on compact/narrow screens
             var renderedPills = (displayMode === 'compact' && pills.length > 5) ? pills.slice(0, 5) : pills;
-
             var pillHtml = renderedPills.map(function (p) {
                 return '<span class="playback-pill ' + p.cls + '">' + escapeHtml(p.text) + '</span>';
             }).join('');
@@ -588,83 +776,126 @@
                 percent = Math.min(100, Math.max(0, (positionTicks / runtimeTicks) * 100));
             }
 
-            // Truthful How and Why transcode details
-            var metaParts = [];
-            var engine = session.TranscodeEngine || (tInfo ? extractTranscoderEngine(tInfo.HardwareAccelerationType) : '');
-            if (engine) metaParts.push('Engine: ' + escapeHtml(engine));
+            // Truthful telemetry fields
+            var sourceVideoCodec = (videoStream && videoStream.Codec) ? videoStream.Codec.toUpperCase() : (session.VideoCodec ? session.VideoCodec.toUpperCase() : null);
+            var outputVideoCodec = (tInfo && tInfo.VideoCodec) ? tInfo.VideoCodec.toUpperCase() : (isVideoDirect === true ? sourceVideoCodec : null);
 
-            var streamVideoCodec = session.VideoCodec || (tInfo && tInfo.VideoCodec);
-            if (streamVideoCodec) metaParts.push('Video: ' + escapeHtml(streamVideoCodec.toUpperCase()));
+            var sourceAudioCodec = (audioStream && audioStream.Codec) ? audioStream.Codec.toUpperCase() : (session.AudioCodec ? session.AudioCodec.toUpperCase() : null);
+            var outputAudioCodec = (tInfo && tInfo.AudioCodec) ? tInfo.AudioCodec.toUpperCase() : (isAudioDirect === true ? sourceAudioCodec : null);
 
-            var streamAudioCodec = session.AudioCodec || (tInfo && tInfo.AudioCodec);
-            if (streamAudioCodec) metaParts.push('Audio: ' + escapeHtml(streamAudioCodec.toUpperCase()));
+            var sourceResolution = (item.Width && item.Height) ? (item.Width + 'x' + item.Height) : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : null);
+            var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : (session.Resolution || sourceResolution);
 
-            var containerStr = session.Container || (tInfo && tInfo.Container) || item.Container;
-            if (containerStr) {
-                var cConversion = (item.Container && tInfo && tInfo.Container && item.Container.toLowerCase() !== tInfo.Container.toLowerCase())
-                    ? (escapeHtml(item.Container.toUpperCase()) + ' &rarr; ' + escapeHtml(tInfo.Container.toUpperCase()))
-                    : escapeHtml(containerStr.toUpperCase());
-                metaParts.push('Container: ' + cConversion);
-            }
+            var frameRateStr = getTruthfulFrameRate(session, item, videoStream);
 
-            if (session.Resolution) metaParts.push('Resolution: ' + escapeHtml(session.Resolution));
+            var rawHw = tInfo ? tInfo.HardwareAccelerationType : session.TranscodeEngine;
+            var hardwareEngineStr = extractTranscoderEngine(rawHw, isVideoDirect);
 
-            if (tInfo && typeof tInfo.Framerate === 'number' && isFinite(tInfo.Framerate) && tInfo.Framerate > 0) {
-                metaParts.push(Math.round(tInfo.Framerate) + ' fps');
-            }
-
+            var bitrateStr = null;
             if (tInfo && typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
-                var mbps = (tInfo.Bitrate / 1000000).toFixed(1);
-                metaParts.push('Bitrate: ' + mbps + ' Mbps');
+                bitrateStr = (tInfo.Bitrate / 1000000).toFixed(1) + ' Mbps';
+            } else if (videoStream && typeof videoStream.BitRate === 'number' && isFinite(videoStream.BitRate) && videoStream.BitRate > 0) {
+                bitrateStr = (videoStream.BitRate / 1000000).toFixed(1) + ' Mbps';
             }
 
-            var reasonsWhyHtml = '';
-            if (session.TranscodeReasonsWhy) {
-                reasonsWhyHtml = escapeHtml(session.TranscodeReasonsWhy);
-            } else if (Array.isArray(session.TranscodeReasons) && session.TranscodeReasons.length > 0) {
-                var validReasons = session.TranscodeReasons.map(formatTranscodeReason);
-                reasonsWhyHtml = escapeHtml(validReasons.join(', '));
-            } else if (tInfo && Array.isArray(tInfo.TranscodeReasons) && tInfo.TranscodeReasons.length > 0) {
-                var validTReasons = tInfo.TranscodeReasons.filter(function (r) { return r != null; }).map(formatTranscodeReason);
-                if (validTReasons.length > 0) {
-                    reasonsWhyHtml = escapeHtml(validTReasons.join(', '));
-                }
-            } else if (playMethod === 'Transcode' || tInfo) {
-                reasonsWhyHtml = 'Reason not reported by server';
+            var containerConversionHtml = '';
+            if (item.Container && tInfo && tInfo.Container && item.Container.toLowerCase() !== tInfo.Container.toLowerCase()) {
+                containerConversionHtml = escapeHtml(item.Container.toUpperCase()) + ' &rarr; ' + escapeHtml(tInfo.Container.toUpperCase());
+            } else if (containerVal) {
+                containerConversionHtml = escapeHtml(containerVal);
             }
+
+            var serverReasons = getTruthfulTranscodeReasons(session);
+
+            // Extended mode inline summary row (only truthful values, no fabricated QSV or 2191 fps)
+            var metaParts = [];
+            if (hardwareEngineStr) metaParts.push('Engine: ' + escapeHtml(hardwareEngineStr));
+            if (outputVideoCodec || sourceVideoCodec) metaParts.push('Video: ' + escapeHtml(outputVideoCodec || sourceVideoCodec));
+            if (outputAudioCodec || sourceAudioCodec) metaParts.push('Audio: ' + escapeHtml(outputAudioCodec || sourceAudioCodec));
+            if (containerConversionHtml) metaParts.push('Container: ' + containerConversionHtml);
+            if (outputResolution) metaParts.push('Resolution: ' + escapeHtml(outputResolution));
+            if (frameRateStr) metaParts.push(escapeHtml(frameRateStr));
+            if (bitrateStr) metaParts.push('Bitrate: ' + escapeHtml(bitrateStr));
+
+            var cardWhyHtml = '';
+            if (serverReasons) {
+                cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> ' + escapeHtml(serverReasons) + '</div>';
+            } else if (classification.method === 'Transcode') {
+                cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> Reason not reported by server</div>';
+            }
+
+            // Info Drawer Complete 21-Field Technical Breakdown
+            var hdrStatus = extractDynamicRangePill(videoStream) || 'SDR';
+            var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
+            var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
+
+            var gridRows = [
+                { key: 'User', val: escapeHtml(session.UserName || 'Not reported') },
+                { key: 'Client', val: escapeHtml(session.Client || 'Not reported') },
+                { key: 'Client Version', val: session.ApplicationVersion ? ('v' + escapeHtml(session.ApplicationVersion)) : 'Not reported' },
+                { key: 'Device', val: escapeHtml(session.DeviceName || session.Client || 'Not reported') },
+                { key: 'Playback State', val: isPaused ? 'Paused' : 'Playing' },
+                { key: 'Playback Method', val: escapeHtml(classification.badgeText) },
+                { key: 'Video Status', val: isVideoDirect === true ? 'Direct' : (isVideoDirect === false ? 'Transcode' : 'Not reported') },
+                { key: 'Video Source Codec', val: escapeHtml(sourceVideoCodec || 'Not reported') },
+                { key: 'Video Output Codec', val: escapeHtml(outputVideoCodec || (isVideoDirect === true ? 'Direct (Source Codec)' : 'Not reported')) },
+                { key: 'Video Resolution', val: escapeHtml(outputResolution || sourceResolution || 'Not reported') },
+                { key: 'Frame Rate', val: escapeHtml(frameRateStr || 'Not reported') },
+                { key: 'HDR Status', val: escapeHtml(hdrStatus) },
+                { key: 'HDR to SDR Conversion', val: escapeHtml(hdrToSdrVal) },
+                { key: 'Audio Status', val: isAudioDirect === true ? 'Direct' : (isAudioDirect === false ? 'Transcode' : 'Not reported') },
+                { key: 'Audio Source Codec', val: escapeHtml(sourceAudioCodec || 'Not reported') },
+                { key: 'Audio Output Codec', val: escapeHtml(outputAudioCodec || (isAudioDirect === true ? 'Direct (Source Codec)' : 'Not reported')) },
+                { key: 'Audio Channel Layout', val: escapeHtml(audioChannelsLayout || 'Not reported') },
+                { key: 'Container', val: containerConversionHtml || escapeHtml(containerVal || 'Not reported') },
+                { key: 'Bitrate', val: escapeHtml(bitrateStr || 'Not reported') },
+                { key: 'Hardware Engine', val: escapeHtml(hardwareEngineStr || 'Not reported') },
+                { key: 'Transcode Reason', val: escapeHtml(serverReasons || 'Reason not reported by server'), fullWidth: true }
+            ];
+
+            var gridRowsHtml = gridRows.map(function (row) {
+                return '<div class="playback-info-row' + (row.fullWidth ? ' full-width' : '') + '">' +
+                    '<span class="playback-info-key">' + escapeHtml(row.key) + '</span>' +
+                    '<span class="playback-info-val">' + row.val + '</span>' +
+                '</div>';
+            }).join('');
+
+            var isDrawerOpen = (displayMode === 'extended') || Boolean(showAllDetails);
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isDrawerOpen ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle technical stream details">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
             var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isDrawerOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
+                '<div class="playback-drawer-header">' +
+                    '<div class="playback-drawer-title-wrap">' +
+                        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
+                        '<span class="playback-drawer-title">Technical Stream Details</span>' +
+                    '</div>' +
+                    '<button type="button" class="playback-drawer-close" data-action="close-info" aria-label="Close details">&times;</button>' +
+                '</div>' +
                 '<div class="playback-stream-badges">' +
                     '<span class="' + videoBadgeCls + '">' + escapeHtml(videoBadgeText) + '</span>' +
                     '<span class="' + audioBadgeCls + '">' + escapeHtml(audioBadgeText) + '</span>' +
                 '</div>' +
-                (metaParts.length > 0 ? '<div class="playback-details-row"><strong>Stream:</strong> ' + metaParts.join(' &bull; ') + '</div>' : '') +
-                (reasonsWhyHtml ? '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> ' + reasonsWhyHtml + '</div>' : '') +
+                (metaParts.length > 0 ? '<div class="playback-details-row playback-extended-summary"><strong>Stream:</strong> ' + metaParts.join(' &bull; ') + '</div>' : '') +
+                cardWhyHtml +
+                '<div class="playback-info-grid">' +
+                    gridRowsHtml +
+                '</div>' +
             '</div>';
 
             // Artwork
             var apiClient = getApiClient();
-            var posterUrl = '';
-            var backdropUrl = '';
-            var itemId = session.ItemId || item.Id;
-            var primaryTag = session.PrimaryImageTag || item.PrimaryImageTag;
-
-            if (apiClient && typeof apiClient.getImageUrl === 'function' && itemId) {
-                if (primaryTag) {
-                    posterUrl = apiClient.getImageUrl(itemId, { type: 'Primary', tag: primaryTag, maxWidth: 200 });
-                }
-                if (item.BackdropImageTags && item.BackdropImageTags.length > 0) {
-                    backdropUrl = apiClient.getImageUrl(itemId, { type: 'Backdrop', tag: item.BackdropImageTags[0], maxWidth: 600 });
-                }
-            }
+            var art = resolveArtworkUrls(session, item, apiClient);
+            var posterUrl = art.posterUrl;
+            var backdropUrl = art.backdropUrl;
 
             var backdropStyle = backdropUrl ? ' style="background-image: url(\'' + escapeHtml(backdropUrl) + '\');"' : '';
             var posterHtml = '';
             if (posterUrl) {
-                posterHtml = '<img class="playback-poster" src="' + escapeHtml(posterUrl) + '" alt="' + title + '" onerror="this.parentNode.innerHTML=\'<div class=\\\'playback-poster-fallback\\\'><svg viewBox=\\\'0 0 24 24\\\' width=\\\'24\\\' height=\\\'24\\\' fill=\\\'none\\\' stroke=\\\'currentColor\\\' stroke-width=\\\'1.5\\\'><rect x=\\\'2\\\' y=\\\'2\\\' width=\\\'20\\\' height=\\\'20\\\' rx=\\\'3\\\'/><path d=\\\'M7 2v20M17 2v20M2 12h20\\\'/></svg></div>\';" />';
+                posterHtml = '<img class="playback-poster" src="' + escapeHtml(posterUrl) + '" alt="' + title + '" onerror="this.parentNode.innerHTML=\'<div class=\\\'playback-poster-fallback\\\' aria-label=\\\'No artwork\\\'><svg viewBox=\\\'0 0 24 24\\\' width=\\\'24\\\' height=\\\'24\\\' fill=\\\'none\\\' stroke=\\\'currentColor\\\' stroke-width=\\\'1.5\\\'><rect x=\\\'2\\\' y=\\\'3\\\' width=\\\'20\\\' height=\\\'18\\\' rx=\\\'3\\\' stroke=\\\'currentColor\\\'/><path d=\\\'M7 3v18M17 3v18M2 9h20M2 15h20\\\' stroke=\\\'currentColor\\\'/></svg></div>\';" />';
             } else {
                 state.artworkFallbackCount++;
-                posterHtml = '<div class="playback-poster-fallback"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><path d="M7 2v20M17 2v20M2 12h20"/></svg></div>';
+                posterHtml = '<div class="playback-poster-fallback" aria-label="No artwork"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20" stroke="currentColor"/></svg></div>';
             }
 
             return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '">' +
@@ -711,24 +942,18 @@
     }
 
     function calculateSessionCounts(sessions) {
-        var counts = { directPlay: 0, directStream: 0, transcode: 0, paused: 0 };
+        var counts = { total: Array.isArray(sessions) ? sessions.length : 0, directPlay: 0, remux: 0, directStream: 0, transcode: 0, paused: 0 };
+        if (!Array.isArray(sessions)) return counts;
         for (var i = 0; i < sessions.length; i++) {
-            var s = sessions[i];
-            var ps = s.PlayState || {};
-            var isPaused = s.IsPaused != null ? Boolean(s.IsPaused) : Boolean(ps.IsPaused);
-            if (isPaused) {
+            var c = classifyPlaybackSession(sessions[i]);
+            if (c.isPaused) {
                 counts.paused++;
-                continue;
-            }
-
-            var method = s.PlayMethod || ps.PlayMethod || 'DirectPlay';
-            var tInfo = s.TranscodingInfo;
-            var isRemux = Boolean(s.IsContainerRemux || (tInfo && tInfo.IsVideoDirect && !tInfo.IsAudioDirect));
-
-            if (method === 'Transcode' || (tInfo && !tInfo.IsVideoDirect)) {
-                counts.transcode++;
-            } else if (method === 'DirectStream' || isRemux || method === 'Remux') {
+            } else if (c.method === 'Remux') {
+                counts.remux++;
+            } else if (c.method === 'DirectStream') {
                 counts.directStream++;
+            } else if (c.method === 'Transcode') {
+                counts.transcode++;
             } else {
                 counts.directPlay++;
             }
@@ -794,6 +1019,7 @@
                 '<div class="playback-live-indicator"><span class="playback-live-dot"></span> Live</div>' +
                 '<div class="playback-dashboard-counts">' +
                     '<span class="playback-count-chip count-dp"><span class="count-val">' + counts.directPlay + '</span> Direct Play</span>' +
+                    (counts.remux > 0 ? '<span class="playback-count-chip count-remux"><span class="count-val">' + counts.remux + '</span> Remux</span>' : '') +
                     '<span class="playback-count-chip count-ds"><span class="count-val">' + counts.directStream + '</span> Direct Stream</span>' +
                     '<span class="playback-count-chip count-tc"><span class="count-val">' + counts.transcode + '</span> Transcode</span>' +
                     (counts.paused > 0 ? '<span class="playback-count-chip count-paused"><span class="count-val">' + counts.paused + '</span> Paused</span>' : '') +
@@ -883,12 +1109,51 @@
                         } else {
                             panel.classList.add('open');
                             infoBtn.setAttribute('aria-expanded', 'true');
+                            var closeBtn = panel.querySelector('[data-action="close-info"]');
+                            if (closeBtn && typeof closeBtn.focus === 'function') {
+                                closeBtn.focus();
+                            }
                         }
                     }
                 }
                 return;
             }
+
+            // Close single card info drawer via close button
+            var drawerCloseBtn = target.closest('[data-action="close-info"]');
+            if (drawerCloseBtn) {
+                var panelToClose = drawerCloseBtn.closest('.playback-details-panel');
+                if (panelToClose) {
+                    panelToClose.classList.remove('open');
+                    var panelId = panelToClose.id;
+                    var trig = container.querySelector('[aria-controls="' + panelId + '"]');
+                    if (trig) {
+                        trig.setAttribute('aria-expanded', 'false');
+                        if (typeof trig.focus === 'function') trig.focus();
+                    }
+                }
+                return;
+            }
         });
+
+        // Global Escape key listener to close drawer and restore focus
+        if (typeof document !== 'undefined' && !container._playbackEscBound) {
+            container._playbackEscBound = true;
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+                    var openPanels = container.querySelectorAll('.playback-details-panel.open');
+                    for (var i = 0; i < openPanels.length; i++) {
+                        var p = openPanels[i];
+                        p.classList.remove('open');
+                        var trigBtn = container.querySelector('[aria-controls="' + p.id + '"]');
+                        if (trigBtn) {
+                            trigBtn.setAttribute('aria-expanded', 'false');
+                            if (typeof trigBtn.focus === 'function') trigBtn.focus();
+                        }
+                    }
+                }
+            });
+        }
     }
 
     async function pollSessions() {
@@ -1061,6 +1326,12 @@
         extractSubtitleBadge: extractSubtitleBadge,
         extractTranscoderEngine: extractTranscoderEngine,
         formatTranscodeReason: formatTranscodeReason,
+        classifyPlaybackSession: classifyPlaybackSession,
+        formatFrameRate: formatFrameRate,
+        getTruthfulFrameRate: getTruthfulFrameRate,
+        getTruthfulTranscodeReasons: getTruthfulTranscodeReasons,
+        isHdrToSdr: isHdrToSdr,
+        resolveArtworkUrls: resolveArtworkUrls,
         getPlatformIconSvg: getPlatformIconSvg,
         startPolling: startPolling,
         stopPolling: stopPolling,

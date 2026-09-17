@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.3.6 Test Suite', () => {
+describe('Playback Info Card v0.2.3.7 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.3.6 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.3.6', () => {
-            assert.equal(controller.version, '0.2.3.6');
-            assert.equal(controller.diagState.pluginVersion, '0.2.3.6');
+        it('initializes with default waiting state and version 0.2.3.7', () => {
+            assert.equal(controller.version, '0.2.3.7');
+            assert.equal(controller.diagState.pluginVersion, '0.2.3.7');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.3.6 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.3.6');
+            assert.equal(report.pluginVersion, '0.2.3.7');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.3.6 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.3.6',
+                pluginVersion: '0.2.3.7',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -629,7 +629,7 @@ describe('Playback Info Card v0.2.3.6 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.3.6)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.3.7)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -667,10 +667,10 @@ describe('Playback Info Card v0.2.3.6 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.3.6', () => {
+        it('initializes with version 0.2.3.7', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.3.6');
-            assert.equal(dash.state.version, '0.2.3.6');
+            assert.equal(dash.version, '0.2.3.7');
+            assert.equal(dash.state.version, '0.2.3.7');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -1296,5 +1296,340 @@ describe('Playback Info Card v0.2.3.6 Test Suite', () => {
             assert.ok(html.includes('aria-label="Stream Details"'), 'Details panel has accessible label');
         });
     });
+
+    describe('19. Telemetry Accuracy, Framerate Validation, QSV Suppression, and 21-Field Drawer', () => {
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+
+        function createMockDashboard(env = {}) {
+            const mockModule = { exports: {} };
+            const mockWindow = {
+                location: { hash: '#/dashboard', pathname: '/web/index.html' },
+                addEventListener: () => {},
+                removeEventListener: () => {},
+                setInterval: () => 123,
+                clearInterval: () => {},
+                ...env.window
+            };
+            const mockDocument = {
+                getElementById: (id) => null,
+                querySelector: (sel) => null,
+                querySelectorAll: (sel) => [],
+                createElement: (tag) => ({
+                    id: '',
+                    tagName: tag.toUpperCase(),
+                    style: {},
+                    classList: { contains: () => false, add: () => {}, remove: () => {} },
+                    setAttribute: () => {},
+                    getAttribute: () => null,
+                    appendChild: () => {},
+                    insertBefore: () => {}
+                }),
+                addEventListener: () => {},
+                removeEventListener: () => {},
+                readyState: 'complete',
+                ...env.document
+            };
+            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+            return mockModule.exports;
+        }
+
+        it('classifies Remux streams accurately and keeps header counts and card badges in strict agreement', () => {
+            const dash = createMockDashboard();
+            const remuxSession = {
+                Id: 's-remux',
+                UserName: 'TestUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome Windows',
+                PlayMethod: 'Transcode',
+                PlayState: { PlayMethod: 'Transcode', IsPaused: false },
+                TranscodingInfo: {
+                    IsVideoDirect: true,
+                    IsAudioDirect: true,
+                    Container: 'mp4',
+                    HardwareAccelerationType: 'qsv'
+                },
+                NowPlayingItem: {
+                    Name: 'An Action Hero',
+                    Container: 'mkv',
+                    MediaStreams: [
+                        { Type: 'Video', Codec: 'h264', RealFrameRate: 24 }
+                    ]
+                }
+            };
+
+            const classification = dash.classifyPlaybackSession(remuxSession);
+            assert.equal(classification.isRemux, true, 'Remux session must have isRemux true');
+            assert.equal(classification.method, 'Remux', 'Remux session must have method Remux');
+            assert.equal(classification.badgeText, 'Remux', 'Remux session must have badgeText Remux');
+
+            const counts = dash.calculateSessionCounts([remuxSession]);
+            assert.equal(counts.total, 1);
+            assert.equal(counts.remux, 1, 'Remux count must be 1');
+            assert.equal(counts.transcode, 0, 'Transcode count must be 0 for Remux stream');
+            assert.equal(counts.directPlay, 0);
+            assert.equal(counts.directStream, 0);
+
+            // Verify rendered card badge
+            const html = dash.renderSessionCard(remuxSession, 0, 'compact', false);
+            assert.ok(html.includes('Remux'), 'Card must display Remux badge');
+            assert.ok(!html.includes('pill-transcode'), 'Card must NOT display Transcode pill for Remux');
+
+            // Direct Stream session must also never be counted as Transcode
+            const directStreamSession = {
+                Id: 's-ds',
+                PlayMethod: 'DirectStream',
+                PlayState: { PlayMethod: 'DirectStream', IsPaused: false },
+                NowPlayingItem: { Name: 'Direct Stream Video' }
+            };
+            const dsClassification = dash.classifyPlaybackSession(directStreamSession);
+            assert.equal(dsClassification.isDirectStream, true);
+            assert.equal(dsClassification.badgeText, 'Direct Stream');
+            const dsCounts = dash.calculateSessionCounts([directStreamSession]);
+            assert.equal(dsCounts.directStream, 1);
+            assert.equal(dsCounts.transcode, 0, 'Direct Stream must NEVER be counted as Transcode');
+        });
+
+        it('suppresses hardware engine display when video is direct (Remux or Audio-only transcode)', () => {
+            const dash = createMockDashboard();
+
+            // Direct video with QSV configured on server
+            assert.equal(dash.extractTranscoderEngine('qsv', true), null, 'QSV must be suppressed when video is direct');
+            assert.equal(dash.extractTranscoderEngine('nvenc', true), null, 'NVENC must be suppressed when video is direct');
+            assert.equal(dash.extractTranscoderEngine('vaapi', true), null, 'VAAPI must be suppressed when video is direct');
+            assert.equal(dash.extractTranscoderEngine('amf', true), null, 'AMF must be suppressed when video is direct');
+            assert.equal(dash.extractTranscoderEngine('videotoolbox', true), null, 'VideoToolbox must be suppressed when video is direct');
+
+            // When video is actively transcoded, engine should be reported
+            assert.equal(dash.extractTranscoderEngine('qsv', false), 'QSV');
+            assert.equal(dash.extractTranscoderEngine('nvenc', false), 'NVENC');
+            assert.equal(dash.extractTranscoderEngine('vaapi', false), 'VAAPI');
+
+            // Render remux card with QSV in TranscodingInfo
+            const remuxSession = {
+                Id: 's-remux-hw',
+                UserName: 'TestUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome Windows',
+                PlayMethod: 'Transcode',
+                TranscodingInfo: {
+                    IsVideoDirect: true,
+                    IsAudioDirect: true,
+                    Container: 'mp4',
+                    HardwareAccelerationType: 'qsv'
+                },
+                NowPlayingItem: {
+                    Name: 'Remux Title',
+                    Container: 'mkv'
+                }
+            };
+
+            const html = dash.renderSessionCard(remuxSession, 0, 'compact', false);
+            assert.ok(!html.includes('Hardware engine: QSV'), 'Card must NOT show Hardware engine: QSV during remux');
+            assert.ok(!html.includes('pill-hw'), 'Card must NOT render hardware pill during remux');
+            // Check Info drawer
+            assert.ok(html.includes('<span class="playback-info-key">Hardware Engine</span><span class="playback-info-val">Not reported</span>'), 'Info drawer must report Not reported for hardware engine during remux');
+        });
+
+        it('validates framerate strictly and rejects impossible values like 2191 fps', () => {
+            const dash = createMockDashboard();
+
+            // formatFrameRate rejection
+            assert.equal(dash.formatFrameRate(2191), null, 'Must reject 2191 fps');
+            assert.equal(dash.formatFrameRate(300), null, 'Must reject > 240 fps');
+            assert.equal(dash.formatFrameRate(0), null, 'Must reject 0 fps');
+            assert.equal(dash.formatFrameRate(-1), null, 'Must reject negative fps');
+            assert.equal(dash.formatFrameRate(null), null, 'Must reject null fps');
+            assert.equal(dash.formatFrameRate('garbage'), null, 'Must reject non-numeric fps');
+
+            // formatFrameRate valid rates
+            assert.equal(dash.formatFrameRate(23.976024), '23.976 fps');
+            assert.equal(dash.formatFrameRate(24), '24 fps');
+            assert.equal(dash.formatFrameRate(25), '25 fps');
+            assert.equal(dash.formatFrameRate(29.97003), '29.97 fps');
+            assert.equal(dash.formatFrameRate(30), '30 fps');
+            assert.equal(dash.formatFrameRate(50), '50 fps');
+            assert.equal(dash.formatFrameRate(59.94006), '59.94 fps');
+            assert.equal(dash.formatFrameRate(60), '60 fps');
+
+            // getTruthfulFrameRate prioritizes videoStream and ignores impossible TranscodingInfo.Framerate
+            const session = {
+                TranscodingInfo: { Framerate: 2191 }
+            };
+            const item = { Framerate: 23.976 };
+            const videoStream = { RealFrameRate: 23.976, AverageFrameRate: 23.976 };
+
+            const truthfulFps = dash.getTruthfulFrameRate(session, item, videoStream);
+            assert.equal(truthfulFps, '23.976 fps', 'Must pull media stream framerate and reject TranscodingInfo 2191');
+
+            // Render card with 2191 throughput counter
+            const fullSession = {
+                Id: 's-fps',
+                PlayMethod: 'Transcode',
+                TranscodingInfo: { Framerate: 2191, IsVideoDirect: true },
+                NowPlayingItem: {
+                    Name: 'Framerate Test',
+                    MediaStreams: [{ Type: 'Video', RealFrameRate: 23.976 }]
+                }
+            };
+            const html = dash.renderSessionCard(fullSession, 0, 'compact', false);
+            assert.ok(!html.includes('2191 fps'), 'Must NEVER render 2191 fps');
+            assert.ok(html.includes('23.976 fps'), 'Must render truthful 23.976 fps');
+        });
+
+        it('extracts server-reported transcode reasons without guessing or inferring Container not supported', () => {
+            const dash = createMockDashboard();
+
+            // Legitimate server reasons
+            const sessionWithReasons = {
+                TranscodingInfo: {
+                    TranscodeReasons: ['ContainerNotSupported', 'AudioCodecNotSupported']
+                }
+            };
+            const reasons = dash.getTruthfulTranscodeReasons(sessionWithReasons);
+            assert.equal(reasons, 'Container not supported, Audio codec not supported');
+
+            // Missing reasons: must NOT infer or guess reasons
+            const sessionNoReasons = {
+                TranscodingInfo: {
+                    IsVideoDirect: true,
+                    IsAudioDirect: true,
+                    Container: 'mp4'
+                },
+                NowPlayingItem: { Container: 'mkv' }
+            };
+            const emptyReasons = dash.getTruthfulTranscodeReasons(sessionNoReasons);
+            assert.equal(emptyReasons, null, 'Must return null and NOT infer Container not supported when server omits reasons');
+
+            // Render session card: drawer must report "Reason not reported by server"
+            const html = dash.renderSessionCard(sessionNoReasons, 0, 'compact', false);
+            assert.ok(html.includes('Reason not reported by server'), 'Must show Reason not reported by server fallback');
+        });
+
+        it('resolves artwork with TV series poster fallback and slate SVG placeholder', () => {
+            const dash = createMockDashboard();
+            const mockApiClient = {
+                getUrl: (p, q) => '/jellyfin/' + p + (q ? '?' + new URLSearchParams(q).toString() : ''),
+                accessToken: () => 'my-auth-token'
+            };
+
+            // TV Episode with Series poster tag
+            const tvItem = {
+                Id: 'ep-001',
+                Type: 'Episode',
+                SeriesId: 'series-999',
+                SeriesPrimaryImageTag: 'tag-series-art'
+            };
+            const tvArt = dash.resolveArtworkUrls({}, tvItem, mockApiClient);
+            assert.ok(tvArt.posterUrl.includes('series-999'), 'Artwork must fall back to SeriesId for TV episode');
+            assert.ok(tvArt.posterUrl.includes('tag-series-art'), 'Artwork must use SeriesPrimaryImageTag');
+            assert.ok(tvArt.posterUrl.includes('api_key=my-auth-token'), 'Artwork must include authentication token');
+
+            // Movie with Item primary image tag
+            const movieItem = {
+                Id: 'movie-111',
+                Type: 'Movie',
+                PrimaryImageTag: 'tag-movie-art'
+            };
+            const movieArt = dash.resolveArtworkUrls({}, movieItem, mockApiClient);
+            assert.ok(movieArt.posterUrl.includes('movie-111'));
+            assert.ok(movieArt.posterUrl.includes('tag-movie-art'));
+
+            // Missing artwork: returns empty string URL, card renders SVG slate placeholder
+            const missingArt = dash.resolveArtworkUrls({}, {}, mockApiClient);
+            assert.equal(missingArt.posterUrl, '');
+
+            const html = dash.renderSessionCard({ NowPlayingItem: { Name: 'No Artwork Movie' } }, 0, 'compact', false);
+            assert.ok(html.includes('playback-poster-fallback'), 'Must render poster fallback element');
+            assert.ok(html.includes('<svg'), 'Must render SVG slate icon instead of a black box');
+        });
+
+        it('renders complete 21-field technical breakdown grid in Info drawer with accessible controls', () => {
+            const dash = createMockDashboard();
+            const session = {
+                Id: 's-grid-21',
+                UserName: 'TechUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome',
+                PlayMethod: 'DirectPlay',
+                NowPlayingItem: {
+                    Name: 'Technical Specs Test',
+                    Container: 'mkv',
+                    MediaStreams: [
+                        {
+                            Type: 'Video',
+                            Codec: 'h264',
+                            Profile: 'High',
+                            Width: 1920,
+                            Height: 1080,
+                            AspectRatio: '16:9',
+                            RealFrameRate: 24,
+                            BitRate: 5000000,
+                            ColorSpace: 'bt709',
+                            VideoRange: 'SDR'
+                        },
+                        {
+                            Type: 'Audio',
+                            Codec: 'aac',
+                            Profile: 'LC',
+                            Channels: 6,
+                            BitRate: 384000,
+                            SampleRate: 48000
+                        }
+                    ]
+                }
+            };
+
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+
+            // All 21 keys required in technical breakdown
+            const requiredKeys = [
+                'User',
+                'Client',
+                'Client Version',
+                'Device',
+                'Playback State',
+                'Playback Method',
+                'Video Status',
+                'Video Source Codec',
+                'Video Output Codec',
+                'Video Resolution',
+                'Frame Rate',
+                'HDR Status',
+                'HDR to SDR Conversion',
+                'Audio Status',
+                'Audio Source Codec',
+                'Audio Output Codec',
+                'Audio Channel Layout',
+                'Container',
+                'Bitrate',
+                'Hardware Engine',
+                'Transcode Reason'
+            ];
+
+            for (const key of requiredKeys) {
+                assert.ok(html.includes(`<span class="playback-info-key">${key}</span>`), `Info drawer must contain row: ${key}`);
+            }
+
+            // Verify accessibility attributes
+            assert.ok(html.includes('aria-expanded="false"'), 'Drawer toggle button has aria-expanded');
+            assert.ok(html.includes('aria-controls="details-dash-card-1"'), 'Drawer toggle button has aria-controls');
+            assert.ok(html.includes('role="region"'), 'Drawer panel has role="region"');
+            assert.ok(html.includes('aria-label="Stream Details"'), 'Drawer panel has aria-label');
+            assert.ok(html.includes('data-action="close-info"'), 'Drawer has close button');
+            assert.ok(html.includes('aria-label="Close details"'), 'Drawer close button has accessible label');
+
+            // Missing fields show "Not reported"
+            const sparseSession = {
+                Id: 's-sparse',
+                NowPlayingItem: { Name: 'Sparse Media' }
+            };
+            const sparseHtml = dash.renderSessionCard(sparseSession, 1, 'compact', false);
+            assert.ok(sparseHtml.includes('Not reported'), 'Missing technical fields must display "Not reported"');
+            assert.ok(sparseHtml.includes('Reason not reported by server'), 'Missing transcode reason must display "Reason not reported by server"');
+        });
+    });
 });
+
 
