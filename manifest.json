@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.5.1",
+        "changelog": "Release v0.2.5.1 - Standalone My Playback page brought to full parity with the dashboard widget (Info-panel persistence fix, ETA/Atmos/audio-language/subtitle-method/avatar additions, matching artwork/badge/transcode-reason logic), removal of a dead MVC controller superseded by the dashboard middleware, and added test coverage for the notification delivery service's safe-degradation behavior when the plugin has not yet initialized.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.5.1/jellyfin-plugin-playbackcard.zip",
+        "checksum": "511bee9ed603eaadc54b54a2827e245b",
+        "timestamp": "2026-09-17T20:39:00Z"
+      },
+      {
         "version": "0.2.5.0",
         "changelog": "Release v0.2.5.0 - Truthful transcode diagnostics additions: estimated finish time (ETA), Dolby Atmos/DTS:X detection, audio track language, and subtitle delivery method (surfaces burned-in subtitles as a genuine transcode cause) -- none inferred, all read directly from server-reported fields. Adds the user's own avatar next to their name and a layered cinema-poster shadow on artwork. Fixes a Remux/Transcode misclassification in the personal My Playback API, hardens secret storage (no more guessable fallback key, no silent ACL failures, no silent secret wipe on key mismatch), fixes a notification dedupe race condition, adds Brotli response support to the dashboard injector, and brings the Info-panel persistence fix to the standalone Playback Monitor page.",
         "targetAbi": "10.9.0.0",
@@ -39,14 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.7/jellyfin-plugin-playbackcard.zip",
         "checksum": "91ed0b7645aee44062cf6457b5dcc2d6",
         "timestamp": "2026-09-17T17:25:00Z"
-      },
-      {
-        "version": "0.2.3.6",
-        "changelog": "Release v0.2.3.6 - In-place replacement of modern Jellyfin 12.1 React/MUI Devices widget, zero top-of-page fallback, connected devices visibility, and No active playback empty state.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.6/jellyfin-plugin-playbackcard.zip",
-        "checksum": "b62ddc5570b2676e1dab9ade1bb68ea5",
-        "timestamp": "2026-09-17T16:11:00Z"
       }
     ]
   }
