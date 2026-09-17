@@ -212,7 +212,85 @@ The previous `0.2.3.0` release artifact and repository manifest entry remain pre
 ## Known Unverified Scenarios
 
 * **Live Server Environments**: Manual verification matrix across all physical native clients (Moonfin, Android TV, Jellyfin Enhanced) and live Windows host deployments remains to be verified by administrators on their respective servers.
-* **Method 1 Catalog**: The repository catalog (`manifest.json`) remains pinned to `0.2.3.0` as a safe rollback entry until live installation verification is completed on production servers.
+* **Method 1 Catalog**: The repository catalog (`manifest.json`) on `main` provides version `0.2.3.1` with verified MD5 checksums, while retaining `0.2.3.0` for safe rollback.
+
+---
+
+## Playback Notifications (Discord & Telegram)
+
+Administrators seeking Tautulli-like playback notifications can integrate Jellyfin with Discord and Telegram. While native server-side notification dispatch is planned for a future milestone (Option B), notifications can be enabled immediately using the official [Jellyfin Webhook Plugin](https://github.com/jellyfin/jellyfin-plugin-webhook) (Option A).
+
+### Upstream Security & Privacy Warning
+
+> [!CAUTION]
+> **DO NOT USE THE OFFICIAL UPSTREAM SAMPLE TELEGRAM TEMPLATE AS-IS.**
+> The sample `PlaybackStart.handlebars` template in the official webhook repository includes `{{RemoteEndPoint}}`, which broadcasts internal server IP addresses, client IP addresses, and private network topologies into chat rooms.
+> Always use the privacy-safe templates below, which strictly omit all IP and network fields.
+
+---
+
+### Telegram Setup (Generic Destination)
+
+1. **Create Bot & Obtain Credentials**:
+   - Talk to [@BotFather](https://t.me/botfather) on Telegram to create a bot and receive your bot token (`<BOT_TOKEN>`).
+   - Obtain your target Telegram chat ID (using `@userinfobot` or `@get_id_bot`).
+2. **Configure Jellyfin Webhook Plugin**:
+   - In Jellyfin Web, open **Dashboard** &rarr; **Plugins** &rarr; **Webhook**.
+   - Add a new destination: **Generic Destination**.
+   - **Webhook Name**: `Telegram Playback Alerts`
+   - **Webhook URL**: `https://api.telegram.org/bot<BOT_TOKEN>/sendMessage`
+   - **Notification Type**: Enable `Playback Start` and `Playback Stop`.
+   - **Request Header**:
+     - Key: `Content-Type`
+     - Value: `application/json`
+3. **Privacy-Safe Telegram Template**:
+   Paste the following payload into the template field:
+   ```json
+   {
+     "chat_id": "YOUR_CHAT_ID",
+     "text": "🎬 <b>Playback Started</b>\n\n<b>Title:</b> {{#if_equals ItemType 'Episode'}}<b>{{SeriesName}}</b> — S{{SeasonNumber00}}E{{EpisodeNumber00}} {{Name}}{{else}}<b>{{Name}}</b> ({{Year}}){{/if_equals}}\n<b>User:</b> {{NotificationUsername}}\n<b>Client:</b> {{ClientName}} ({{DeviceName}})\n<b>Play Method:</b> {{PlayMethod}}\n<b>Video:</b> {{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}\n<b>Audio:</b> {{Audio_0_Codec}} ({{Audio_0_Channels}}ch)",
+     "parse_mode": "HTML",
+     "protect_content": true,
+     "disable_web_page_preview": true
+   }
+   ```
+
+---
+
+### Discord Setup (Discord Destination or Webhook)
+
+1. **Create Discord Webhook**:
+   - In Discord, go to **Server Settings** &rarr; **Integrations** &rarr; **Webhooks** &rarr; **New Webhook**.
+   - Select the destination channel and copy the Webhook URL.
+2. **Configure Jellyfin Webhook Plugin**:
+   - In Jellyfin Web, open **Dashboard** &rarr; **Plugins** &rarr; **Webhook**.
+   - Add a new destination: **Discord Destination** or **Generic Destination**.
+   - **Webhook URL**: `https://discord.com/api/webhooks/<ID>/<TOKEN>`
+   - **Notification Type**: Enable `Playback Start` and `Playback Stop`.
+3. **Privacy-Safe Discord Embed Template**:
+   ```json
+   {
+     "content": "",
+     "allowed_mentions": { "parse": [] },
+     "embeds": [
+       {
+         "title": "🎬 Playback Started",
+         "description": "{{#if_equals ItemType 'Episode'}}**{{SeriesName}}**\nS{{SeasonNumber00}}E{{EpisodeNumber00}} — {{Name}}{{else}}**{{Name}}** ({{Year}}){{/if_equals}}",
+         "color": 421980,
+         "fields": [
+           { "name": "User", "value": "{{NotificationUsername}}", "inline": true },
+           { "name": "Client", "value": "{{ClientName}} ({{DeviceName}})", "inline": true },
+           { "name": "Stream", "value": "{{PlayMethod}}", "inline": true },
+           { "name": "Video", "value": "{{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}", "inline": true },
+           { "name": "Audio", "value": "{{Audio_0_Codec}} {{Audio_0_Channels}}ch", "inline": true }
+         ],
+         "footer": { "text": "Playback Info Card • Privacy Safe" },
+         "timestamp": "{{UtcTimestamp}}"
+       }
+     ]
+   }
+   ```
+   *Note: `"allowed_mentions": { "parse": [] }` strictly prevents media titles containing `@everyone` from generating Discord ping storms.*
 
 ---
 
