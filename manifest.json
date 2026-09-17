@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.5.2",
+        "changelog": "Release v0.2.5.2 - Prominent summary strip above the grid shows total active streams plus a genuine Direct/Transcoding split (correctly counts a paused Transcode session as Transcoding, not silently dropped). High-signal pills (resolution, dynamic range, audio, subtitle) now carry a leading icon so they scan at a glance; codec/bit-depth/container pills stay icon-free. The progress bar moves from the card footer to directly under the title for better visual hierarchy. Deeper \"liquid glass\" treatment (backdrop blur, saturation boost, specular highlight, bright/dim edge split) applied consistently across the card, badges, pills, chips, and Info drawer on both the dashboard widget and the standalone My Playback page.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.5.2/jellyfin-plugin-playbackcard.zip",
+        "checksum": "e2254d9db44c05581e0cfe185b9505f2",
+        "timestamp": "2026-09-17T20:55:13Z"
+      },
+      {
         "version": "0.2.5.1",
         "changelog": "Release v0.2.5.1 - Standalone My Playback page brought to full parity with the dashboard widget (Info-panel persistence fix, ETA/Atmos/audio-language/subtitle-method/avatar additions, matching artwork/badge/transcode-reason logic), removal of a dead MVC controller superseded by the dashboard middleware, and added test coverage for the notification delivery service's safe-degradation behavior when the plugin has not yet initialized.",
         "targetAbi": "10.9.0.0",
@@ -39,14 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.4.0/jellyfin-plugin-playbackcard.zip",
         "checksum": "072ebefe279214a736f56a2c4773059b",
         "timestamp": "2026-09-17T18:00:00Z"
-      },
-      {
-        "version": "0.2.3.7",
-        "changelog": "Release v0.2.3.7 - Telemetry accuracy corrections: Remux and Direct Stream separation in header counts, strict QSV/HW engine suppression when video is direct, truthful framerate parsing (rejection of ffmpeg throughput counter 2191 fps), server-reported transcode reasons without speculative inference, TV series artwork fallback, and accessible 21-field technical breakdown drawer.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.7/jellyfin-plugin-playbackcard.zip",
-        "checksum": "91ed0b7645aee44062cf6457b5dcc2d6",
-        "timestamp": "2026-09-17T17:25:00Z"
       }
     ]
   }
