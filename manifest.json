@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.3.2",
+        "changelog": "Release v0.2.3.2 - Native Discord/Telegram notifications, transcode details, and My Playback view.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.2/jellyfin-plugin-playbackcard.zip",
+        "checksum": "eeaaa13518e46284a03929528c91854e",
+        "timestamp": "2026-09-17T09:44:00Z"
+      },
+      {
         "version": "0.2.3.1",
         "changelog": "Release v0.2.3.1 - Safe internal monitor page, local diagnostics, and issue reporting.",
         "targetAbi": "10.9.0.0",
