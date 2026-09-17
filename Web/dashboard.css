@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Dashboard Integration Styles (v0.2.4.0)
+ * Playback Info Card - Dashboard Integration Styles (v0.2.4.1)
  * Liquid Glass Dark Theme & Responsive Telemetry Cards
  */
 
@@ -643,7 +643,7 @@
     border-radius: 2px;
 }
 
-/* 21-Field Technical Breakdown Grid */
+/* Grouped 26-Field Technical Breakdown Grid (used inside the singleton Info drawer) */
 .playback-info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -682,10 +682,140 @@
     word-break: break-word;
 }
 
+/* Singleton Info Drawer (modal): mounted once under document.body, right-side panel on
+   desktop/tablet, bottom sheet on mobile. Overlay/panel nodes are never recreated -- only
+   their content is refreshed -- so the drawer survives polling re-renders untouched. */
+#playback-drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 4000;
+}
+
+#playback-drawer-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#playback-drawer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100dvh;
+    width: 480px;
+    max-width: 90vw;
+    background: #0d1117;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: -12px 0 32px rgba(0, 0, 0, 0.45);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 4001;
+    display: flex;
+    flex-direction: column;
+    outline: none;
+}
+
+#playback-drawer-panel.open {
+    transform: translateX(0);
+}
+
+#playback-drawer-panel .playback-drawer-header {
+    flex-shrink: 0;
+    padding: 0.9rem 1rem;
+    position: sticky;
+    top: 0;
+    background: #0d1117;
+    z-index: 1;
+}
+
+.playback-drawer-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0 1rem 0.75rem 1rem;
+    flex-shrink: 0;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+}
+
+.playback-drawer-identity .playback-platform-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.playback-drawer-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 0 1rem 1.25rem 1rem;
+    -webkit-overflow-scrolling: touch;
+}
+
+.playback-drawer-empty {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    padding: 1rem 0;
+}
+
+.playback-drawer-group {
+    margin-top: 1rem;
+}
+
+.playback-drawer-group:first-child {
+    margin-top: 0;
+}
+
+.playback-drawer-group-title {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #38bdf8;
+}
+
+@media (max-width: 1023px) and (min-width: 600px) {
+    #playback-drawer-panel {
+        max-width: 90vw;
+    }
+}
+
+/* Mobile: Info drawer becomes a bottom sheet */
+@media (max-width: 599px) {
+    #playback-drawer-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100vw;
+        max-width: 100vw;
+        height: 88dvh;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    #playback-drawer-panel.open {
+        transform: translateY(0);
+    }
+
+    .playback-drawer-close {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .playback-details-panel,
     .playback-drawer-close,
-    .playback-card {
+    .playback-card,
+    #playback-drawer-overlay,
+    #playback-drawer-panel {
         transition: none !important;
         animation: none !important;
     }

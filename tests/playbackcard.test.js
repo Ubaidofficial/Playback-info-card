@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.4.0 Test Suite', () => {
+describe('Playback Info Card v0.2.4.1 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.4.0', () => {
-            assert.equal(controller.version, '0.2.4.0');
-            assert.equal(controller.diagState.pluginVersion, '0.2.4.0');
+        it('initializes with default waiting state and version 0.2.4.1', () => {
+            assert.equal(controller.version, '0.2.4.1');
+            assert.equal(controller.diagState.pluginVersion, '0.2.4.1');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.4.0');
+            assert.equal(report.pluginVersion, '0.2.4.1');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.4.0',
+                pluginVersion: '0.2.4.1',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -629,7 +629,7 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.4.0)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.4.1)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -667,10 +667,10 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.4.0', () => {
+        it('initializes with version 0.2.4.1', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.4.0');
-            assert.equal(dash.state.version, '0.2.4.0');
+            assert.equal(dash.version, '0.2.4.1');
+            assert.equal(dash.state.version, '0.2.4.1');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -1158,7 +1158,9 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             assert.ok(activeHtml.includes('MKV'), 'Shows MKV container badge');
             assert.ok(activeHtml.includes('data-action="toggle-info"'), 'Shows Info toggle button');
             assert.ok(activeHtml.includes('aria-expanded="false"'), 'Info toggle has aria-expanded false');
-            assert.ok(activeHtml.includes('aria-controls="details-dash-card-1"'), 'Info toggle has aria-controls');
+            assert.ok(activeHtml.includes('aria-haspopup="dialog"'), 'Info toggle announces it opens a dialog');
+            assert.ok(activeHtml.includes('aria-controls="playback-drawer-panel"'), 'Info toggle points to the singleton drawer panel');
+            assert.ok(activeHtml.includes('data-card-id="dash-card-1"'), 'Info toggle carries its card correlation id');
 
             // Paused State
             moonfinSession.IsPaused = true;
@@ -1374,10 +1376,11 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
 
             const html = dash.renderSessionCard(session, 1, 'compact', false);
             assert.ok(html.includes('aria-expanded="false"'), 'Info button has initial aria-expanded false');
-            assert.ok(html.includes('aria-controls="details-dash-card-2"'), 'Info button has deterministic aria-controls');
-            assert.ok(html.includes('id="details-dash-card-2"'), 'Details panel has matching ID');
-            assert.ok(html.includes('role="region"'), 'Details panel has role region');
-            assert.ok(html.includes('aria-label="Stream Details"'), 'Details panel has accessible label');
+            assert.ok(html.includes('aria-controls="playback-drawer-panel"'), 'Info button points to the singleton drawer panel');
+            assert.ok(html.includes('data-card-id="dash-card-2"'), 'Info button has deterministic card correlation id');
+            assert.ok(html.includes('id="details-dash-card-2"'), 'Inline Show-Details summary panel has matching ID');
+            assert.ok(html.includes('role="region"'), 'Inline summary panel has role region');
+            assert.ok(html.includes('aria-label="Stream Details"'), 'Inline summary panel has accessible label');
         });
     });
 
@@ -1417,6 +1420,48 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
             runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
             return mockModule.exports;
+        }
+
+        // A minimal but real element/registry mock, capable enough for the singleton Info
+        // drawer to actually mount (createElement + body.appendChild + getElementById +
+        // classList + setAttribute/getAttribute), unlike the plain stub above.
+        function createDrawerCapableDashboard() {
+            const registry = {};
+            const mockDocument = {
+                body: {
+                    style: {},
+                    appendChild: (el) => { registry[el.id] = el; }
+                },
+                getElementById: (id) => registry[id] || null,
+                createElement: (tag) => {
+                    const attrs = {};
+                    const classes = new Set();
+                    return {
+                        id: '',
+                        tagName: tag.toUpperCase(),
+                        style: {},
+                        _html: '',
+                        get innerHTML() { return this._html; },
+                        set innerHTML(v) { this._html = v; },
+                        classList: {
+                            add: (c) => classes.add(c),
+                            remove: (c) => classes.delete(c),
+                            contains: (c) => classes.has(c)
+                        },
+                        setAttribute: (k, v) => { attrs[k] = v; },
+                        getAttribute: (k) => (k in attrs ? attrs[k] : null),
+                        addEventListener: () => {},
+                        appendChild: () => {},
+                        focus: () => {},
+                        querySelector: () => null,
+                        querySelectorAll: () => []
+                    };
+                },
+                addEventListener: () => {},
+                querySelectorAll: () => [],
+                readyState: 'complete'
+            };
+            return createMockDashboard({ document: mockDocument });
         }
 
         it('classifies Remux streams accurately and keeps header counts and card badges in strict agreement', () => {
@@ -1512,8 +1557,9 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             const html = dash.renderSessionCard(remuxSession, 0, 'compact', false);
             assert.ok(!html.includes('Hardware engine: QSV'), 'Card must NOT show Hardware engine: QSV during remux');
             assert.ok(!html.includes('pill-hw'), 'Card must NOT render hardware pill during remux');
-            // Check Info drawer
-            assert.ok(html.includes('<span class="playback-info-key">Hardware Engine</span><span class="playback-info-val">Not reported</span>'), 'Info drawer must report Not reported for hardware engine during remux');
+            // Check the Info drawer's full breakdown (built independently of the card's own HTML)
+            const drawerHtml = dash.buildDrawerContentHtml(remuxSession);
+            assert.ok(drawerHtml.includes('<span class="playback-info-key">Hardware Engine</span><span class="playback-info-val">Not reported</span>'), 'Info drawer must report Not reported for hardware engine during remux');
         });
 
         it('validates framerate strictly and rejects impossible values like 2191 fps', () => {
@@ -1574,8 +1620,27 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             const reasons = dash.getTruthfulTranscodeReasons(sessionWithReasons);
             assert.equal(reasons, 'Container not supported, Audio codec not supported');
 
-            // Missing reasons: must NOT infer or guess reasons
-            const sessionNoReasons = {
+            // Missing reasons on a genuine Transcode: must NOT infer or guess a reason,
+            // but the drawer must still show the honest "not reported" fallback.
+            const genuineTranscodeNoReasons = {
+                PlayMethod: 'Transcode',
+                TranscodingInfo: {
+                    IsVideoDirect: false,
+                    IsAudioDirect: true,
+                    Container: 'mp4'
+                },
+                NowPlayingItem: { Container: 'mkv' }
+            };
+            const emptyReasons = dash.getTruthfulTranscodeReasons(genuineTranscodeNoReasons);
+            assert.equal(emptyReasons, null, 'Must return null and NOT infer Container not supported when server omits reasons');
+            assert.equal(dash.classifyPlaybackSession(genuineTranscodeNoReasons).method, 'Transcode', 'Fixture must be a genuine Transcode');
+
+            const transcodeDrawerHtml = dash.buildDrawerContentHtml(genuineTranscodeNoReasons);
+            assert.ok(transcodeDrawerHtml.includes('Reason not reported by server'), 'Genuine Transcode with no reported reason must show the fallback text');
+
+            // A Remux (video+audio direct, container changed) with no reasons must NEVER show
+            // "Reason not reported by server" -- that text implies a transcode is happening.
+            const remuxNoReasons = {
                 TranscodingInfo: {
                     IsVideoDirect: true,
                     IsAudioDirect: true,
@@ -1583,12 +1648,10 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
                 },
                 NowPlayingItem: { Container: 'mkv' }
             };
-            const emptyReasons = dash.getTruthfulTranscodeReasons(sessionNoReasons);
-            assert.equal(emptyReasons, null, 'Must return null and NOT infer Container not supported when server omits reasons');
-
-            // Render session card: drawer must report "Reason not reported by server"
-            const html = dash.renderSessionCard(sessionNoReasons, 0, 'compact', false);
-            assert.ok(html.includes('Reason not reported by server'), 'Must show Reason not reported by server fallback');
+            assert.equal(dash.classifyPlaybackSession(remuxNoReasons).method, 'Remux', 'Fixture must classify as Remux');
+            const remuxDrawerHtml = dash.buildDrawerContentHtml(remuxNoReasons);
+            assert.ok(!remuxDrawerHtml.includes('Reason not reported by server'), 'Remux must never show the Transcode-only fallback reason text');
+            assert.ok(remuxDrawerHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not reported</span>'), 'Remux Transcode Reason field must read Not reported');
         });
 
         it('resolves artwork with TV series poster fallback and slate SVG placeholder', () => {
@@ -1629,14 +1692,16 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
             assert.ok(html.includes('<svg'), 'Must render SVG slate icon instead of a black box');
         });
 
-        it('renders complete 21-field technical breakdown grid in Info drawer with accessible controls', () => {
-            const dash = createMockDashboard();
+        it('renders complete grouped 26-field technical breakdown in the singleton Info drawer', () => {
+            const dash = createDrawerCapableDashboard();
             const session = {
-                Id: 's-grid-21',
+                Id: 's-grid-26',
                 UserName: 'TechUser',
                 Client: 'Jellyfin Web',
                 DeviceName: 'Chrome',
+                ApplicationVersion: '10.9.0',
                 PlayMethod: 'DirectPlay',
+                PlayState: { SubtitleStreamIndex: 2 },
                 NowPlayingItem: {
                     Name: 'Technical Specs Test',
                     Container: 'mkv',
@@ -1658,62 +1723,185 @@ describe('Playback Info Card v0.2.4.0 Test Suite', () => {
                             Codec: 'aac',
                             Profile: 'LC',
                             Channels: 6,
+                            ChannelLayout: '5.1',
                             BitRate: 384000,
                             SampleRate: 48000
-                        }
+                        },
+                        { Type: 'Subtitle', Index: 2, Language: 'eng', DisplayTitle: 'English', Codec: 'srt' }
                     ]
                 }
             };
 
-            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            // The full breakdown is built independently of the card, so it agrees with the
+            // canonical model regardless of the card's own compact/extended render mode.
+            const drawerHtml = dash.buildDrawerContentHtml(session);
 
-            // All 22 keys required in technical breakdown
             const requiredKeys = [
-                'User',
-                'Client',
-                'Client Version',
-                'Device',
-                'Playback State',
-                'Playback Method',
-                'Video Status',
-                'Video Source Codec',
-                'Video Output Codec',
-                'Source Resolution',
-                'Output Resolution',
-                'Frame Rate',
-                'HDR Status',
-                'HDR to SDR Conversion',
-                'Audio Status',
-                'Audio Source Codec',
-                'Audio Output Codec',
-                'Audio Channel Layout',
-                'Source Container',
-                'Output Container',
-                'Bitrate',
-                'Hardware Engine',
-                'Transcode Reason'
+                // Playback (6)
+                'User', 'Client', 'Client Version', 'Device', 'Playback State', 'Playback Method',
+                // Video (8)
+                'Video Status', 'Source Video Codec', 'Output Video Codec', 'Source Resolution',
+                'Output Resolution', 'Frame Rate', 'HDR Status', 'Tone Mapping / HDR Conversion',
+                // Audio (5)
+                'Audio Status', 'Source Audio Codec', 'Output Audio Codec', 'Audio Channels / Layout', 'Audio Bitrate',
+                // Stream (6)
+                'Source Container', 'Output Container', 'Video Bitrate', 'Overall Stream Bitrate', 'Hardware Engine', 'Transcode Reason',
+                // Subtitles (1)
+                'Subtitle Stream / Language'
             ];
+            assert.equal(requiredKeys.length, 26, 'Test fixture itself must enumerate exactly 26 required fields');
 
             for (const key of requiredKeys) {
-                assert.ok(html.includes(`<span class="playback-info-key">${key}</span>`), `Info drawer must contain row: ${key}`);
+                assert.ok(drawerHtml.includes(`<span class="playback-info-key">${key}</span>`), `Info drawer must contain row: ${key}`);
             }
 
-            // Verify accessibility attributes
-            assert.ok(html.includes('aria-expanded="false"'), 'Drawer toggle button has aria-expanded');
-            assert.ok(html.includes('aria-controls="details-dash-card-1"'), 'Drawer toggle button has aria-controls');
-            assert.ok(html.includes('role="region"'), 'Drawer panel has role="region"');
-            assert.ok(html.includes('aria-label="Stream Details"'), 'Drawer panel has aria-label');
-            assert.ok(html.includes('data-action="close-info"'), 'Drawer has close button');
-            assert.ok(html.includes('aria-label="Close details"'), 'Drawer close button has accessible label');
+            // Grouped into named sections
+            for (const group of ['Playback', 'Video', 'Audio', 'Stream', 'Subtitles']) {
+                assert.ok(drawerHtml.includes(`<h4 class="playback-drawer-group-title">${group}</h4>`), `Drawer must group fields under "${group}"`);
+            }
 
-            // Missing fields show "Not reported"
-            const sparseSession = {
-                Id: 's-sparse',
-                NowPlayingItem: { Name: 'Sparse Media' }
-            };
-            const sparseHtml = dash.renderSessionCard(sparseSession, 1, 'compact', false);
+            // Each row carries a safe, non-sensitive diagnostic hook (section 17)
+            assert.ok(drawerHtml.includes('data-drawer-field="user"'), 'Fields carry data-drawer-field hooks');
+            assert.ok(drawerHtml.includes('data-drawer-field="transcode-reason"'), 'Transcode Reason field carries its slug');
+            assert.ok(drawerHtml.includes('English (SRT)'), 'Active subtitle stream reports language and codec');
+
+            // Card-level Info button accessibility (points at the singleton dialog, not a per-card region)
+            const cardHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(cardHtml.includes('aria-expanded="false"'), 'Info button has aria-expanded');
+            assert.ok(cardHtml.includes('aria-haspopup="dialog"'), 'Info button announces a dialog');
+            assert.ok(cardHtml.includes('aria-controls="playback-drawer-panel"'), 'Info button points at the singleton drawer');
+
+            // The mounted drawer shell itself is a proper accessible dialog
+            const panel = dash.ensureDrawerMounted();
+            assert.ok(panel, 'Drawer panel mounts under document.body');
+            assert.equal(panel.getAttribute('role'), 'dialog', 'Drawer panel has role="dialog"');
+            assert.equal(panel.getAttribute('aria-modal'), 'true', 'Drawer panel has aria-modal="true"');
+            assert.ok(panel.getAttribute('aria-labelledby'), 'Drawer panel has aria-labelledby');
+
+            // Missing fields show "Not reported" -- and a non-Transcode session never shows
+            // the Transcode-only "Reason not reported by server" fallback (section 9/14).
+            const sparseSession = { Id: 's-sparse', NowPlayingItem: { Name: 'Sparse Media' } };
+            assert.equal(dash.classifyPlaybackSession(sparseSession).method, 'DirectPlay');
+            const sparseHtml = dash.buildDrawerContentHtml(sparseSession);
             assert.ok(sparseHtml.includes('Not reported'), 'Missing technical fields must display "Not reported"');
-            assert.ok(sparseHtml.includes('Reason not reported by server'), 'Missing transcode reason must display "Reason not reported by server"');
+            assert.ok(!sparseHtml.includes('Reason not reported by server'), 'DirectPlay must never show the Transcode-only fallback reason text');
+            assert.ok(sparseHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not reported</span>'), 'DirectPlay Transcode Reason field must read Not reported');
+        });
+
+        it('keeps the singleton Info drawer open across simulated polling and closes only after confirmed session disappearance', () => {
+            const dash = createDrawerCapableDashboard();
+            const container = { innerHTML: '' };
+
+            const session = {
+                Id: 'poll-persist-1',
+                UserName: 'PersistUser',
+                Client: 'Jellyfin Web',
+                DeviceName: 'Chrome',
+                PlayMethod: 'DirectPlay',
+                NowPlayingItem: { Name: 'Long Movie' }
+            };
+
+            dash.renderDashboardContainer(container, [session], [session]);
+            const opened = dash.openInfoDrawer('dash-card-1');
+            assert.equal(opened, true, 'Info drawer opens for a known card/session pair');
+            assert.equal(dash.state.drawer.open, true);
+            assert.equal(dash.state.drawer.sessionId, 'poll-persist-1');
+
+            // Simulate several poll cycles while the session is still present: the drawer
+            // must remain open and its content must NOT be torn down/recreated.
+            for (let i = 0; i < 4; i++) {
+                dash.renderDashboardContainer(container, [session], [session]);
+                assert.equal(dash.state.drawer.open, true, `Drawer must stay open through poll cycle ${i + 1}`);
+                assert.equal(dash.state.drawer.missingPolls, 0, 'Missing-poll counter resets while session is present');
+            }
+
+            // Now the session disappears (stopped/stream ended). A single missed poll must
+            // NOT immediately close the drawer -- only sustained absence should.
+            dash.renderDashboardContainer(container, [], []);
+            assert.equal(dash.state.drawer.open, true, 'Drawer must tolerate a single missed poll');
+            assert.equal(dash.state.drawer.missingPolls, 1);
+
+            dash.renderDashboardContainer(container, [], []);
+            assert.equal(dash.state.drawer.open, true, 'Drawer must tolerate a second missed poll (still within tolerance)');
+
+            dash.renderDashboardContainer(container, [], []);
+            assert.equal(dash.state.drawer.open, false, 'Drawer closes only after exceeding the missed-poll tolerance');
+            assert.equal(dash.state.drawer.sessionId, null, 'Drawer state fully clears on close');
+        });
+    });
+
+    describe('20. Client Brand Resolver Matrix', () => {
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+
+        function createMockDashboard() {
+            const mockModule = { exports: {} };
+            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
+            const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
+            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+            return mockModule.exports;
+        }
+
+        const dash = createMockDashboard();
+
+        const cases = [
+            { client: 'Jellyfin Web', device: 'Chrome Windows', expectKey: 'chrome' },
+            { client: 'Jellyfin Web', device: 'Safari iPhone', expectKey: 'safari' },
+            { client: 'Jellyfin Web', device: 'Edge', expectKey: 'edge' },
+            { client: 'Jellyfin Web', device: 'Firefox', expectKey: 'firefox' },
+            { client: 'Jellyfin Web', device: 'Brave', expectKey: 'brave' },
+            { client: 'Jellyfin Web', device: '', expectKey: 'jellyfin-web' },
+            { client: 'Jellyfin Media Player', device: 'Windows', expectKey: 'jellyfin-desktop' },
+            { client: 'Jellyfin Android', device: 'Pixel 8', expectKey: 'jellyfin-android' },
+            { client: 'Jellyfin Android TV', device: 'Shield', expectKey: 'jellyfin-androidtv' },
+            { client: 'Jellyfin iOS', device: 'iPhone', expectKey: 'jellyfin-ios' },
+            { client: 'Jellyfin tvOS', device: 'Apple TV', expectKey: 'jellyfin-tvos' },
+            { client: 'Swiftfin', device: 'iPhone', expectKey: 'swiftfin' },
+            { client: 'Finamp', device: 'Pixel', expectKey: 'finamp' },
+            { client: 'Findroid', device: 'Pixel', expectKey: 'findroid' },
+            { client: 'Streamyfin', device: 'iPhone', expectKey: 'streamyfin' },
+            { client: 'Moonfin', device: 'Android TV', expectKey: 'moonfin' },
+            { client: 'Infuse', device: 'Apple TV', expectKey: 'infuse' },
+            { client: 'Kodi', device: 'HTPC', expectKey: 'kodi' },
+            { client: 'DLNA Renderer', device: 'Roku Ultra', expectKey: 'roku' },
+            { client: 'Fire TV', device: 'Fire TV Stick', expectKey: 'firetv' },
+            { client: 'Chromecast', device: 'Google TV', expectKey: 'chromecast' },
+            { client: 'DLNA', device: 'Generic Renderer', expectKey: 'dlna' },
+            { client: 'Samsung Smart TV', device: 'Tizen', expectKey: 'tizen' },
+            { client: 'LG Smart TV', device: 'webOS', expectKey: 'webos' },
+            { client: 'Xbox One', device: 'Xbox', expectKey: 'xbox' },
+            { client: 'PlayStation 5', device: 'PS5', expectKey: 'playstation' },
+            { client: 'Unknown Client', device: 'Windows 11', expectKey: 'windows' },
+            { client: 'Unknown Client', device: 'Android Phone', expectKey: 'android' },
+            { client: 'Unknown Client', device: 'Unknown Device', expectKey: 'generic' }
+        ];
+
+        for (const c of cases) {
+            it(`resolves "${c.client}" / "${c.device}" -> ${c.expectKey}`, () => {
+                const brand = dash.resolveClientBrand({ client: c.client, deviceName: c.device });
+                assert.equal(brand.key, c.expectKey, `Expected ${c.expectKey} for client="${c.client}" device="${c.device}", got ${brand.key}`);
+                assert.ok(brand.svg.startsWith('<svg'), 'Every resolved brand must return real inline SVG markup');
+                assert.ok(!/^data:|http:|https:/.test(brand.svg), 'Brand icon must never reference an external URL');
+            });
+        }
+
+        it('gives exact Jellyfin-application identity priority over generic OS identity', () => {
+            const swiftfinOnIos = dash.resolveClientBrand({ client: 'Swiftfin', deviceName: 'iPhone 15' });
+            assert.equal(swiftfinOnIos.key, 'swiftfin', 'Swiftfin must not fall back to generic Apple/iOS icon');
+
+            const moonfinOnAndroidTv = dash.resolveClientBrand({ client: 'Moonfin', deviceName: 'Android TV' });
+            assert.equal(moonfinOnAndroidTv.key, 'moonfin', 'Moonfin must not fall back to generic Android TV icon');
+        });
+
+        it('uses the same resolver for Now Playing cards and Connected Devices', () => {
+            const session = { Id: 'brand-parity', UserName: 'U', Client: 'Jellyfin Web', DeviceName: 'Safari iPhone', NowPlayingItem: { Name: 'X' } };
+            const cardHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            const deviceHtml = dash.renderConnectedDeviceItem(session);
+            assert.ok(cardHtml.includes('data-client-brand="safari"'), 'Now Playing card tags the resolved brand key');
+            assert.ok(deviceHtml.includes('data-client-brand="safari"'), 'Connected Devices card tags the same resolved brand key');
+            assert.ok(deviceHtml.includes('data-connected-device-card="true"'), 'Connected device card carries its diagnostic hook');
+            assert.ok(!deviceHtml.includes('brand-parity'), 'Raw session ID must never be written into the DOM');
         });
     });
 });

@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.4.0)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.4.1)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,12 +7,17 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.4.0';
+    var VERSION = '0.2.4.1';
+    var ASSET_REVISION = '0.2.4.1';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
+    var DRAWER_OVERLAY_ID = 'playback-drawer-overlay';
+    var DRAWER_PANEL_ID = 'playback-drawer-panel';
     var POLL_INTERVAL_MS = 3000;
+    var DRAWER_MISSING_POLL_TOLERANCE = 2;
 
     var state = {
         version: VERSION,
+        assetRevision: ASSET_REVISION,
         activeSessions: [],
         allSessions: [],
         displayMode: 'compact', // compact (default) | extended
@@ -23,7 +28,15 @@
         isNonAdmin: false,
         lastRenderedJson: '',
         artworkFallbackCount: 0,
-        renderErrors: 0
+        renderErrors: 0,
+        cardSessionMap: {},
+        drawer: {
+            open: false,
+            sessionId: null,
+            cardDomId: null,
+            missingPolls: 0,
+            lastFocusEl: null
+        }
     };
 
     function escapeHtml(str) {
@@ -336,12 +349,27 @@
         if (typeof apiClient.accessToken === 'function') token = apiClient.accessToken() || '';
         else if (apiClient.accessToken) token = String(apiClient.accessToken);
 
+        function buildImageUrl(itemId, opts) {
+            if (!itemId) return '';
+            if (typeof apiClient.getImageUrl === 'function') return apiClient.getImageUrl(itemId, opts) || '';
+            if (typeof apiClient.getUrl === 'function') return apiClient.getUrl('Items/' + itemId + '/Images/' + opts.type, opts) || '';
+            return '';
+        }
+
+        // Poster resolution chain: item ID + primary image tag -> primary image item ID
+        // -> series ID + series image tag (episode-to-series fallback) -> session-level tag.
         var posterItemId = null;
         var posterTag = null;
 
-        if (item && (item.SeriesPrimaryImageTag || (item.Type === 'Episode' && item.SeriesId))) {
-            posterItemId = item.SeriesId || session.ItemId || item.Id;
-            posterTag = item.SeriesPrimaryImageTag || session.PrimaryImageTag || item.PrimaryImageTag || null;
+        if (item && item.PrimaryImageTag && item.Id) {
+            posterItemId = item.Id;
+            posterTag = item.PrimaryImageTag;
+        } else if (item && item.PrimaryImageItemId) {
+            posterItemId = item.PrimaryImageItemId;
+            posterTag = item.PrimaryImageTag || null;
+        } else if (item && (item.SeriesPrimaryImageTag || (item.Type === 'Episode' && item.SeriesId))) {
+            posterItemId = item.SeriesId || (session && session.ItemId) || item.Id;
+            posterTag = item.SeriesPrimaryImageTag || (session && session.PrimaryImageTag) || item.PrimaryImageTag || null;
         } else {
             posterItemId = (session && session.ItemId) || (item && item.Id);
             posterTag = (session && session.PrimaryImageTag) || (item && item.PrimaryImageTag) || null;
@@ -351,55 +379,159 @@
             var pOpts = { type: 'Primary', maxWidth: 300, quality: 90 };
             if (posterTag) pOpts.tag = posterTag;
             if (token) pOpts.api_key = token;
-
-            if (typeof apiClient.getImageUrl === 'function') {
-                posterUrl = apiClient.getImageUrl(posterItemId, pOpts);
-            } else if (typeof apiClient.getUrl === 'function') {
-                posterUrl = apiClient.getUrl('Items/' + posterItemId + '/Images/Primary', pOpts);
-            }
+            posterUrl = buildImageUrl(posterItemId, pOpts);
         }
 
-        var backdropItemId = (session && session.ItemId) || (item && item.Id);
-        var backdropTag = (item && item.BackdropImageTags && item.BackdropImageTags.length > 0)
-            ? item.BackdropImageTags[0]
-            : (item && item.SeriesBackdropImageTags && item.SeriesBackdropImageTags.length > 0 ? item.SeriesBackdropImageTags[0] : null);
+        // Backdrop resolution chain: item backdrop tags -> parent backdrop ID + tags
+        // -> series backdrop tags (episode-to-series fallback). ID and tag always resolved together.
+        var backdropItemId = null;
+        var backdropTag = null;
+
+        if (item && item.BackdropImageTags && item.BackdropImageTags.length > 0) {
+            backdropItemId = (session && session.ItemId) || item.Id;
+            backdropTag = item.BackdropImageTags[0];
+        } else if (item && item.ParentBackdropItemId && item.ParentBackdropImageTags && item.ParentBackdropImageTags.length > 0) {
+            backdropItemId = item.ParentBackdropItemId;
+            backdropTag = item.ParentBackdropImageTags[0];
+        } else if (item && item.SeriesId && item.SeriesBackdropImageTags && item.SeriesBackdropImageTags.length > 0) {
+            backdropItemId = item.SeriesId;
+            backdropTag = item.SeriesBackdropImageTags[0];
+        }
 
         if (backdropItemId && backdropTag) {
             var bOpts = { type: 'Backdrop', maxWidth: 800, quality: 80, tag: backdropTag };
             if (token) bOpts.api_key = token;
-
-            if (typeof apiClient.getImageUrl === 'function') {
-                backdropUrl = apiClient.getImageUrl(backdropItemId, bOpts);
-            } else if (typeof apiClient.getUrl === 'function') {
-                backdropUrl = apiClient.getUrl('Items/' + backdropItemId + '/Images/Backdrop', bOpts);
-            }
+            backdropUrl = buildImageUrl(backdropItemId, bOpts);
         }
 
         return { posterUrl: posterUrl, backdropUrl: backdropUrl };
     }
 
+    // Real, locally-bundled brand-colored SVG glyphs (no CDN, no emoji, no runtime fetches).
+    var BRAND_SVG = {
+        jellyfinWeb: '<svg viewBox="0 0 24 24" width="20" height="20"><rect x="2" y="4" width="20" height="13" rx="2" fill="none" stroke="#00A4DC" stroke-width="2"/><path d="M9 20h6M12 17v3" stroke="#00A4DC" stroke-width="2" fill="none"/><circle cx="12" cy="10.5" r="3" fill="#00A4DC"/></svg>',
+        jellyfinMobile: '<svg viewBox="0 0 24 24" width="20" height="20"><rect x="6" y="2" width="12" height="20" rx="2" fill="none" stroke="#00A4DC" stroke-width="2"/><circle cx="12" cy="17.5" r="1.3" fill="#00A4DC"/><circle cx="12" cy="9" r="2.6" fill="#00A4DC"/></svg>',
+        jellyfinTv: '<svg viewBox="0 0 24 24" width="20" height="20"><rect x="2" y="3" width="20" height="14" rx="2" fill="none" stroke="#00A4DC" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke="#00A4DC" stroke-width="2"/><circle cx="12" cy="10" r="3" fill="#00A4DC"/></svg>',
+        jellyfinDesktop: '<svg viewBox="0 0 24 24" width="20" height="20"><rect x="2" y="4" width="20" height="12" rx="1" fill="none" stroke="#00A4DC" stroke-width="2"/><path d="M8 20h8M12 16v4" stroke="#00A4DC" stroke-width="2"/><circle cx="12" cy="10" r="2.5" fill="#00A4DC"/></svg>',
+        chrome: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="#EA4335" stroke-width="6" stroke-dasharray="18.84 37.7" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="9" fill="none" stroke="#34A853" stroke-width="6" stroke-dasharray="18.84 37.7" stroke-dashoffset="-18.84" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="9" fill="none" stroke="#FBBC05" stroke-width="6" stroke-dasharray="18.84 37.7" stroke-dashoffset="-37.68" transform="rotate(-90 12 12)"/><circle cx="12" cy="12" r="4" fill="#4285F4" stroke="#fff" stroke-width="1"/></svg>',
+        edge: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#0078D7"/><path d="M4 13c2-5 8-7 12-4-3-1-7 0-8 4-1 3 1 6 5 6 2 0 4-1 5-3-1 4-5 6-9 5-4-1-6-5-5-8z" fill="#00B7C3"/></svg>',
+        firefox: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#FF9500"/><path d="M12 4c3 3 1 5 3 7 1 1 2 3 1 5-1 3-4 4-6 3 2 0 3-2 2-4-1 2-3 2-4 1-2-1-2-3-1-5 1 1 2 1 3 0-2-2-2-5 2-7z" fill="#D6270C"/></svg>',
+        safari: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#fff"/><circle cx="12" cy="12" r="10" fill="none" stroke="#3fa4dc" stroke-width="1.5"/><polygon points="12,4 14.2,12 12,12" fill="#ff3b30"/><polygon points="12,4 9.8,12 12,12" fill="#e2e2e2"/><polygon points="12,20 9.8,12 12,12" fill="#c7c7c7"/><polygon points="12,20 14.2,12 12,12" fill="#8e8e93"/></svg>',
+        brave: '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2l7 3v6c0 5-3 8.5-7 11-4-2.5-7-6-7-11V5z" fill="#FB542B"/><path d="M12 5l4 1.7v4.3c0 3-1.7 5.3-4 6.8-2.3-1.5-4-3.8-4-6.8V6.7z" fill="#fff" opacity="0.85"/></svg>',
+        android: '<svg viewBox="0 0 24 24" width="20" height="20" fill="#3ddc84"><path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0003 0-.5516.4482-.9998.9993-.9998.5516 0 .9997.4482.9997.9998 0 .5517-.4481 1.0003-.9997 1.0003m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0003 0-.5516.4482-.9998.9993-.9998.5516 0 .9998.4482.9998.9998 0 .5517-.4482 1.0003-.9998 1.0003m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4114 13.8533 8.167 12 8.167c-1.8533 0-3.5902.2444-5.1367.783L4.841 5.447a.416.416 0 00-.5676-.1521.416.416 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396" transform="translate(0,1) scale(0.85)"/></svg>',
+        androidTv: '<svg viewBox="0 0 24 24" width="20" height="20" fill="#3ddc84"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>',
+        apple: '<svg viewBox="0 0 24 24" width="20" height="20" fill="#a2aaad"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-1.98.6-2.62 1.35-.57.65-1.07 1.72-.94 2.74 1 .08 2.02-.49 2.64-1.24z"/></svg>',
+        windows: '<svg viewBox="0 0 24 24" width="20" height="20" fill="#00a4ef"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.95-1.801"/></svg>',
+        roku: '<svg viewBox="0 0 24 24" width="20" height="20" fill="#6c3c97"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-4.5H7.5V10H11v6zm4.5 0h-2V8h2c1.66 0 3 1.34 3 3s-1.34 3-3 3zm0-4h-1v2h1c.55 0 1-.45 1-1s-.45-1-1-1z"/></svg>',
+        firetv: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#232F3E"/><path d="M12 5c2 3 0 4 2 6 1 1 1 3 0 4-1 2-3 2-4 1 1 0 2-1 1-2-1 2-3 1-3-1 0-2 1-3 2-4-1 0-1-1 0-2 0 0 1-1 2-2z" fill="#FF9900"/></svg>',
+        chromecast: '<svg viewBox="0 0 24 24" width="20" height="20"><rect x="2" y="4" width="20" height="14" rx="2" fill="none" stroke="#9e9e9e" stroke-width="1.5"/><path d="M6 15a6 6 0 0 1 6-6" stroke="#4285F4" stroke-width="2" fill="none"/><path d="M6 15a9 9 0 0 1 9-9" stroke="#34A853" stroke-width="2" fill="none" opacity="0.9"/><circle cx="6" cy="15" r="1.6" fill="#EA4335"/></svg>',
+        appletv: '<svg viewBox="0 0 24 24" width="20" height="20"><rect x="2" y="5" width="20" height="12" rx="2" fill="#1d1d1f"/><circle cx="12" cy="11" r="3.2" fill="#fff"/></svg>',
+        tizen: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1428A0"/><ellipse cx="12" cy="12" rx="7" ry="4" fill="#fff"/><ellipse cx="12" cy="12" rx="3" ry="4" fill="#1428A0"/></svg>',
+        webos: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#A50034"/><circle cx="12" cy="12" r="5.5" fill="none" stroke="#fff" stroke-width="2"/><circle cx="17" cy="9" r="1.5" fill="#fff"/></svg>',
+        xbox: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#107C10"/><path d="M8 7c2 2 3 3.5 4 5 1-1.5 2-3 4-5 1.5 1 2.5 3 2.5 5-2-3-3.5-2-4.5-1-1 1-1.5 1.5-2 2-.5-.5-1-1-2-2-1-1-2.5-2-4.5 1 0-2 1-4 2.5-5z" fill="#fff"/></svg>',
+        playstation: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#003791"/><path d="M9 6.5v11l2-.7V8.3c0-.4.2-.6.6-.4.5.2.5.7.5 1.1v3.7c1.6.7 3-.1 3-1.9 0-2-1.4-3-3.4-3.7-1-.4-2-.6-2.7-.6zM15 15.5l2.5-.9c.7-.2.8-.6.2-.9l-2.7-1v1l1.3.5c.2.1.2.3 0 .3l-1.3.5v.5z" fill="#fff"/></svg>',
+        dlna: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="5" r="2" fill="#8a8a8a"/><circle cx="5" cy="18" r="2" fill="#8a8a8a"/><circle cx="19" cy="18" r="2" fill="#8a8a8a"/><path d="M12 7v6M12 13 6 16M12 13l6 3" stroke="#8a8a8a" stroke-width="1.5" fill="none"/></svg>',
+        swiftfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#0b1f3a"/><path d="M6 14c3 1 6 1 9-1-1 3-4 5-7 4.5C5.5 17 4.5 15 6 14z" fill="#FF6B57"/><path d="M8 9c3-2 7-2 10 0-2-.5-5 0-6.5 2C10 12.5 8.5 13 7 12.5 6 11.5 6.5 10 8 9z" fill="#34AADC"/></svg>',
+        finamp: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1DB5A6"/><path d="M14 6v8.2a2.6 2.6 0 1 1-1.5-2.4V9l-3 .7v6.2A2.6 2.6 0 1 1 8 13.5V8.5l6-1.4z" fill="#fff"/></svg>',
+        findroid: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#0F9D58"/><polygon points="9,7.5 17,12 9,16.5" fill="#fff"/></svg>',
+        streamyfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#8B5CF6"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/><circle cx="12" cy="12" r="10" fill="none" stroke="#EC4899" stroke-width="1"/></svg>',
+        moonfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#312E81"/><path d="M14.5 6.5A6 6 0 1 0 14.5 17.5 7 7 0 1 1 14.5 6.5z" fill="#C7D2FE"/></svg>',
+        infuse: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1173D4"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/></svg>',
+        kodi: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#17B2E7"/><path d="M8 7v10M8 12l5-5v5l-5 5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        generic: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 2v1h12v-1l-1-2h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/></svg>'
+    };
+
+    function detectBrowserBrand(str) {
+        if (!str) return null;
+        if (str.indexOf('edg') !== -1) return { key: 'edge', label: 'Edge', svg: BRAND_SVG.edge };
+        if (str.indexOf('brave') !== -1) return { key: 'brave', label: 'Brave', svg: BRAND_SVG.brave };
+        if (str.indexOf('firefox') !== -1) return { key: 'firefox', label: 'Firefox', svg: BRAND_SVG.firefox };
+        if (str.indexOf('chrome') !== -1) return { key: 'chrome', label: 'Chrome', svg: BRAND_SVG.chrome };
+        if (str.indexOf('safari') !== -1) return { key: 'safari', label: 'Safari', svg: BRAND_SVG.safari };
+        return null;
+    }
+
+    /**
+     * Resolves the correct locally-bundled brand icon for a session.
+     * Priority: exact Jellyfin application -> browser -> streaming/device platform -> operating system -> neutral fallback.
+     * Accepts either resolveClientBrand({client, deviceName, appVersion}) or legacy positional (clientName, deviceName).
+     */
+    function resolveClientBrand(input, legacyDeviceName) {
+        var clientName = '';
+        var deviceName = '';
+        if (typeof input === 'object' && input !== null) {
+            clientName = input.client || input.clientName || '';
+            deviceName = input.deviceName || '';
+        } else {
+            clientName = input || '';
+            deviceName = legacyDeviceName || '';
+        }
+
+        var c = String(clientName).toLowerCase();
+        var d = String(deviceName).toLowerCase();
+        var combined = (c + ' ' + d).trim();
+
+        function brand(key, label, svg) { return { key: key, label: label, svg: svg }; }
+
+        // 1. Exact third-party Jellyfin-application identity (overrides generic OS identity)
+        if (c.indexOf('swiftfin') !== -1) return brand('swiftfin', 'Swiftfin', BRAND_SVG.swiftfin);
+        if (c.indexOf('finamp') !== -1) return brand('finamp', 'Finamp', BRAND_SVG.finamp);
+        if (c.indexOf('findroid') !== -1) return brand('findroid', 'Findroid', BRAND_SVG.findroid);
+        if (c.indexOf('streamyfin') !== -1) return brand('streamyfin', 'Streamyfin', BRAND_SVG.streamyfin);
+        if (c.indexOf('moonfin') !== -1 || d.indexOf('moonfin') !== -1) return brand('moonfin', 'Moonfin', BRAND_SVG.moonfin);
+        if (c.indexOf('infuse') !== -1) return brand('infuse', 'Infuse', BRAND_SVG.infuse);
+        if (c.indexOf('kodi') !== -1) return brand('kodi', 'Kodi', BRAND_SVG.kodi);
+
+        // 1b. Official Jellyfin clients (exact application identity, then sub-variant, then browser override for Web)
+        if (c.indexOf('jellyfin') !== -1) {
+            if (combined.indexOf('android tv') !== -1 || combined.indexOf('androidtv') !== -1 || d.indexOf('shield') !== -1) {
+                return brand('jellyfin-androidtv', 'Jellyfin Android TV', BRAND_SVG.jellyfinTv);
+            }
+            if (c.indexOf('android') !== -1) return brand('jellyfin-android', 'Jellyfin Android', BRAND_SVG.jellyfinMobile);
+            // "Jellyfin Web" is unambiguous from the client name alone -- resolve it (and its
+            // browser override) BEFORE any device-name-based iOS/tvOS heuristics, since a web
+            // session's device name is the browser/platform string (e.g. "Safari iPhone") and
+            // must never be mistaken for the native Jellyfin iOS app.
+            if (c.indexOf('web') !== -1) {
+                var webBrowser = detectBrowserBrand(d);
+                if (webBrowser) return webBrowser;
+                return brand('jellyfin-web', 'Jellyfin Web', BRAND_SVG.jellyfinWeb);
+            }
+            if (c.indexOf('tvos') !== -1 || combined.indexOf('apple tv') !== -1) return brand('jellyfin-tvos', 'Jellyfin tvOS', BRAND_SVG.jellyfinTv);
+            if (c.indexOf('ios') !== -1) return brand('jellyfin-ios', 'Jellyfin iOS', BRAND_SVG.jellyfinMobile);
+            if (c.indexOf('media player') !== -1 || c.indexOf('desktop') !== -1 || c.indexOf('jmp') !== -1) {
+                return brand('jellyfin-desktop', 'Jellyfin Media Player', BRAND_SVG.jellyfinDesktop);
+            }
+            return brand('jellyfin', 'Jellyfin', BRAND_SVG.jellyfinWeb);
+        }
+
+        // 3. Streaming / TV device platforms
+        if (combined.indexOf('roku') !== -1) return brand('roku', 'Roku', BRAND_SVG.roku);
+        if (combined.indexOf('fire tv') !== -1 || combined.indexOf('firetv') !== -1) return brand('firetv', 'Fire TV', BRAND_SVG.firetv);
+        if (combined.indexOf('chromecast') !== -1 || combined.indexOf('google tv') !== -1) return brand('chromecast', 'Chromecast', BRAND_SVG.chromecast);
+        if (combined.indexOf('apple tv') !== -1) return brand('appletv', 'Apple TV', BRAND_SVG.appletv);
+        if (combined.indexOf('tizen') !== -1 || combined.indexOf('samsung') !== -1) return brand('tizen', 'Samsung Tizen', BRAND_SVG.tizen);
+        if (combined.indexOf('webos') !== -1 || combined.indexOf(' lg ') !== -1 || combined.indexOf(' lg') !== -1) return brand('webos', 'LG webOS', BRAND_SVG.webos);
+        if (combined.indexOf('xbox') !== -1) return brand('xbox', 'Xbox', BRAND_SVG.xbox);
+        if (combined.indexOf('playstation') !== -1 || combined.indexOf('ps4') !== -1 || combined.indexOf('ps5') !== -1) return brand('playstation', 'PlayStation', BRAND_SVG.playstation);
+        if (combined.indexOf('dlna') !== -1) return brand('dlna', 'DLNA', BRAND_SVG.dlna);
+
+        // 2. Browser (generic/third-party web clients not identified as "Jellyfin Web")
+        var browser = detectBrowserBrand(combined);
+        if (browser) return browser;
+
+        // 4. Operating system fallback
+        if (combined.indexOf('android tv') !== -1 || combined.indexOf('androidtv') !== -1) return brand('androidtv', 'Android TV', BRAND_SVG.androidTv);
+        if (combined.indexOf('android') !== -1) return brand('android', 'Android', BRAND_SVG.android);
+        if (combined.indexOf('ios') !== -1 || combined.indexOf('iphone') !== -1 || combined.indexOf('ipad') !== -1 || combined.indexOf('apple') !== -1) return brand('apple', 'Apple', BRAND_SVG.apple);
+        if (combined.indexOf('windows') !== -1) return brand('windows', 'Windows', BRAND_SVG.windows);
+
+        // 5. Neutral fallback
+        return brand('generic', 'Media Client', BRAND_SVG.generic);
+    }
+
     function getPlatformIconSvg(clientName, deviceName) {
-        var str = ((clientName || '') + ' ' + (deviceName || '')).toLowerCase();
-        if (str.indexOf('android tv') !== -1 || str.indexOf('androidtv') !== -1 || str.indexOf('moonfin') !== -1 || str.indexOf('fire tv') !== -1 || str.indexOf('shield') !== -1) {
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>';
-        }
-        if (str.indexOf('android') !== -1) {
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="#3ddc84"><path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0003 0-.5516.4482-.9998.9993-.9998.5516 0 .9997.4482.9997.9998 0 .5517-.4481 1.0003-.9997 1.0003m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0003 0-.5516.4482-.9998.9993-.9998.5516 0 .9998.4482.9998.9998 0 .5517-.4482 1.0003-.9998 1.0003m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4114 13.8533 8.167 12 8.167c-1.8533 0-3.5902.2444-5.1367.783L4.841 5.447a.416.416 0 00-.5676-.1521.416.416 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396"/></svg>';
-        }
-        if (str.indexOf('apple') !== -1 || str.indexOf('ios') !== -1 || str.indexOf('iphone') !== -1 || str.indexOf('ipad') !== -1 || str.indexOf('safari') !== -1) {
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="#a2aaad"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-1.98.6-2.62 1.35-.57.65-1.07 1.72-.94 2.74 1 .08 2.02-.49 2.64-1.24z"/></svg>';
-        }
-        if (str.indexOf('roku') !== -1) {
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="#6c3c97"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-4.5H7.5V10H11v6zm4.5 0h-2V8h2c1.66 0 3 1.34 3 3s-1.34 3-3 3zm0-4h-1v2h1c.55 0 1-.45 1-1s-.45-1-1-1z"/></svg>';
-        }
-        if (str.indexOf('windows') !== -1) {
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="#00a4ef"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.95-1.801"/></svg>';
-        }
-        if (str.indexOf('chrome') !== -1) {
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="#fbbc05"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.73A11.944 11.944 0 0 0 12 0zm-8.89 6.273A11.936 11.936 0 0 0 0 12c0 5.617 3.868 10.332 9.07 11.648l3.953-6.848a5.454 5.454 0 0 1-5.69-2.825zm14.39 3.018a5.454 5.454 0 0 1-.806 8.164L12.74 24C18.969 24 24 18.969 24 12.741c0-1.157-.164-2.276-.468-3.332zM12 7.636a4.364 4.364 0 1 0 0 8.728 4.364 4.364 0 0 0 0-8.728z"/></svg>';
-        }
-        // Default generic screen/player icon
-        return '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 2v1h12v-1l-1-2h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/></svg>';
+        return resolveClientBrand({ client: clientName, deviceName: deviceName }).svg;
     }
 
     function getApiClient() {
@@ -712,6 +844,11 @@
                 existing.id = CONTAINER_ID;
                 attachContainerEvents(existing);
             }
+            if (typeof existing.setAttribute === 'function') {
+                existing.setAttribute('data-playback-card-root', 'true');
+                existing.setAttribute('data-plugin-version', VERSION);
+                existing.setAttribute('data-asset-revision', ASSET_REVISION);
+            }
 
             // In-place replacement of the stock Devices widget
             if (typeof devicesSection.replaceWith === 'function') {
@@ -735,6 +872,11 @@
 
         // If existing is already mounted and no stock devices section is found
         if (existing && existing.parentNode) {
+            if (typeof existing.setAttribute === 'function') {
+                existing.setAttribute('data-playback-card-root', 'true');
+                existing.setAttribute('data-plugin-version', VERSION);
+                existing.setAttribute('data-asset-revision', ASSET_REVISION);
+            }
             cleanupLingeringStockDevices(existing);
             return existing;
         }
@@ -763,7 +905,8 @@
                 clientDevice += ' (v' + escapeHtml(session.ApplicationVersion) + ')';
             }
 
-            var platformIconSvg = getPlatformIconSvg(session.Client, session.DeviceName);
+            var clientBrand = resolveClientBrand({ client: session.Client, deviceName: session.DeviceName });
+            var platformIconSvg = clientBrand.svg;
 
             var item = session.NowPlayingItem || {};
             var playState = session.PlayState || {};
@@ -947,66 +1090,24 @@
                 cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> Reason not reported by server</div>';
             }
 
-            // Info Drawer Complete 22-Field Technical Breakdown
-            var hdrStatus = extractDynamicRangePill(videoStream) || 'SDR';
-            var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
-            var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
-
-            var gridRows = [
-                { key: 'User', val: escapeHtml(session.UserName || 'Not reported') },
-                { key: 'Client', val: escapeHtml(session.Client || 'Not reported') },
-                { key: 'Client Version', val: session.ApplicationVersion ? ('v' + escapeHtml(session.ApplicationVersion)) : 'Not reported' },
-                { key: 'Device', val: escapeHtml(session.DeviceName || session.Client || 'Not reported') },
-                { key: 'Playback State', val: isPaused ? 'Paused' : 'Playing' },
-                { key: 'Playback Method', val: escapeHtml(classification.badgeText) },
-                { key: 'Video Status', val: isVideoDirect === true ? 'Direct' : (isVideoDirect === false ? 'Transcode' : 'Not reported') },
-                { key: 'Video Source Codec', val: escapeHtml(sourceVideoCodec || 'Not reported') },
-                { key: 'Video Output Codec', val: escapeHtml(outputVideoCodec || (isVideoDirect === true ? (sourceVideoCodec || 'Direct (Source Codec)') : 'Not reported')) },
-                { key: 'Source Resolution', val: escapeHtml(sourceResolution || 'Not reported') },
-                { key: 'Output Resolution', val: escapeHtml(outputResolution || (isVideoDirect === true ? (sourceResolution || 'Direct') : 'Not reported')) },
-                { key: 'Frame Rate', val: escapeHtml(frameRateStr || 'Not reported') },
-                { key: 'HDR Status', val: escapeHtml(hdrStatus) },
-                { key: 'HDR to SDR Conversion', val: escapeHtml(hdrToSdrVal) },
-                { key: 'Audio Status', val: isAudioDirect === true ? 'Direct' : (isAudioDirect === false ? 'Transcode' : 'Not reported') },
-                { key: 'Audio Source Codec', val: escapeHtml(sourceAudioCodec || 'Not reported') },
-                { key: 'Audio Output Codec', val: escapeHtml(outputAudioCodec || (isAudioDirect === true ? (sourceAudioCodec || 'Direct (Source Codec)') : 'Not reported')) },
-                { key: 'Audio Channel Layout', val: escapeHtml(audioChannelsLayout || 'Not reported') },
-                { key: 'Source Container', val: escapeHtml(sourceContainer || 'Not reported') },
-                { key: 'Output Container', val: escapeHtml(outputContainer || (isVideoDirect === true && isAudioDirect === true ? (sourceContainer || 'Direct') : 'Not reported')) },
-                { key: 'Bitrate', val: escapeHtml(bitrateStr || 'Not reported') },
-                { key: 'Hardware Engine', val: escapeHtml(hardwareEngineStr || 'Not reported') },
-                { key: 'Transcode Reason', val: escapeHtml(serverReasons || 'Reason not reported by server'), fullWidth: true }
-            ];
-
-            var gridRowsHtml = gridRows.map(function (row) {
-                return '<div class="playback-info-row' + (row.fullWidth ? ' full-width' : '') + '">' +
-                    '<span class="playback-info-key">' + escapeHtml(row.key) + '</span>' +
-                    '<span class="playback-info-val">' + row.val + '</span>' +
-                '</div>';
-            }).join('');
-
-            var isDrawerOpen = (displayMode === 'extended') || Boolean(showAllDetails);
-            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isDrawerOpen ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle technical stream details">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
-
-            var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isDrawerOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
-                '<div class="playback-drawer-header">' +
-                    '<div class="playback-drawer-title-wrap">' +
-                        '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
-                        '<span class="playback-drawer-title">Technical Stream Details</span>' +
-                    '</div>' +
-                    '<button type="button" class="playback-drawer-close" data-action="close-info" aria-label="Close details">&times;</button>' +
-                '</div>' +
+            // Inline "Show Details" technical summary (global toggle, section 10) -- lightweight,
+            // NOT the full 26-field breakdown. The full breakdown lives in the singleton Info drawer.
+            var isSummaryOpen = (displayMode === 'extended') || Boolean(showAllDetails);
+            var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isSummaryOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
                 '<div class="playback-stream-badges">' +
                     '<span class="' + videoBadgeCls + '">' + escapeHtml(videoBadgeText) + '</span>' +
                     '<span class="' + audioBadgeCls + '">' + escapeHtml(audioBadgeText) + '</span>' +
                 '</div>' +
                 (metaParts.length > 0 ? '<div class="playback-details-row playback-extended-summary"><strong>Stream:</strong> ' + metaParts.join(' &bull; ') + '</div>' : '') +
                 cardWhyHtml +
-                '<div class="playback-info-grid">' +
-                    gridRowsHtml +
-                '</div>' +
             '</div>';
+
+            // Info button: opens the singleton modal Info drawer (section 14), never an inline panel.
+            state.cardSessionMap = state.cardSessionMap || {};
+            state.cardSessionMap[cardDomId] = session.Id || null;
+            var infoIsOpenForThisCard = Boolean(state.drawer && state.drawer.open && state.drawer.cardDomId === cardDomId);
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-haspopup="dialog" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="playback-drawer-panel" id="btn-info-' + cardDomId + '" title="View full technical stream details">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
             // Artwork
             var apiClient = getApiClient();
@@ -1017,18 +1118,18 @@
             var backdropStyle = backdropUrl ? ' style="background-image: url(\'' + escapeHtml(backdropUrl) + '\');"' : '';
             var posterHtml = '';
             if (posterUrl) {
-                posterHtml = '<img class="playback-poster" src="' + escapeHtml(posterUrl) + '" alt="' + title + '" onerror="this.parentNode.innerHTML=\'<div class=\\\'playback-poster-fallback\\\' aria-label=\\\'No artwork\\\'><svg viewBox=\\\'0 0 24 24\\\' width=\\\'24\\\' height=\\\'24\\\' fill=\\\'none\\\' stroke=\\\'currentColor\\\' stroke-width=\\\'1.5\\\'><rect x=\\\'2\\\' y=\\\'3\\\' width=\\\'20\\\' height=\\\'18\\\' rx=\\\'3\\\' stroke=\\\'currentColor\\\'/><path d=\\\'M7 3v18M17 3v18M2 9h20M2 15h20\\\' stroke=\\\'currentColor\\\'/></svg></div>\';" />';
+                posterHtml = '<img class="playback-poster" data-artwork-role="poster" src="' + escapeHtml(posterUrl) + '" alt="' + title + '" onerror="this.parentNode.innerHTML=\'<div class=\\\'playback-poster-fallback\\\' data-artwork-role=\\\'poster-fallback\\\' aria-label=\\\'No artwork\\\'><svg viewBox=\\\'0 0 24 24\\\' width=\\\'24\\\' height=\\\'24\\\' fill=\\\'none\\\' stroke=\\\'currentColor\\\' stroke-width=\\\'1.5\\\'><rect x=\\\'2\\\' y=\\\'3\\\' width=\\\'20\\\' height=\\\'18\\\' rx=\\\'3\\\' stroke=\\\'currentColor\\\'/><path d=\\\'M7 3v18M17 3v18M2 9h20M2 15h20\\\' stroke=\\\'currentColor\\\'/></svg></div>\';" />';
             } else {
                 state.artworkFallbackCount++;
-                posterHtml = '<div class="playback-poster-fallback" aria-label="No artwork"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20" stroke="currentColor"/></svg></div>';
+                posterHtml = '<div class="playback-poster-fallback" data-artwork-role="poster-fallback" aria-label="No artwork"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20" stroke="currentColor"/></svg></div>';
             }
 
-            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '">' +
-                '<div class="playback-card-backdrop"' + backdropStyle + '></div>' +
+            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-card="true" data-playback-method="' + escapeHtml(classification.method) + '">' +
+                '<div class="playback-card-backdrop" data-artwork-role="backdrop"' + backdropStyle + '></div>' +
                 '<div class="playback-card-inner">' +
                     '<div class="playback-card-header">' +
                         '<div class="playback-card-user-group">' +
-                            '<span class="playback-platform-icon" title="' + client + '">' + platformIconSvg + '</span>' +
+                            '<span class="playback-platform-icon" data-client-brand="' + escapeHtml(clientBrand.key) + '" title="' + client + '">' + platformIconSvg + '</span>' +
                             '<div class="playback-card-user-info">' +
                                 '<div class="playback-card-user">' + user + '</div>' +
                                 '<div class="playback-card-client">' + clientDevice + '</div>' +
@@ -1066,6 +1167,201 @@
         }
     }
 
+    function slugifyFieldKey(key) {
+        return String(key).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '');
+    }
+
+    function formatBitrate(bitsPerSecond) {
+        if (typeof bitsPerSecond !== 'number' || !isFinite(bitsPerSecond) || bitsPerSecond <= 0) return null;
+        if (bitsPerSecond >= 1000000) return (bitsPerSecond / 1000000).toFixed(1) + ' Mbps';
+        return Math.round(bitsPerSecond / 1000) + ' kbps';
+    }
+
+    /**
+     * Canonical telemetry model (section 8): normalizes a session exactly once so the
+     * Info drawer's full 26-field breakdown always agrees with the card/header.
+     */
+    function buildTelemetryModel(session) {
+        var item = (session && session.NowPlayingItem) || {};
+        var playStateM = (session && session.PlayState) || {};
+        var tInfo = session && session.TranscodingInfo;
+
+        var mediaStreams = item.MediaStreams || [];
+        var videoStream = null;
+        var audioStream = null;
+        for (var i = 0; i < mediaStreams.length; i++) {
+            if (!videoStream && mediaStreams[i].Type === 'Video') videoStream = mediaStreams[i];
+            if (!audioStream && mediaStreams[i].Type === 'Audio') audioStream = mediaStreams[i];
+        }
+
+        var classification = classifyPlaybackSession(session);
+        var isPaused = classification.isPaused;
+        var isVideoDirect = classification.isVideoDirect;
+        var isAudioDirect = classification.isAudioDirect;
+
+        var sourceVideoCodec = (videoStream && videoStream.Codec) ? videoStream.Codec.toUpperCase() : ((session && session.VideoCodec) ? session.VideoCodec.toUpperCase() : null);
+        var outputVideoCodec = (tInfo && tInfo.VideoCodec) ? tInfo.VideoCodec.toUpperCase() : (isVideoDirect === true ? sourceVideoCodec : null);
+
+        var sourceAudioCodec = (audioStream && audioStream.Codec) ? audioStream.Codec.toUpperCase() : ((session && session.AudioCodec) ? session.AudioCodec.toUpperCase() : null);
+        var outputAudioCodec = (tInfo && tInfo.AudioCodec) ? tInfo.AudioCodec.toUpperCase() : (isAudioDirect === true ? sourceAudioCodec : null);
+
+        var sourceResolution = (item.Width && item.Height) ? (item.Width + 'x' + item.Height) : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : null);
+        var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : ((session && session.Resolution) || (isVideoDirect === true ? sourceResolution : null));
+
+        var frameRateStr = getTruthfulFrameRate(session, item, videoStream);
+
+        var rawHw = tInfo ? tInfo.HardwareAccelerationType : (session && session.TranscodeEngine);
+        var hardwareEngineStr = extractTranscoderEngine(rawHw, isVideoDirect);
+
+        var containerVal = ((session && session.Container) || (tInfo && tInfo.Container) || item.Container || '').toUpperCase();
+        var sourceContainer = (item.Container || (session && session.Container) || containerVal || '').toUpperCase() || null;
+        var outputContainer = (tInfo && tInfo.Container) ? tInfo.Container.toUpperCase() : (isVideoDirect === true && isAudioDirect === true ? sourceContainer : null);
+
+        var videoBitrateStr = formatBitrate(videoStream && videoStream.BitRate);
+        var audioBitrateStr = formatBitrate(audioStream && audioStream.BitRate);
+        var overallBitrateStr = formatBitrate(tInfo && tInfo.Bitrate) ||
+            ((videoStream && videoStream.BitRate) || (audioStream && audioStream.BitRate)
+                ? formatBitrate((videoStream && videoStream.BitRate || 0) + (audioStream && audioStream.BitRate || 0))
+                : null);
+
+        var serverReasons = getTruthfulTranscodeReasons(session);
+        var hdrStatus = extractDynamicRangePill(videoStream) || (videoStream ? 'SDR' : null);
+        var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
+        var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
+
+        var subIndex = (playStateM.SubtitleStreamIndex != null) ? playStateM.SubtitleStreamIndex : ((session && session.SubtitleStreamIndex != null) ? session.SubtitleStreamIndex : -1);
+        var subtitleField = null;
+        if (subIndex !== -1 && subIndex != null) {
+            for (var s = 0; s < mediaStreams.length; s++) {
+                if (mediaStreams[s].Type === 'Subtitle' && (mediaStreams[s].Index === subIndex || subIndex === -2)) {
+                    var subS = mediaStreams[s];
+                    var subTitle = (subS.Title || subS.DisplayTitle || '').toLowerCase();
+                    var isCC = Boolean(subS.IsHearingImpaired) || subTitle.indexOf('sdh') !== -1 || subTitle.indexOf('cc') !== -1;
+                    var subLabel = subS.DisplayTitle || subS.Language || 'Subtitle';
+                    subtitleField = (isCC ? 'Closed Captions' : subLabel) + (subS.Codec ? ' (' + String(subS.Codec).toUpperCase() + ')' : '');
+                    break;
+                }
+            }
+        }
+
+        var clientBrand = resolveClientBrand({ client: session && session.Client, deviceName: session && session.DeviceName });
+
+        return {
+            session: session,
+            item: item,
+            tInfo: tInfo,
+            videoStream: videoStream,
+            audioStream: audioStream,
+            classification: classification,
+            isPaused: isPaused,
+            isVideoDirect: isVideoDirect,
+            isAudioDirect: isAudioDirect,
+            sourceVideoCodec: sourceVideoCodec,
+            outputVideoCodec: outputVideoCodec,
+            sourceAudioCodec: sourceAudioCodec,
+            outputAudioCodec: outputAudioCodec,
+            sourceResolution: sourceResolution,
+            outputResolution: outputResolution,
+            frameRateStr: frameRateStr,
+            hardwareEngineStr: hardwareEngineStr,
+            sourceContainer: sourceContainer,
+            outputContainer: outputContainer,
+            videoBitrateStr: videoBitrateStr,
+            audioBitrateStr: audioBitrateStr,
+            overallBitrateStr: overallBitrateStr,
+            serverReasons: serverReasons,
+            hdrStatus: hdrStatus,
+            hdrToSdrVal: hdrToSdrVal,
+            audioChannelsLayout: audioChannelsLayout,
+            subtitleField: subtitleField,
+            clientBrand: clientBrand
+        };
+    }
+
+    /**
+     * Builds the Info drawer's full, grouped 26-field technical breakdown (section 14) for one session.
+     * Pure function of the session -- safe to call independently of any card render/DOM state.
+     */
+    function buildDrawerContentHtml(session) {
+        if (!session || typeof session !== 'object') {
+            return '<div class="playback-drawer-empty">No session selected.</div>';
+        }
+
+        var m = buildTelemetryModel(session);
+        var c = m.classification;
+
+        function row(key, val) {
+            return { key: key, val: val };
+        }
+
+        var groups = [
+            {
+                title: 'Playback',
+                rows: [
+                    row('User', escapeHtml(m.session.UserName || 'Not reported')),
+                    row('Client', escapeHtml(m.session.Client || 'Not reported')),
+                    row('Client Version', m.session.ApplicationVersion ? ('v' + escapeHtml(m.session.ApplicationVersion)) : 'Not reported'),
+                    row('Device', escapeHtml(m.session.DeviceName || m.session.Client || 'Not reported')),
+                    row('Playback State', m.isPaused ? 'Paused' : 'Playing'),
+                    row('Playback Method', escapeHtml(c.badgeText))
+                ]
+            },
+            {
+                title: 'Video',
+                rows: [
+                    row('Video Status', m.isVideoDirect === true ? 'Direct' : (m.isVideoDirect === false ? 'Transcode' : 'Not reported')),
+                    row('Source Video Codec', escapeHtml(m.sourceVideoCodec || 'Not reported')),
+                    row('Output Video Codec', escapeHtml(m.outputVideoCodec || (m.isVideoDirect === true ? (m.sourceVideoCodec || 'Direct (Source Codec)') : 'Not reported'))),
+                    row('Source Resolution', escapeHtml(m.sourceResolution || 'Not reported')),
+                    row('Output Resolution', escapeHtml(m.outputResolution || (m.isVideoDirect === true ? (m.sourceResolution || 'Direct') : 'Not reported'))),
+                    row('Frame Rate', escapeHtml(m.frameRateStr || 'Not reported')),
+                    row('HDR Status', escapeHtml(m.hdrStatus || 'Not reported')),
+                    row('Tone Mapping / HDR Conversion', escapeHtml(m.hdrToSdrVal))
+                ]
+            },
+            {
+                title: 'Audio',
+                rows: [
+                    row('Audio Status', m.isAudioDirect === true ? 'Direct' : (m.isAudioDirect === false ? 'Transcode' : 'Not reported')),
+                    row('Source Audio Codec', escapeHtml(m.sourceAudioCodec || 'Not reported')),
+                    row('Output Audio Codec', escapeHtml(m.outputAudioCodec || (m.isAudioDirect === true ? (m.sourceAudioCodec || 'Direct (Source Codec)') : 'Not reported'))),
+                    row('Audio Channels / Layout', escapeHtml(m.audioChannelsLayout || 'Not reported')),
+                    row('Audio Bitrate', escapeHtml(m.audioBitrateStr || 'Not reported'))
+                ]
+            },
+            {
+                title: 'Stream',
+                rows: [
+                    row('Source Container', escapeHtml(m.sourceContainer || 'Not reported')),
+                    row('Output Container', escapeHtml(m.outputContainer || (m.isVideoDirect === true && m.isAudioDirect === true ? (m.sourceContainer || 'Direct') : 'Not reported'))),
+                    row('Video Bitrate', escapeHtml(m.videoBitrateStr || 'Not reported')),
+                    row('Overall Stream Bitrate', escapeHtml(m.overallBitrateStr || 'Not reported')),
+                    row('Hardware Engine', escapeHtml(m.hardwareEngineStr || 'Not reported')),
+                    row('Transcode Reason', escapeHtml(m.serverReasons || (c.method === 'Transcode' ? 'Reason not reported by server' : 'Not reported')))
+                ]
+            },
+            {
+                title: 'Subtitles',
+                rows: [
+                    row('Subtitle Stream / Language', escapeHtml(m.subtitleField || 'None'))
+                ]
+            }
+        ];
+
+        return groups.map(function (group) {
+            var rowsHtml = group.rows.map(function (r) {
+                return '<div class="playback-info-row" data-drawer-field="' + slugifyFieldKey(r.key) + '">' +
+                    '<span class="playback-info-key">' + escapeHtml(r.key) + '</span>' +
+                    '<span class="playback-info-val">' + r.val + '</span>' +
+                '</div>';
+            }).join('');
+            return '<div class="playback-drawer-group">' +
+                '<h4 class="playback-drawer-group-title">' + escapeHtml(group.title) + '</h4>' +
+                '<div class="playback-info-grid">' + rowsHtml + '</div>' +
+            '</div>';
+        }).join('');
+    }
+
     function calculateSessionCounts(sessions) {
         var counts = { total: Array.isArray(sessions) ? sessions.length : 0, directPlay: 0, remux: 0, directStream: 0, transcode: 0, paused: 0 };
         if (!Array.isArray(sessions)) return counts;
@@ -1092,7 +1388,8 @@
         var device = escapeHtml(session.DeviceName || client);
         var user = escapeHtml(session.UserName || 'Unknown User');
         var version = session.ApplicationVersion ? ('v' + escapeHtml(session.ApplicationVersion)) : '';
-        var platformIcon = getPlatformIconSvg(session.Client, session.DeviceName);
+        var deviceClientBrand = resolveClientBrand({ client: session.Client, deviceName: session.DeviceName });
+        var platformIcon = deviceClientBrand.svg;
         var lastActive = formatRelativeTime(session.LastActivityDate);
 
         var isPlaying = Boolean(session.NowPlayingItem || session.MediaTitle);
@@ -1109,8 +1406,8 @@
             playStatus = '<span class="playback-device-status status-idle">Idle &bull; ' + escapeHtml(lastActive) + '</span>';
         }
 
-        return '<div class="playback-device-card" data-device-id="' + escapeHtml(session.Id || '') + '">' +
-            '<div class="playback-device-icon" title="' + client + '">' + platformIcon + '</div>' +
+        return '<div class="playback-device-card" data-connected-device-card="true">' +
+            '<div class="playback-device-icon" data-client-brand="' + escapeHtml(deviceClientBrand.key) + '" title="' + client + '">' + platformIcon + '</div>' +
             '<div class="playback-device-info">' +
                 '<div class="playback-device-top-row">' +
                     '<span class="playback-device-name">' + device + '</span>' +
@@ -1132,6 +1429,15 @@
             ? allSessions
             : (Array.isArray(state.allSessions) && state.allSessions.length > 0 ? state.allSessions : activeSessions);
 
+        // Keep state in sync with whatever was just rendered, so the Info drawer (which
+        // looks sessions up by ID via state, independent of the calling render pass) can
+        // always find the currently-open session regardless of which code path rendered it.
+        state.activeSessions = activeSessions;
+        state.allSessions = connectedSessions;
+
+        // Reset per-render card->session correlation map (rebuilt below as each card renders).
+        state.cardSessionMap = {};
+
         var counts = calculateSessionCounts(activeSessions);
         var isCompact = (state.displayMode === 'compact');
 
@@ -1143,11 +1449,11 @@
                 '</h2>' +
                 '<div class="playback-live-indicator"><span class="playback-live-dot"></span> Live</div>' +
                 '<div class="playback-dashboard-counts">' +
-                    '<span class="playback-count-chip count-dp"><span class="count-val">' + counts.directPlay + '</span> Direct Play</span>' +
-                    (counts.remux > 0 ? '<span class="playback-count-chip count-remux"><span class="count-val">' + counts.remux + '</span> Remux</span>' : '') +
-                    '<span class="playback-count-chip count-ds"><span class="count-val">' + counts.directStream + '</span> Direct Stream</span>' +
-                    '<span class="playback-count-chip count-tc"><span class="count-val">' + counts.transcode + '</span> Transcode</span>' +
-                    (counts.paused > 0 ? '<span class="playback-count-chip count-paused"><span class="count-val">' + counts.paused + '</span> Paused</span>' : '') +
+                    '<span class="playback-count-chip count-dp" data-count-method="directPlay" data-count-value="' + counts.directPlay + '"><span class="count-val">' + counts.directPlay + '</span> Direct Play</span>' +
+                    '<span class="playback-count-chip count-ds" data-count-method="directStream" data-count-value="' + counts.directStream + '"><span class="count-val">' + counts.directStream + '</span> Direct Stream</span>' +
+                    '<span class="playback-count-chip count-remux" data-count-method="remux" data-count-value="' + counts.remux + '"><span class="count-val">' + counts.remux + '</span> Remux</span>' +
+                    '<span class="playback-count-chip count-tc" data-count-method="transcode" data-count-value="' + counts.transcode + '"><span class="count-val">' + counts.transcode + '</span> Transcode</span>' +
+                    (counts.paused > 0 ? '<span class="playback-count-chip count-paused" data-count-method="paused" data-count-value="' + counts.paused + '"><span class="count-val">' + counts.paused + '</span> Paused</span>' : '') +
                 '</div>' +
             '</div>' +
             '<div class="playback-dashboard-controls">' +
@@ -1191,6 +1497,229 @@
         }
 
         container.innerHTML = headerHtml + contentHtml + connectedDevicesHtml;
+
+        // The Info drawer is a singleton mounted outside this container's innerHTML,
+        // so it must be (re)synced explicitly on every render/poll cycle instead of
+        // being torn down and rebuilt with the cards above it.
+        ensureDrawerMounted();
+        updateDrawerIfOpen(activeSessions, connectedSessions);
+    }
+
+    function findSessionById(sessionId) {
+        if (!sessionId) return null;
+        var pools = [state.activeSessions, state.allSessions];
+        for (var p = 0; p < pools.length; p++) {
+            var arr = pools[p];
+            if (!Array.isArray(arr)) continue;
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] && arr[i].Id === sessionId) return arr[i];
+            }
+        }
+        return null;
+    }
+
+    function renderDrawerContent(panel, session) {
+        if (!panel || typeof panel.querySelector !== 'function') return;
+        var identityEl = panel.querySelector('#playback-drawer-identity');
+        var bodyEl = panel.querySelector('#playback-drawer-body');
+        if (!session) {
+            if (bodyEl) bodyEl.innerHTML = '<div class="playback-drawer-empty">This session has ended.</div>';
+            if (identityEl) identityEl.innerHTML = '';
+            return;
+        }
+        var brand = resolveClientBrand({ client: session.Client, deviceName: session.DeviceName });
+        if (identityEl) {
+            identityEl.innerHTML =
+                '<span class="playback-platform-icon" data-client-brand="' + escapeHtml(brand.key) + '">' + brand.svg + '</span>' +
+                '<span class="playback-drawer-identity-text">' + escapeHtml(session.UserName || 'Unknown User') + ' &bull; ' + escapeHtml(session.Client || 'Playback Client') + '</span>';
+        }
+        if (bodyEl) bodyEl.innerHTML = buildDrawerContentHtml(session);
+    }
+
+    function lockBodyScroll() {
+        if (typeof document === 'undefined' || !document.body || !document.body.style) return;
+        if (state.drawerBodyOverflowSaved == null) {
+            state.drawerBodyOverflowSaved = document.body.style.overflow || '';
+        }
+        document.body.style.overflow = 'hidden';
+    }
+
+    function unlockBodyScroll() {
+        if (typeof document === 'undefined' || !document.body || !document.body.style) return;
+        document.body.style.overflow = state.drawerBodyOverflowSaved || '';
+        state.drawerBodyOverflowSaved = null;
+    }
+
+    function trapDrawerFocus(e) {
+        if (typeof document === 'undefined') return;
+        var panel = document.getElementById(DRAWER_PANEL_ID);
+        if (!panel || typeof panel.querySelectorAll !== 'function') return;
+        var focusable = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (!focusable || focusable.length === 0) return;
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        var active = document.activeElement;
+        if (e.shiftKey) {
+            if (active === first || active === panel) {
+                e.preventDefault();
+                if (typeof last.focus === 'function') last.focus();
+            }
+        } else if (active === last) {
+            e.preventDefault();
+            if (typeof first.focus === 'function') first.focus();
+        }
+    }
+
+    /**
+     * Mounts the singleton Info drawer (overlay + dialog panel) under document.body exactly once.
+     * Idempotent: safe to call on every render. The overlay/panel nodes are never recreated --
+     * only their content is refreshed in place -- so the drawer survives polling re-renders.
+     */
+    function ensureDrawerMounted() {
+        if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return null;
+
+        var panel = document.getElementById(DRAWER_PANEL_ID);
+        if (panel) return panel;
+        if (typeof document.createElement !== 'function' || !document.body || typeof document.body.appendChild !== 'function') {
+            return null;
+        }
+
+        var overlay = document.createElement('div');
+        overlay.id = DRAWER_OVERLAY_ID;
+
+        panel = document.createElement('div');
+        panel.id = DRAWER_PANEL_ID;
+        if (typeof panel.setAttribute === 'function') {
+            panel.setAttribute('role', 'dialog');
+            panel.setAttribute('aria-modal', 'true');
+            panel.setAttribute('aria-labelledby', 'playback-drawer-title-label');
+            panel.setAttribute('tabindex', '-1');
+        }
+        panel.innerHTML =
+            '<div class="playback-drawer-header">' +
+                '<div class="playback-drawer-title-wrap">' +
+                    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
+                    '<span class="playback-drawer-title" id="playback-drawer-title-label">Technical Stream Details</span>' +
+                '</div>' +
+                '<button type="button" class="playback-drawer-close" data-action="close-info" aria-label="Close details">&times;</button>' +
+            '</div>' +
+            '<div class="playback-drawer-identity" id="playback-drawer-identity"></div>' +
+            '<div class="playback-drawer-body" id="playback-drawer-body"></div>';
+
+        document.body.appendChild(overlay);
+        document.body.appendChild(panel);
+
+        if (typeof panel.addEventListener === 'function') {
+            panel.addEventListener('keydown', function (e) {
+                if (e.key === 'Tab' || e.keyCode === 9) trapDrawerFocus(e);
+            });
+        }
+
+        return panel;
+    }
+
+    /**
+     * Opens the singleton Info drawer for the session bound to a given card. Only one session
+     * can be shown at a time; opening a different card's Info re-targets the same drawer.
+     */
+    function openInfoDrawer(cardDomId, triggerEl) {
+        var sessionId = state.cardSessionMap && state.cardSessionMap[cardDomId];
+        if (!sessionId) return false;
+
+        var panel = ensureDrawerMounted();
+        var overlay = (typeof document !== 'undefined' && typeof document.getElementById === 'function') ? document.getElementById(DRAWER_OVERLAY_ID) : null;
+
+        state.drawer.open = true;
+        state.drawer.sessionId = sessionId;
+        state.drawer.cardDomId = cardDomId;
+        state.drawer.missingPolls = 0;
+        state.drawer.lastFocusEl = triggerEl ||
+            (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('btn-info-' + cardDomId) : null);
+
+        renderDrawerContent(panel, findSessionById(sessionId));
+
+        if (panel && panel.classList && typeof panel.classList.add === 'function') panel.classList.add('open');
+        if (overlay && overlay.classList && typeof overlay.classList.add === 'function') overlay.classList.add('open');
+
+        lockBodyScroll();
+
+        if (panel && typeof panel.focus === 'function') {
+            try { panel.focus(); } catch (_) {}
+        }
+
+        return true;
+    }
+
+    /**
+     * Closes the Info drawer. Only called from: the close button, a backdrop click, Escape,
+     * or confirmed session disappearance after DRAWER_MISSING_POLL_TOLERANCE consecutive polls.
+     * Never called as a side effect of normal polling/rerendering while the session still exists.
+     */
+    function closeInfoDrawer(restoreFocus) {
+        if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+            var panel = document.getElementById(DRAWER_PANEL_ID);
+            var overlay = document.getElementById(DRAWER_OVERLAY_ID);
+            if (panel && panel.classList && typeof panel.classList.remove === 'function') panel.classList.remove('open');
+            if (overlay && overlay.classList && typeof overlay.classList.remove === 'function') overlay.classList.remove('open');
+        }
+        unlockBodyScroll();
+
+        var storedFocusEl = state.drawer.lastFocusEl;
+        var cardDomId = state.drawer.cardDomId;
+        state.drawer.open = false;
+        state.drawer.sessionId = null;
+        state.drawer.cardDomId = null;
+        state.drawer.missingPolls = 0;
+        state.drawer.lastFocusEl = null;
+
+        if (restoreFocus === false) return;
+
+        // The stored trigger element goes stale the moment a poll/re-render rebuilds the
+        // cards grid (container.innerHTML replaces every node), so prefer it only while
+        // still attached, and otherwise re-resolve the button fresh by its stable DOM id.
+        var focusTarget = (storedFocusEl && storedFocusEl.isConnected) ? storedFocusEl : null;
+        if (!focusTarget && cardDomId && typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+            focusTarget = document.getElementById('btn-info-' + cardDomId);
+        }
+        if (focusTarget && typeof focusTarget.focus === 'function') {
+            try { focusTarget.focus(); } catch (_) {}
+        }
+    }
+
+    /**
+     * Re-syncs the open drawer's content on every poll/render cycle. Session still present ->
+     * update values in place (fields only, never the overlay/panel nodes). Session missing ->
+     * increment a tolerance counter and only close after it is exceeded, so one dropped poll
+     * or reordering of the sessions array can never silently close the drawer.
+     */
+    function updateDrawerIfOpen(activeSessions, allSessions) {
+        if (!state.drawer.open) return;
+
+        var session = null;
+        var pools = [activeSessions, allSessions];
+        for (var p = 0; p < pools.length && !session; p++) {
+            var arr = pools[p];
+            if (!Array.isArray(arr)) continue;
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] && arr[i].Id === state.drawer.sessionId) {
+                    session = arr[i];
+                    break;
+                }
+            }
+        }
+
+        if (session) {
+            state.drawer.missingPolls = 0;
+            if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+                renderDrawerContent(document.getElementById(DRAWER_PANEL_ID), session);
+            }
+            return;
+        }
+
+        state.drawer.missingPolls++;
+        if (state.drawer.missingPolls > DRAWER_MISSING_POLL_TOLERANCE) {
+            closeInfoDrawer(true);
+        }
     }
 
     function attachContainerEvents(container) {
@@ -1222,62 +1751,41 @@
                 return;
             }
 
-            // Toggle single card info drawer
+            // Info button always opens (or refocuses) the singleton modal Info drawer for this card.
             var infoBtn = target.closest('[data-action="toggle-info"]');
             if (infoBtn) {
-                var controlsId = infoBtn.getAttribute('aria-controls');
-                if (controlsId) {
-                    var panel = document.getElementById(controlsId);
-                    if (panel) {
-                        var isOpen = panel.classList.contains('open');
-                        if (isOpen) {
-                            panel.classList.remove('open');
-                            infoBtn.setAttribute('aria-expanded', 'false');
-                        } else {
-                            panel.classList.add('open');
-                            infoBtn.setAttribute('aria-expanded', 'true');
-                            var closeBtn = panel.querySelector('[data-action="close-info"]');
-                            if (closeBtn && typeof closeBtn.focus === 'function') {
-                                closeBtn.focus();
-                            }
-                        }
-                    }
+                var cardId = infoBtn.getAttribute('data-card-id');
+                if (cardId) {
+                    openInfoDrawer(cardId, infoBtn);
+                    renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 }
                 return;
             }
 
-            // Close single card info drawer via close button
+            // Drawer close button (delegated -- the drawer itself lives outside this container).
             var drawerCloseBtn = target.closest('[data-action="close-info"]');
             if (drawerCloseBtn) {
-                var panelToClose = drawerCloseBtn.closest('.playback-details-panel');
-                if (panelToClose) {
-                    panelToClose.classList.remove('open');
-                    var panelId = panelToClose.id;
-                    var trig = container.querySelector('[aria-controls="' + panelId + '"]');
-                    if (trig) {
-                        trig.setAttribute('aria-expanded', 'false');
-                        if (typeof trig.focus === 'function') trig.focus();
-                    }
-                }
+                closeInfoDrawer(true);
+                renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 return;
             }
         });
 
-        // Global Escape key listener to close drawer and restore focus
-        if (typeof document !== 'undefined' && !container._playbackEscBound) {
-            container._playbackEscBound = true;
+        // Drawer backdrop click-to-close and Escape-to-close are bound once globally,
+        // not per container, since the drawer is a page-level singleton.
+        if (typeof document !== 'undefined' && !global.__playbackCardDrawerEventsBound) {
+            global.__playbackCardDrawerEventsBound = true;
+            document.addEventListener('click', function (e) {
+                if (!state.drawer.open) return;
+                var t = e.target;
+                if (t && typeof t.closest === 'function' && t.id === DRAWER_OVERLAY_ID) {
+                    closeInfoDrawer(true);
+                }
+            });
             document.addEventListener('keydown', function (e) {
+                if (!state.drawer.open) return;
                 if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
-                    var openPanels = container.querySelectorAll('.playback-details-panel.open');
-                    for (var i = 0; i < openPanels.length; i++) {
-                        var p = openPanels[i];
-                        p.classList.remove('open');
-                        var trigBtn = container.querySelector('[aria-controls="' + p.id + '"]');
-                        if (trigBtn) {
-                            trigBtn.setAttribute('aria-expanded', 'false');
-                            if (typeof trigBtn.focus === 'function') trigBtn.focus();
-                        }
-                    }
+                    closeInfoDrawer(true);
                 }
             });
         }
@@ -1463,6 +1971,14 @@
         isHdrToSdr: isHdrToSdr,
         resolveArtworkUrls: resolveArtworkUrls,
         getPlatformIconSvg: getPlatformIconSvg,
+        resolveClientBrand: resolveClientBrand,
+        buildTelemetryModel: buildTelemetryModel,
+        buildDrawerContentHtml: buildDrawerContentHtml,
+        ensureDrawerMounted: ensureDrawerMounted,
+        openInfoDrawer: openInfoDrawer,
+        closeInfoDrawer: closeInfoDrawer,
+        updateDrawerIfOpen: updateDrawerIfOpen,
+        findSessionById: findSessionById,
         startPolling: startPolling,
         stopPolling: stopPolling,
         pollSessions: pollSessions,
