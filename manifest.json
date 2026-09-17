@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.4.1",
+        "changelog": "Release v0.2.4.1 - Singleton Info drawer that survives polling (fixes Info closing itself every 3s), real brand-accurate client logos (Chrome/Safari/Edge/Firefox/Brave and ~20 third-party/device clients replacing single-color placeholders), Remux/DirectPlay no longer show the Transcode-only \"Reason not reported by server\" text, corrected header method-count chip order (Direct Play/Direct Stream/Remux/Transcode/Paused, Remux always shown), expanded 26-field grouped technical breakdown, extended artwork fallback chain, and removal of a raw session-ID DOM leak in Connected Devices.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.4.1/jellyfin-plugin-playbackcard.zip",
+        "checksum": "9514fd5677c82188ac9527e23a9337ab",
+        "timestamp": "2026-09-17T19:23:15Z"
+      },
+      {
         "version": "0.2.4.0",
         "changelog": "Release v0.2.4.0 - Corrective patch: complete in-place replacement of Jellyfin 12.1 Devices widget with strict exclusion of navigation drawer links, zero top-of-page fallback, connected devices preservation, and accessible 22-field technical breakdown drawer with distinct Source/Output resolution and container telemetry.",
         "targetAbi": "10.9.0.0",
