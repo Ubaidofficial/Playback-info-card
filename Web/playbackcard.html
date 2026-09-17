@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.3.7</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.4.0</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -262,7 +262,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.3.7</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.4.0</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -1490,7 +1490,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.3.7';
+    var PLUGIN_VERSION = '0.2.4.0';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -2119,7 +2119,7 @@
             var outputAudioCodec = (tInfo && tInfo.AudioCodec) ? tInfo.AudioCodec.toUpperCase() : (isAudioDirect === true ? sourceAudioCodec : null);
 
             var sourceResolution = (item.Width && item.Height) ? (item.Width + 'x' + item.Height) : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : null);
-            var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : (session.Resolution || sourceResolution);
+            var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : (session.Resolution || (isVideoDirect === true ? sourceResolution : null));
 
             var frameRateStr = getTruthfulFrameRate(session, item, videoStream);
 
@@ -2132,6 +2132,9 @@
             } else if (videoStream && typeof videoStream.BitRate === 'number' && isFinite(videoStream.BitRate) && videoStream.BitRate > 0) {
                 bitrateStr = (videoStream.BitRate / 1000000).toFixed(1) + ' Mbps';
             }
+
+            var sourceContainer = (item.Container || session.Container || containerVal || '').toUpperCase() || null;
+            var outputContainer = (tInfo && tInfo.Container) ? tInfo.Container.toUpperCase() : (classification.isRemux ? (tInfo && tInfo.Container ? tInfo.Container.toUpperCase() : null) : (isVideoDirect === true && isAudioDirect === true ? sourceContainer : null));
 
             var containerConversionHtml = '';
             if (item.Container && tInfo && tInfo.Container && item.Container.toLowerCase() !== tInfo.Container.toLowerCase()) {
@@ -2159,7 +2162,7 @@
                 cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> Reason not reported by server</div>';
             }
 
-            // Info Drawer Complete 21-Field Technical Breakdown
+            // Info Drawer Complete 22-Field Technical Breakdown
             var hdrStatus = extractDynamicRangePill(videoStream) || 'SDR';
             var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
             var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
@@ -2173,16 +2176,18 @@
                 { key: 'Playback Method', val: escapeHtml(classification.badgeText) },
                 { key: 'Video Status', val: isVideoDirect === true ? 'Direct' : (isVideoDirect === false ? 'Transcode' : 'Not reported') },
                 { key: 'Video Source Codec', val: escapeHtml(sourceVideoCodec || 'Not reported') },
-                { key: 'Video Output Codec', val: escapeHtml(outputVideoCodec || (isVideoDirect === true ? 'Direct (Source Codec)' : 'Not reported')) },
-                { key: 'Video Resolution', val: escapeHtml(outputResolution || sourceResolution || 'Not reported') },
+                { key: 'Video Output Codec', val: escapeHtml(outputVideoCodec || (isVideoDirect === true ? (sourceVideoCodec || 'Direct (Source Codec)') : 'Not reported')) },
+                { key: 'Source Resolution', val: escapeHtml(sourceResolution || 'Not reported') },
+                { key: 'Output Resolution', val: escapeHtml(outputResolution || (isVideoDirect === true ? (sourceResolution || 'Direct') : 'Not reported')) },
                 { key: 'Frame Rate', val: escapeHtml(frameRateStr || 'Not reported') },
                 { key: 'HDR Status', val: escapeHtml(hdrStatus) },
                 { key: 'HDR to SDR Conversion', val: escapeHtml(hdrToSdrVal) },
                 { key: 'Audio Status', val: isAudioDirect === true ? 'Direct' : (isAudioDirect === false ? 'Transcode' : 'Not reported') },
                 { key: 'Audio Source Codec', val: escapeHtml(sourceAudioCodec || 'Not reported') },
-                { key: 'Audio Output Codec', val: escapeHtml(outputAudioCodec || (isAudioDirect === true ? 'Direct (Source Codec)' : 'Not reported')) },
+                { key: 'Audio Output Codec', val: escapeHtml(outputAudioCodec || (isAudioDirect === true ? (sourceAudioCodec || 'Direct (Source Codec)') : 'Not reported')) },
                 { key: 'Audio Channel Layout', val: escapeHtml(audioChannelsLayout || 'Not reported') },
-                { key: 'Container', val: containerConversionHtml || escapeHtml(containerVal || 'Not reported') },
+                { key: 'Source Container', val: escapeHtml(sourceContainer || 'Not reported') },
+                { key: 'Output Container', val: escapeHtml(outputContainer || (isVideoDirect === true && isAudioDirect === true ? (sourceContainer || 'Direct') : 'Not reported')) },
                 { key: 'Bitrate', val: escapeHtml(bitrateStr || 'Not reported') },
                 { key: 'Hardware Engine', val: escapeHtml(hardwareEngineStr || 'Not reported') },
                 { key: 'Transcode Reason', val: escapeHtml(serverReasons || 'Reason not reported by server'), fullWidth: true }

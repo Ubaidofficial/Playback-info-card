@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.3.7 Test Suite', () => {
+describe('Playback Info Card v0.2.4.0 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,9 +36,9 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.3.7', () => {
-            assert.equal(controller.version, '0.2.3.7');
-            assert.equal(controller.diagState.pluginVersion, '0.2.3.7');
+        it('initializes with default waiting state and version 0.2.4.0', () => {
+            assert.equal(controller.version, '0.2.4.0');
+            assert.equal(controller.diagState.pluginVersion, '0.2.4.0');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -174,7 +174,7 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.3.7');
+            assert.equal(report.pluginVersion, '0.2.4.0');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +222,7 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.3.7',
+                pluginVersion: '0.2.4.0',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -629,7 +629,7 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
         });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.3.7)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.4.0)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -667,10 +667,10 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.3.7', () => {
+        it('initializes with version 0.2.4.0', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.3.7');
-            assert.equal(dash.state.version, '0.2.3.7');
+            assert.equal(dash.version, '0.2.4.0');
+            assert.equal(dash.state.version, '0.2.4.0');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -859,6 +859,90 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
             assert.equal(removeChildCalled, true, 'Stock 12.1 DevicesWidget removed from DOM');
             assert.equal(devicesWidgetBox.style.display, 'none', 'Stock 12.1 DevicesWidget display set to none');
             assert.equal(devicesWidgetBox.parentNode, null, 'Stock 12.1 DevicesWidget unparented');
+        });
+
+        it('strictly excludes navigation drawer/sidebar items and finds the real Devices widget inside main', () => {
+            let replacedInMain = false;
+
+            const navDrawer = {
+                tagName: 'NAV',
+                className: 'MuiDrawer-root',
+                closest: (sel) => (sel.includes('.MuiDrawer-root') || sel.includes('nav') ? navDrawer : null)
+            };
+
+            const drawerDevicesLink = {
+                tagName: 'A',
+                href: '/dashboard/devices',
+                className: 'MuiListItemButton-root',
+                parentElement: navDrawer,
+                parentNode: navDrawer,
+                closest: (sel) => (sel.includes('.MuiDrawer-root') || sel.includes('nav') ? navDrawer : null)
+            };
+
+            const mainLayoutStack = {
+                tagName: 'DIV',
+                className: 'MuiStack-root',
+                children: []
+            };
+
+            const realDevicesWidget = {
+                tagName: 'DIV',
+                className: 'MuiBox-root stock-devices-box',
+                parentElement: mainLayoutStack,
+                parentNode: mainLayoutStack,
+                style: { display: 'block' },
+                closest: () => null,
+                querySelectorAll: () => []
+            };
+
+            const realHeading = {
+                tagName: 'H2',
+                textContent: 'Devices',
+                parentElement: realDevicesWidget,
+                parentNode: realDevicesWidget,
+                closest: () => null
+            };
+
+            mainLayoutStack.children = [realDevicesWidget];
+            mainLayoutStack.insertBefore = (newNode, refNode) => {
+                if (refNode === realDevicesWidget) {
+                    replacedInMain = true;
+                    newNode.parentNode = mainLayoutStack;
+                }
+            };
+            mainLayoutStack.removeChild = (child) => {
+                child.parentNode = null;
+            };
+
+            const mockDoc = {
+                getElementById: (id) => null,
+                querySelector: () => null,
+                querySelectorAll: (sel) => {
+                    if (sel.includes('Typography') || sel.includes('h2') || sel.includes('sectionTitle')) {
+                        return [
+                            {
+                                textContent: 'Devices',
+                                closest: (s) => (s.includes('MuiDrawer') ? navDrawer : null)
+                            },
+                            realHeading
+                        ];
+                    }
+                    if (sel.includes('dashboard/devices')) {
+                        return [drawerDevicesLink];
+                    }
+                    return [];
+                },
+                createElement: (tag) => ({ id: '', setAttribute: () => {}, addEventListener: () => {} }),
+                addEventListener: () => {}
+            };
+
+            const dash = createMockDashboard({ document: mockDoc });
+            const container = dash.ensureContainerInserted();
+
+            assert.ok(container, 'Container must be created');
+            assert.equal(replacedInMain, true, 'Must replace real Devices widget inside main, ignoring navigation drawer');
+            assert.equal(realDevicesWidget.style.display, 'none');
+            assert.equal(realDevicesWidget.parentNode, null);
         });
 
         it('NEVER mounts at the top of the dashboard or falls back to mainContent.firstChild when Devices block is not found', () => {
@@ -1583,7 +1667,7 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
 
             const html = dash.renderSessionCard(session, 0, 'compact', false);
 
-            // All 21 keys required in technical breakdown
+            // All 22 keys required in technical breakdown
             const requiredKeys = [
                 'User',
                 'Client',
@@ -1594,7 +1678,8 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
                 'Video Status',
                 'Video Source Codec',
                 'Video Output Codec',
-                'Video Resolution',
+                'Source Resolution',
+                'Output Resolution',
                 'Frame Rate',
                 'HDR Status',
                 'HDR to SDR Conversion',
@@ -1602,7 +1687,8 @@ describe('Playback Info Card v0.2.3.7 Test Suite', () => {
                 'Audio Source Codec',
                 'Audio Output Codec',
                 'Audio Channel Layout',
-                'Container',
+                'Source Container',
+                'Output Container',
                 'Bitrate',
                 'Hardware Engine',
                 'Transcode Reason'

@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.3.7)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.4.0)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,7 +7,7 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.3.7';
+    var VERSION = '0.2.4.0';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -462,91 +462,160 @@
         return false;
     }
 
-    function findWidgetContainerFromTarget(targetNode, scope) {
-        if (!targetNode) return null;
-        var cur = targetNode;
-        while (cur && cur !== scope && cur !== document.body && cur !== document.documentElement) {
-            var p = cur.parentElement;
-            if (!p) break;
-            var pCls = (p.className || '').toLowerCase();
-            var pId = (p.id || '').toLowerCase();
-
-            var isParentColumn = pCls.indexOf('muistack') !== -1 ||
-                                 pCls.indexOf('muigrid') !== -1 ||
-                                 pCls.indexOf('content-primary') !== -1 ||
-                                 pCls.indexOf('verticalsection') !== -1 ||
-                                 pCls.indexOf('dashboardsection') !== -1 ||
-                                 pId === 'dashboardpage' ||
-                                 pId === 'devicespage' ||
-                                 (typeof p.getAttribute === 'function' && p.getAttribute('data-role') === 'content');
-
-            var isTooBroad = cur.classList && (
-                cur.classList.contains('content-primary') ||
-                cur.id === 'dashboardPage' ||
-                cur.id === 'devicesPage'
-            );
-
-            if (isParentColumn && !isTooBroad) {
-                var hasOtherWidgets = false;
-                try {
-                    var otherLinks = (typeof cur.querySelectorAll === 'function')
-                        ? cur.querySelectorAll('a[href*="activity"], a[href*="serverinfo"], a[href*="tasks"], a[href*="logs"], a[href*="paths"]')
-                        : [];
-                    if (otherLinks && otherLinks.length > 0) {
-                        hasOtherWidgets = true;
-                    }
-                } catch (_) {}
-
-                if (!hasOtherWidgets) {
-                    return cur;
-                }
+    function isExcludedNavigation(el) {
+        if (!el) return false;
+        if (typeof el.closest === 'function') {
+            return Boolean(el.closest('nav, aside, header, .MuiDrawer-root, .mainDrawer, .sidebar, [role="navigation"], .MuiAppBar-root, dialog, .MuiDialog-root, .header, #header'));
+        }
+        var cur = el;
+        while (cur && cur !== document.body && cur !== document.documentElement) {
+            var tag = (cur.tagName || '').toLowerCase();
+            var cls = (cur.className || '').toString().toLowerCase();
+            var role = (cur.getAttribute && cur.getAttribute('role')) || '';
+            if (tag === 'nav' || tag === 'aside' || tag === 'header' || tag === 'dialog' ||
+                cls.indexOf('muidrawer') !== -1 || cls.indexOf('maindrawer') !== -1 ||
+                cls.indexOf('sidebar') !== -1 || cls.indexOf('muiappbar') !== -1 ||
+                cls.indexOf('muidialog') !== -1 || role === 'navigation') {
+                return true;
             }
             cur = cur.parentElement;
         }
-        return targetNode.parentElement || targetNode;
+        return false;
+    }
+
+    function getDashboardContentRoot() {
+        if (typeof document === 'undefined') return null;
+        if (typeof document.querySelector === 'function') {
+            var activePage = document.querySelector('#dashboardPage:not(.hide), #devicesPage:not(.hide), .page.page-current:not(.hide), [data-role="page"].page-current:not(.hide), .page:not(.hide)');
+            if (activePage && typeof activePage.querySelectorAll === 'function') {
+                var content = (typeof activePage.querySelector === 'function')
+                    ? (activePage.querySelector('.content-primary, [data-role="content"], main, [role="main"]') || activePage)
+                    : activePage;
+                if (content && typeof content.querySelectorAll === 'function') {
+                    return content;
+                }
+            }
+            var main = document.querySelector('main, [role="main"], #mainContainer');
+            if (main && typeof main.querySelectorAll === 'function') return main;
+        }
+        return (typeof document.body !== 'undefined' && typeof document.body.querySelectorAll === 'function') ? document.body : document;
+    }
+
+    function findWidgetContainerFromTarget(targetNode, scope) {
+        if (!targetNode) return null;
+        if (isExcludedNavigation(targetNode)) return null;
+
+        var cur = targetNode;
+        var bestCandidate = null;
+
+        while (cur && cur !== scope && cur !== document.body && cur !== document.documentElement) {
+            var p = cur.parentElement || cur.parentNode;
+            if (!p) break;
+
+            var curCls = (cur.className || '').toString().toLowerCase();
+            var curId = (cur.id || '').toString().toLowerCase();
+            var pCls = (p.className || '').toString().toLowerCase();
+            var pId = (p.id || '').toString().toLowerCase();
+
+            var isTooBroad = curId === 'dashboardpage' ||
+                             curId === 'devicespage' ||
+                             curId === 'maincontainer' ||
+                             curCls.indexOf('content-primary') !== -1 ||
+                             cur.tagName === 'MAIN' ||
+                             (typeof cur.getAttribute === 'function' && cur.getAttribute('role') === 'main');
+
+            if (isTooBroad) {
+                break;
+            }
+
+            var hasOtherWidgets = false;
+            try {
+                if (typeof cur.querySelectorAll === 'function') {
+                    var otherWidgets = cur.querySelectorAll(
+                        'a[href*="serverinfo"], a[href*="activity"], a[href*="tasks"], a[href*="logs"], a[href*="paths"], ' +
+                        '[data-testid*="serverinfo"], [data-testid*="activity"], [data-testid*="task"]'
+                    );
+                    if (otherWidgets && otherWidgets.length > 0) {
+                        hasOtherWidgets = true;
+                    }
+                    var otherHeadings = cur.querySelectorAll('h1, h2, h3, h4, .sectionTitle');
+                    var nonDeviceHeadings = 0;
+                    for (var h = 0; h < otherHeadings.length; h++) {
+                        var hTxt = (otherHeadings[h].textContent || '').trim().toLowerCase();
+                        if (hTxt && hTxt !== 'devices' && hTxt !== 'active devices') {
+                            nonDeviceHeadings++;
+                        }
+                    }
+                    if (nonDeviceHeadings > 0) {
+                        hasOtherWidgets = true;
+                    }
+                }
+            } catch (_) {}
+
+            if (hasOtherWidgets) {
+                break;
+            }
+
+            var isParentContainer = pCls.indexOf('muistack') !== -1 ||
+                                    pCls.indexOf('muigrid') !== -1 ||
+                                    pCls.indexOf('content-primary') !== -1 ||
+                                    pCls.indexOf('verticalsection') !== -1 ||
+                                    pCls.indexOf('dashboardsection') !== -1 ||
+                                    pCls.indexOf('dashboardcontent') !== -1 ||
+                                    pId === 'dashboardpage' ||
+                                    pId === 'devicespage' ||
+                                    pId === 'maincontainer' ||
+                                    p.tagName === 'MAIN' ||
+                                    (typeof p.getAttribute === 'function' && p.getAttribute('data-role') === 'content');
+
+            if (isParentContainer) {
+                return cur;
+            }
+
+            if (curCls.indexOf('verticalsection') !== -1 ||
+                curCls.indexOf('dashboardsection') !== -1 ||
+                curCls.indexOf('section') !== -1 ||
+                curCls.indexOf('muipaper') !== -1 ||
+                curCls.indexOf('muicard') !== -1) {
+                bestCandidate = cur;
+            }
+
+            cur = cur.parentElement || cur.parentNode;
+        }
+
+        return bestCandidate || targetNode;
     }
 
     function findStockDevicesSection(root) {
         if (typeof document === 'undefined') return null;
-        var scope = root || document;
+        var scope = root || getDashboardContentRoot() || document;
 
-        // 1. Modern Jellyfin 12.1 React/MUI: Link or button to devices
-        var deviceLinks = (typeof scope.querySelectorAll === 'function')
-            ? scope.querySelectorAll('a[href*="dashboard/devices"], a[href$="/devices"], a[href*="#/devices"], a[href*="#/dashboard/devices"], button[to*="devices"], a[to*="devices"]')
-            : [];
-
-        for (var l = 0; l < deviceLinks.length; l++) {
-            var link = deviceLinks[l];
-            if (typeof link.closest === 'function' && link.closest('#' + CONTAINER_ID)) {
-                continue;
-            }
-            var container = findWidgetContainerFromTarget(link, scope);
-            if (container && container.id !== CONTAINER_ID) {
-                return container;
-            }
+        // If scope itself is the stock devices section
+        if (scope && scope.id !== CONTAINER_ID && (scope.id === 'activeDevices' || (scope.className && scope.className.indexOf('activeDevices') !== -1))) {
+            return scope;
         }
 
-        // 2. Headings with text "devices" or "active devices"
+        // 1. Headings with exact text "devices" or "active devices" inside dashboard content
         var headings = (typeof scope.querySelectorAll === 'function')
-            ? scope.querySelectorAll('h1, h2, h3, h4, .sectionTitle, [class*="Typography"]')
+            ? scope.querySelectorAll('h1, h2, h3, h4, h5, h6, .sectionTitle, [class*="sectionTitle"], [class*="Typography"]')
             : [];
 
         for (var j = 0; j < headings.length; j++) {
             var h = headings[j];
-            if (typeof h.closest === 'function' && h.closest('#' + CONTAINER_ID)) {
-                continue;
-            }
+            if (typeof h.closest === 'function' && h.closest('#' + CONTAINER_ID)) continue;
+            if (isExcludedNavigation(h)) continue;
+
             var text = (h.textContent || '').trim().toLowerCase();
             var i18n = typeof h.getAttribute === 'function' ? h.getAttribute('data-i18n-key') : null;
             if (text === 'devices' || text === 'active devices' || i18n === 'HeaderDevices') {
                 var hContainer = findWidgetContainerFromTarget(h, scope);
-                if (hContainer && hContainer.id !== CONTAINER_ID) {
+                if (hContainer && hContainer.id !== CONTAINER_ID && !isExcludedNavigation(hContainer)) {
                     return hContainer;
                 }
             }
         }
 
-        // 3. Classic / legacy stock Jellyfin Devices selectors
+        // 2. Classic / legacy stock Jellyfin Devices selectors
         var selectors = [
             '.activeDevices',
             '#activeDevices',
@@ -558,25 +627,77 @@
         ];
 
         for (var i = 0; i < selectors.length; i++) {
-            var el = (typeof scope.querySelector === 'function') ? scope.querySelector(selectors[i]) : null;
-            if (el && el.id !== CONTAINER_ID) {
-                if (typeof el.closest === 'function' && el.closest('#' + CONTAINER_ID)) {
-                    continue;
+            var el = (typeof scope.querySelector === 'function')
+                ? scope.querySelector(selectors[i])
+                : (typeof document.querySelector === 'function' ? document.querySelector(selectors[i]) : null);
+            if (el && el.id !== CONTAINER_ID && !isExcludedNavigation(el)) {
+                if (typeof el.closest === 'function' && el.closest('#' + CONTAINER_ID)) continue;
+                var elContainer = findWidgetContainerFromTarget(el, scope);
+                if (elContainer && elContainer.id !== CONTAINER_ID && !isExcludedNavigation(elContainer)) {
+                    return elContainer;
                 }
-                if (typeof el.closest === 'function') {
-                    var sec = el.closest('.verticalSection, .section, .dashboardSection');
-                    if (sec && sec !== scope && !sec.classList.contains('content-primary') && (!sec.id || sec.id.indexOf('Page') === -1)) {
-                        var titles = sec.querySelectorAll('.sectionTitle, h2, h3');
-                        if (titles.length <= 1) {
-                            return sec;
-                        }
-                    }
+            }
+        }
+
+        // 3. Elements containing active stock device text (e.g. Chrome...Jellyfin Web, Safari iPhone, Moonfin)
+        var deviceTextNodes = (typeof scope.querySelectorAll === 'function')
+            ? scope.querySelectorAll('[class*="card"], [class*="Card"], [class*="device"], [class*="Device"], .paperList > div, [data-testid*="device"]')
+            : [];
+        for (var d = 0; d < deviceTextNodes.length; d++) {
+            var dNode = deviceTextNodes[d];
+            if (typeof dNode.closest === 'function' && dNode.closest('#' + CONTAINER_ID)) continue;
+            if (isExcludedNavigation(dNode)) continue;
+            var dText = (dNode.textContent || '').trim();
+            if (/Chrome.*Jellyfin Web|Safari.*iPhone|Moonfin/i.test(dText)) {
+                var dContainer = findWidgetContainerFromTarget(dNode, scope);
+                if (dContainer && dContainer.id !== CONTAINER_ID && !isExcludedNavigation(dContainer)) {
+                    return dContainer;
                 }
-                return el;
+            }
+        }
+
+        // 4. In-page links/buttons to devices (that are inside the dashboard main content, not in nav/drawer)
+        var deviceLinks = (typeof scope.querySelectorAll === 'function')
+            ? scope.querySelectorAll('a[href*="dashboard/devices"], a[href$="/devices"], a[href*="#/devices"], a[href*="#/dashboard/devices"], button[to*="devices"], a[to*="devices"]')
+            : [];
+
+        for (var l = 0; l < deviceLinks.length; l++) {
+            var link = deviceLinks[l];
+            if (typeof link.closest === 'function' && link.closest('#' + CONTAINER_ID)) continue;
+            if (isExcludedNavigation(link)) continue;
+
+            var lContainer = findWidgetContainerFromTarget(link, scope);
+            if (lContainer && lContainer.id !== CONTAINER_ID && !isExcludedNavigation(lContainer)) {
+                return lContainer;
             }
         }
 
         return null;
+    }
+
+    function cleanupLingeringStockDevices(container) {
+        if (typeof document === 'undefined') return;
+        try {
+            var root = getDashboardContentRoot() || document;
+            if (typeof root.querySelectorAll !== 'function') return;
+            var lingeringHeadings = root.querySelectorAll('h1, h2, h3, h4, h5, h6, .sectionTitle, [class*="sectionTitle"]');
+            for (var i = 0; i < lingeringHeadings.length; i++) {
+                var h = lingeringHeadings[i];
+                if (isExcludedNavigation(h)) continue;
+                if (container && (h === container || (typeof container.contains === 'function' && container.contains(h)))) continue;
+                var text = (h.textContent || '').trim().toLowerCase();
+                if (text === 'devices' || text === 'active devices') {
+                    var p = h.parentElement;
+                    if (p && p !== document.body && p !== root && (!p.id || p.id.indexOf('Page') === -1)) {
+                        p.style.display = 'none';
+                        if (p.parentNode) p.parentNode.removeChild(p);
+                    } else {
+                        h.style.display = 'none';
+                        if (h.parentNode) h.parentNode.removeChild(h);
+                    }
+                }
+            }
+        } catch (_) {}
     }
 
     function ensureContainerInserted() {
@@ -592,30 +713,29 @@
                 attachContainerEvents(existing);
             }
 
-            // Mount the NOW PLAYING container in the Devices section's exact location
-            devicesSection.parentNode.insertBefore(existing, devicesSection);
-
-            // Do not remove the original Devices section until NOW PLAYING has mounted successfully
-            var isMounted = false;
-            try {
-                isMounted = Boolean(existing.parentNode && (typeof document.contains !== 'function' || document.contains(existing)));
-            } catch (_) {
-                isMounted = Boolean(existing.parentNode);
+            // In-place replacement of the stock Devices widget
+            if (typeof devicesSection.replaceWith === 'function') {
+                devicesSection.replaceWith(existing);
+            } else if (devicesSection.parentNode) {
+                devicesSection.parentNode.insertBefore(existing, devicesSection);
+                devicesSection.parentNode.removeChild(devicesSection);
             }
 
-            if (isMounted) {
-                // Completely replace / remove original stock Devices section
-                devicesSection.style.display = 'none';
-                if (devicesSection.parentNode) {
-                    devicesSection.parentNode.removeChild(devicesSection);
-                }
+            // Ensure stock devices section is completely hidden and removed
+            devicesSection.style.display = 'none';
+            if (devicesSection.parentNode) {
+                devicesSection.parentNode.removeChild(devicesSection);
             }
+
+            // Cleanup any remaining stock device headings or cards outside our container
+            cleanupLingeringStockDevices(existing);
 
             return existing;
         }
 
         // If existing is already mounted and no stock devices section is found
-        if (existing) {
+        if (existing && existing.parentNode) {
+            cleanupLingeringStockDevices(existing);
             return existing;
         }
 
@@ -784,7 +904,7 @@
             var outputAudioCodec = (tInfo && tInfo.AudioCodec) ? tInfo.AudioCodec.toUpperCase() : (isAudioDirect === true ? sourceAudioCodec : null);
 
             var sourceResolution = (item.Width && item.Height) ? (item.Width + 'x' + item.Height) : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : null);
-            var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : (session.Resolution || sourceResolution);
+            var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : (session.Resolution || (isVideoDirect === true ? sourceResolution : null));
 
             var frameRateStr = getTruthfulFrameRate(session, item, videoStream);
 
@@ -797,6 +917,9 @@
             } else if (videoStream && typeof videoStream.BitRate === 'number' && isFinite(videoStream.BitRate) && videoStream.BitRate > 0) {
                 bitrateStr = (videoStream.BitRate / 1000000).toFixed(1) + ' Mbps';
             }
+
+            var sourceContainer = (item.Container || session.Container || containerVal || '').toUpperCase() || null;
+            var outputContainer = (tInfo && tInfo.Container) ? tInfo.Container.toUpperCase() : (classification.isRemux ? (tInfo && tInfo.Container ? tInfo.Container.toUpperCase() : null) : (isVideoDirect === true && isAudioDirect === true ? sourceContainer : null));
 
             var containerConversionHtml = '';
             if (item.Container && tInfo && tInfo.Container && item.Container.toLowerCase() !== tInfo.Container.toLowerCase()) {
@@ -824,7 +947,7 @@
                 cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> Reason not reported by server</div>';
             }
 
-            // Info Drawer Complete 21-Field Technical Breakdown
+            // Info Drawer Complete 22-Field Technical Breakdown
             var hdrStatus = extractDynamicRangePill(videoStream) || 'SDR';
             var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
             var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
@@ -838,16 +961,18 @@
                 { key: 'Playback Method', val: escapeHtml(classification.badgeText) },
                 { key: 'Video Status', val: isVideoDirect === true ? 'Direct' : (isVideoDirect === false ? 'Transcode' : 'Not reported') },
                 { key: 'Video Source Codec', val: escapeHtml(sourceVideoCodec || 'Not reported') },
-                { key: 'Video Output Codec', val: escapeHtml(outputVideoCodec || (isVideoDirect === true ? 'Direct (Source Codec)' : 'Not reported')) },
-                { key: 'Video Resolution', val: escapeHtml(outputResolution || sourceResolution || 'Not reported') },
+                { key: 'Video Output Codec', val: escapeHtml(outputVideoCodec || (isVideoDirect === true ? (sourceVideoCodec || 'Direct (Source Codec)') : 'Not reported')) },
+                { key: 'Source Resolution', val: escapeHtml(sourceResolution || 'Not reported') },
+                { key: 'Output Resolution', val: escapeHtml(outputResolution || (isVideoDirect === true ? (sourceResolution || 'Direct') : 'Not reported')) },
                 { key: 'Frame Rate', val: escapeHtml(frameRateStr || 'Not reported') },
                 { key: 'HDR Status', val: escapeHtml(hdrStatus) },
                 { key: 'HDR to SDR Conversion', val: escapeHtml(hdrToSdrVal) },
                 { key: 'Audio Status', val: isAudioDirect === true ? 'Direct' : (isAudioDirect === false ? 'Transcode' : 'Not reported') },
                 { key: 'Audio Source Codec', val: escapeHtml(sourceAudioCodec || 'Not reported') },
-                { key: 'Audio Output Codec', val: escapeHtml(outputAudioCodec || (isAudioDirect === true ? 'Direct (Source Codec)' : 'Not reported')) },
+                { key: 'Audio Output Codec', val: escapeHtml(outputAudioCodec || (isAudioDirect === true ? (sourceAudioCodec || 'Direct (Source Codec)') : 'Not reported')) },
                 { key: 'Audio Channel Layout', val: escapeHtml(audioChannelsLayout || 'Not reported') },
-                { key: 'Container', val: containerConversionHtml || escapeHtml(containerVal || 'Not reported') },
+                { key: 'Source Container', val: escapeHtml(sourceContainer || 'Not reported') },
+                { key: 'Output Container', val: escapeHtml(outputContainer || (isVideoDirect === true && isAudioDirect === true ? (sourceContainer || 'Direct') : 'Not reported')) },
                 { key: 'Bitrate', val: escapeHtml(bitrateStr || 'Not reported') },
                 { key: 'Hardware Engine', val: escapeHtml(hardwareEngineStr || 'Not reported') },
                 { key: 'Transcode Reason', val: escapeHtml(serverReasons || 'Reason not reported by server'), fullWidth: true }
@@ -1069,8 +1194,10 @@
     }
 
     function attachContainerEvents(container) {
-        if (!container || container.getAttribute('data-events-attached') === 'true') return;
-        container.setAttribute('data-events-attached', 'true');
+        if (!container) return;
+        if (typeof container.getAttribute === 'function' && container.getAttribute('data-events-attached') === 'true') return;
+        if (typeof container.setAttribute === 'function') container.setAttribute('data-events-attached', 'true');
+        if (typeof container.addEventListener !== 'function') return;
 
         container.addEventListener('click', function (e) {
             var target = e.target;
@@ -1312,7 +1439,10 @@
         version: VERSION,
         state: state,
         isDashboardPage: isDashboardPage,
+        isExcludedNavigation: isExcludedNavigation,
+        getDashboardContentRoot: getDashboardContentRoot,
         findStockDevicesSection: findStockDevicesSection,
+        cleanupLingeringStockDevices: cleanupLingeringStockDevices,
         ensureContainerInserted: ensureContainerInserted,
         renderSessionCard: renderSessionCard,
         calculateSessionCounts: calculateSessionCounts,

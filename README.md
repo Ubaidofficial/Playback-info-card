@@ -1,8 +1,21 @@
 # Playback Info Card for Jellyfin
 
-**Stable Version: v0.2.3.7**
+**Stable Version: v0.2.4.0**
 
 Real-time stream telemetry and playback monitoring for Jellyfin Media Server.
+
+---
+
+## What Changed in v0.2.4.0
+
+Version `0.2.4.0` delivers the definitive in-place replacement fix for Jellyfin Server 12.1+ and 10.9+:
+
+* **Strict Navigation Drawer & Sidebar Exclusion**: Eliminates false matches against navigation links (`nav.MuiDrawer-root a[href*="/dashboard/devices"]` and sidebar drawer headers) that previously caused `NOW PLAYING` to be placed at the top of the dashboard.
+* **Scoping to Active Dashboard Content**: Scopes all widget detection to the active dashboard content root (`main`, `#dashboardPage`, `.content-primary`), ensuring only the true dashboard Devices widget is replaced.
+* **In-Place DOM Swap & Complete Removal**: Mounts `#playback-card-nowplaying-container` in the exact slot of the stock Devices widget, unparents and hides stock elements, and cleans up any lingering stock device cards.
+* **Zero Top-of-Page Fallback**: Telemetry cards are never mounted at the top of the dashboard. If the Devices widget is rendering asynchronously, the observer waits without mounting elsewhere.
+* **Connected Devices Preservation**: Retains active and idle connected client cards (`Connected Devices`), and displays `No active playback` when no streams are playing.
+* **Accessible 22-Field Technical Breakdown Drawer**: Separates `Source Resolution` vs `Output Resolution`, and `Source Container` vs `Output Container`, with full keyboard accessibility (Escape to close, focus restoration, `aria-expanded`, `aria-controls`), and `prefers-reduced-motion` compliance. Missing technical fields display `"Not reported"`.
 
 ---
 
