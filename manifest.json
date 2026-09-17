@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.3.4",
+        "changelog": "Release v0.2.3.4 - Restore primary default Dashboard integration above Devices section, autonomous loading, session count summary, compact mode default, and transcode breakdown.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.4/jellyfin-plugin-playbackcard.zip",
+        "checksum": "87fe697ed204121903f50d7f8895d7d2",
+        "timestamp": "2026-09-17T14:55:00Z"
+      },
+      {
         "version": "0.2.3.3",
         "changelog": "Release v0.2.3.3 - Fix notification route dispatch, preserve partial settings, protect masked secrets, and refine diagnostics.",
         "targetAbi": "10.9.0.0",
