@@ -5,12 +5,12 @@ using Microsoft.AspNetCore.Hosting;
 namespace Jellyfin.Plugin.PlaybackCard;
 
 /// <summary>
-/// Startup filter that registers the PlaybackCardMiddleware into the ASP.NET Core application pipeline.
+/// Startup filter that registers the PlaybackCardDashboardMiddleware into the ASP.NET Core application pipeline.
 /// </summary>
 public class PlaybackCardStartupFilter : IStartupFilter
 {
     /// <summary>
-    /// Extends the application pipeline configuration with the PlaybackCardMiddleware.
+    /// Extends the application pipeline configuration with the PlaybackCardDashboardMiddleware.
     /// </summary>
     /// <param name="next">The next configure action.</param>
     /// <returns>A modified configure action.</returns>
@@ -20,7 +20,7 @@ public class PlaybackCardStartupFilter : IStartupFilter
 
         return app =>
         {
-            app.UseMiddleware<PlaybackCardMiddleware>();
+            app.UseMiddleware<PlaybackCardDashboardMiddleware>();
             next(app);
         };
     }

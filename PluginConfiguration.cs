@@ -1,14 +1,18 @@
+using System.Collections.Generic;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.PlaybackCard;
 
 /// <summary>
-/// Configuration options for the Playback Info Card plugin.
+/// Public configuration options for the Playback Info Card plugin.
+/// Strictly excludes sensitive secrets (such as Discord webhook URLs and Telegram bot tokens),
+/// ensuring that generic Jellyfin plugin configuration endpoints and XML serializers cannot leak credentials.
+/// Sensitive credentials are stored in <see cref="Notifications.NotificationSecretStore"/>.
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="PluginConfiguration"/> class.
+    /// Initializes a new instance of the <see cref="PluginConfiguration"/> class with safe, opt-in defaults.
     /// </summary>
     public PluginConfiguration()
     {
@@ -21,20 +25,27 @@ public class PluginConfiguration : BasePluginConfiguration
         // Default accent color for progress and highlight metrics
         AccentColor = "#00a4dc";
 
-        // Stream Guard Policies
-        KillPausedEnabled = false;
-        KillPausedMinutes = 15;
-        Kill4kSwEnabled = false;
-        MaxConcurrentStreams = 0;
-        ExemptAdmins = true;
+        // Native Notification Engine Defaults (Safe, Disabled until configured and enabled)
+        NotificationsEnabled = false;
+        DiscordEnabled = false;
+        TelegramEnabled = false;
+        TelegramChatId = string.Empty;
 
-        // Servarr Remediation Integrations
-        BazarrUrl = string.Empty;
-        BazarrApiKey = string.Empty;
-        RadarrUrl = string.Empty;
-        RadarrApiKey = string.Empty;
-        SonarrUrl = string.Empty;
-        SonarrApiKey = string.Empty;
+        // All event types are disabled until explicitly selected
+        NotifyOnStart = false;
+        NotifyOnStop = false;
+        NotifyOnPauseResume = false;
+        NotifyOnProgress = false;
+        ProgressIntervalMinutes = 15;
+        NotifyOnCompletion = false;
+
+        // Privacy defaults: strictly opt-in
+        UsernameDisclosure = false;
+        ClientDeviceDisclosure = false;
+
+        // User filtering defaults
+        UserFilterMode = Notifications.UserFilterMode.AllUsers;
+        SelectedUserIds = new List<string>();
     }
 
     /// <summary>
@@ -52,58 +63,78 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string AccentColor { get; set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether to auto-terminate playback sessions paused longer than the timeout.
-    /// </summary>
-    public bool KillPausedEnabled { get; set; }
+    // ==========================================
+    // Native Notification Engine Properties
+    // (Non-sensitive settings only)
+    // ==========================================
 
     /// <summary>
-    /// Gets or sets the paused timeout threshold in minutes.
+    /// Master switch for all outbound playback notifications.
     /// </summary>
-    public int KillPausedMinutes { get; set; }
+    public bool NotificationsEnabled { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether to block and auto-kill unaccelerated 4K software CPU transcodes.
+    /// Gets or sets whether Discord notifications are enabled.
     /// </summary>
-    public bool Kill4kSwEnabled { get; set; }
+    public bool DiscordEnabled { get; set; }
 
     /// <summary>
-    /// Gets or sets the maximum concurrent streams allowed per user account (0 = unlimited).
+    /// Gets or sets whether Telegram notifications are enabled.
     /// </summary>
-    public int MaxConcurrentStreams { get; set; }
+    public bool TelegramEnabled { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether administrator sessions are exempt from auto-kill policies.
+    /// Target Telegram chat or channel ID.
     /// </summary>
-    public bool ExemptAdmins { get; set; }
+    public string TelegramChatId { get; set; }
 
     /// <summary>
-    /// Gets or sets the Bazarr remediation service URL.
+    /// Gets or sets whether to send a notification when playback starts.
     /// </summary>
-    public string BazarrUrl { get; set; }
+    public bool NotifyOnStart { get; set; }
 
     /// <summary>
-    /// Gets or sets the Bazarr API authentication key.
+    /// Gets or sets whether to send a notification when playback stops.
     /// </summary>
-    public string BazarrApiKey { get; set; }
+    public bool NotifyOnStop { get; set; }
 
     /// <summary>
-    /// Gets or sets the Radarr remediation service URL.
+    /// Gets or sets whether to send notifications on pause/resume transitions.
     /// </summary>
-    public string RadarrUrl { get; set; }
+    public bool NotifyOnPauseResume { get; set; }
 
     /// <summary>
-    /// Gets or sets the Radarr API authentication key.
+    /// Gets or sets whether to send periodic progress notifications.
     /// </summary>
-    public string RadarrApiKey { get; set; }
+    public bool NotifyOnProgress { get; set; }
 
     /// <summary>
-    /// Gets or sets the Sonarr remediation service URL.
+    /// Interval in minutes between periodic progress notifications (minimum 5).
     /// </summary>
-    public string SonarrUrl { get; set; }
+    public int ProgressIntervalMinutes { get; set; }
 
     /// <summary>
-    /// Gets or sets the Sonarr API authentication key.
+    /// Gets or sets whether to send a notification when media is played to completion.
     /// </summary>
-    public string SonarrApiKey { get; set; }
+    public bool NotifyOnCompletion { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the Jellyfin user account name is disclosed in notifications.
+    /// </summary>
+    public bool UsernameDisclosure { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether client app name, version, and device name are disclosed in notifications.
+    /// </summary>
+    public bool ClientDeviceDisclosure { get; set; }
+
+    /// <summary>
+    /// User filtering mode (AllUsers, Whitelist, Blacklist).
+    /// </summary>
+    public Notifications.UserFilterMode UserFilterMode { get; set; }
+
+    /// <summary>
+    /// List of user IDs or usernames subject to whitelist/blacklist filtering.
+    /// </summary>
+    public List<string> SelectedUserIds { get; set; }
 }
