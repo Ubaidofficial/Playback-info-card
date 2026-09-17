@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.5.3",
+        "changelog": "Release v0.2.5.3 - Merged the two sidebar entries (Playback Monitor / My Playback) into one: admins see every active session, non-admin users see only their own, decided by role instead of registering the same page twice. The dashboard widget's Info button no longer opens a slide-out side panel -- it now expands the same full field grid inline on that card, tracked by session ID so it survives polling, matching how the standalone page already worked and restoring the original in-card design.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.5.3/jellyfin-plugin-playbackcard.zip",
+        "checksum": "b5ed7ddaf7f831357f77aec5b8aa61eb",
+        "timestamp": "2026-09-17T21:31:39Z"
+      },
+      {
         "version": "0.2.5.2",
         "changelog": "Release v0.2.5.2 - Prominent summary strip above the grid shows total active streams plus a genuine Direct/Transcoding split (correctly counts a paused Transcode session as Transcoding, not silently dropped). High-signal pills (resolution, dynamic range, audio, subtitle) now carry a leading icon so they scan at a glance; codec/bit-depth/container pills stay icon-free. The progress bar moves from the card footer to directly under the title for better visual hierarchy. Deeper \"liquid glass\" treatment (backdrop blur, saturation boost, specular highlight, bright/dim edge split) applied consistently across the card, badges, pills, chips, and Info drawer on both the dashboard widget and the standalone My Playback page.",
         "targetAbi": "10.9.0.0",
@@ -39,14 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.4.1/jellyfin-plugin-playbackcard.zip",
         "checksum": "9514fd5677c82188ac9527e23a9337ab",
         "timestamp": "2026-09-17T19:23:15Z"
-      },
-      {
-        "version": "0.2.4.0",
-        "changelog": "Release v0.2.4.0 - Corrective patch: complete in-place replacement of Jellyfin 12.1 Devices widget with strict exclusion of navigation drawer links, zero top-of-page fallback, connected devices preservation, and accessible 22-field technical breakdown drawer with distinct Source/Output resolution and container telemetry.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.4.0/jellyfin-plugin-playbackcard.zip",
-        "checksum": "072ebefe279214a736f56a2c4773059b",
-        "timestamp": "2026-09-17T18:00:00Z"
       }
     ]
   }
