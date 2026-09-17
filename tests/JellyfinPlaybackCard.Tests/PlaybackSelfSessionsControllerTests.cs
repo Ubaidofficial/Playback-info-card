@@ -221,6 +221,97 @@ public class PlaybackSelfSessionsControllerTests
     }
 
     [Fact]
+    public void GetSelfSessions_VideoDirectButAudioTranscodingWithContainerChange_ReportsTranscodeNotRemux()
+    {
+        // Regression test: video is direct-copied into a different container while audio is
+        // actively being re-encoded (e.g. an incompatible audio codec). This must NEVER be
+        // reported as "Remux" -- real re-encoding work (audio) is happening, so truthful
+        // telemetry requires "Transcode".
+        var user = Guid.NewGuid();
+        var item = new BaseItemDto { Id = Guid.NewGuid(), Name = "Mismatched Container Movie", Container = "mkv" };
+
+        var session = new SessionInfo(null, null)
+        {
+            Id = "sess-video-direct-audio-transcode",
+            UserId = user,
+            NowPlayingItem = item,
+            PlayState = new PlayerStateInfo { PlayMethod = PlayMethod.Transcode, PositionTicks = 0 },
+            TranscodingInfo = new TranscodingInfo
+            {
+                IsVideoDirect = true,
+                IsAudioDirect = false,
+                VideoCodec = "h264",
+                AudioCodec = "aac",
+                Container = "mp4", // differs from source item.Container ("mkv")
+                TranscodeReasons = TranscodeReason.AudioCodecNotSupported
+            }
+        };
+
+        var sessionManager = MockSessionManagerProxy.Create(new[] { session });
+        var controller = new PlaybackSelfSessionsController(sessionManager)
+        {
+            ControllerContext = CreateContextForUser(user)
+        };
+
+        var response = controller.GetSelfSessions();
+        var okResult = Assert.IsType<OkObjectResult>(response.Result);
+        var returnedSessions = Assert.IsAssignableFrom<IReadOnlyList<UserPlaybackSessionDto>>(okResult.Value);
+
+        Assert.Single(returnedSessions);
+        var dto = returnedSessions[0];
+        Assert.Equal("Transcode", dto.PlayMethod);
+        Assert.False(dto.IsContainerRemux);
+        Assert.True(dto.IsVideoDirect);
+        Assert.False(dto.IsAudioDirect);
+        Assert.Equal("Video Direct", dto.VideoStatus);
+        Assert.Equal("Audio Transcoded", dto.AudioStatus);
+    }
+
+    [Fact]
+    public void GetSelfSessions_VideoAndAudioBothDirectWithContainerChange_ReportsRemux()
+    {
+        // Genuine remux case: both video and audio streams are copied without re-encoding,
+        // only the container differs from the source. This must still correctly report "Remux".
+        var user = Guid.NewGuid();
+        var item = new BaseItemDto { Id = Guid.NewGuid(), Name = "Genuine Remux Movie", Container = "mkv" };
+
+        var session = new SessionInfo(null, null)
+        {
+            Id = "sess-genuine-remux",
+            UserId = user,
+            NowPlayingItem = item,
+            PlayState = new PlayerStateInfo { PlayMethod = PlayMethod.Transcode, PositionTicks = 0 },
+            TranscodingInfo = new TranscodingInfo
+            {
+                IsVideoDirect = true,
+                IsAudioDirect = true,
+                VideoCodec = "h264",
+                AudioCodec = "aac",
+                Container = "mp4" // differs from source item.Container ("mkv")
+            }
+        };
+
+        var sessionManager = MockSessionManagerProxy.Create(new[] { session });
+        var controller = new PlaybackSelfSessionsController(sessionManager)
+        {
+            ControllerContext = CreateContextForUser(user)
+        };
+
+        var response = controller.GetSelfSessions();
+        var okResult = Assert.IsType<OkObjectResult>(response.Result);
+        var returnedSessions = Assert.IsAssignableFrom<IReadOnlyList<UserPlaybackSessionDto>>(okResult.Value);
+
+        Assert.Single(returnedSessions);
+        var dto = returnedSessions[0];
+        Assert.Equal("Remux", dto.PlayMethod);
+        Assert.True(dto.IsContainerRemux);
+        Assert.True(dto.IsVideoDirect);
+        Assert.True(dto.IsAudioDirect);
+        Assert.Equal("Video Direct", dto.VideoStatus);
+        Assert.Equal("Audio Direct", dto.AudioStatus);
+    }
+
+    [Fact]
     public void GetSelfSessions_ValidJellyfinUserId_ReturnsOk()
     {
         var targetUser = Guid.NewGuid();

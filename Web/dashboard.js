@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.4.1)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.5.0)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,8 +7,8 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.4.1';
-    var ASSET_REVISION = '0.2.4.1';
+    var VERSION = '0.2.5.0';
+    var ASSET_REVISION = '0.2.5.0';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var DRAWER_OVERLAY_ID = 'playback-drawer-overlay';
     var DRAWER_PANEL_ID = 'playback-drawer-panel';
@@ -26,7 +26,6 @@
         isPolling: false,
         isDashboardActive: false,
         isNonAdmin: false,
-        lastRenderedJson: '',
         artworkFallbackCount: 0,
         renderErrors: 0,
         cardSessionMap: {},
@@ -103,6 +102,21 @@
         return '';
     }
 
+    // Like extractDynamicRangePill, but also surfaces an explicit "SDR" badge when a video
+    // stream is known and genuinely not HDR/DV/HLG (never guessed when no stream is known at all).
+    function extractDynamicRangeCompactPill(videoStream) {
+        var pill = extractDynamicRangePill(videoStream);
+        if (pill) return pill;
+        return videoStream ? 'SDR' : '';
+    }
+
+    function extractBitDepthPill(videoStream) {
+        if (!videoStream || !videoStream.BitDepth) return '';
+        var bitDepth = Number(videoStream.BitDepth);
+        if (!bitDepth || bitDepth <= 0) return '';
+        return bitDepth + '-bit';
+    }
+
     function extractAudioBadges(audioStream) {
         if (!audioStream) return [];
         var badges = [];
@@ -122,6 +136,34 @@
             badges.push(codec);
         }
         return badges;
+    }
+
+    function extractAtmosBadge(audioStream) {
+        if (!audioStream) return '';
+        var text = ((audioStream.Profile || '') + ' ' + (audioStream.Title || '') + ' ' + (audioStream.DisplayTitle || '')).toLowerCase();
+        if (text.indexOf('atmos') !== -1) return 'Atmos';
+        if (text.indexOf('dts:x') !== -1 || text.indexOf('dts-x') !== -1 || text.indexOf('dtsx') !== -1) return 'DTS:X';
+        return '';
+    }
+
+    function extractAudioLanguage(audioStream) {
+        if (!audioStream || !audioStream.Language) return '';
+        var lang = String(audioStream.Language).toUpperCase();
+        return lang.length > 3 ? lang.substring(0, 3) : lang;
+    }
+
+    // Estimated finish time, computed from real remaining playback duration -- never
+    // shown for a paused session (there is no true ETA while paused).
+    function formatEta(remainingTicks, nowMs) {
+        if (typeof remainingTicks !== 'number' || !isFinite(remainingTicks) || remainingTicks <= 0) return null;
+        var finish = new Date((typeof nowMs === 'number' ? nowMs : Date.now()) + Math.round(remainingTicks / 10000));
+        var hours = finish.getHours();
+        var minutes = finish.getMinutes();
+        var ampm = hours >= 12 ? 'PM' : 'AM';
+        var hours12 = hours % 12;
+        if (hours12 === 0) hours12 = 12;
+        var paddedMinutes = minutes < 10 ? '0' + minutes : String(minutes);
+        return hours12 + ':' + paddedMinutes + ' ' + ampm;
     }
 
     function extractSubtitleBadge(session, item) {
@@ -296,7 +338,15 @@
             (tInfo && (tInfo.IsVideoDirect === false || tInfo.IsAudioDirect === false))
         );
 
+        // The underlying method is independent of pause state -- a paused Remux is still
+        // a Remux. badgeText/badgeClass (the legacy combined display value) still collapse
+        // to "Paused" when paused; callers that need the pure method (e.g. the card's
+        // separate state/method badges) must read `method`, not `badgeText`.
         var method = 'DirectPlay';
+        if (isRemux) method = 'Remux';
+        else if (isDirectStream) method = 'DirectStream';
+        else if (isTranscode) method = 'Transcode';
+
         var badgeText = 'Direct Play';
         var badgeClass = 'direct-play';
 
@@ -304,15 +354,12 @@
             badgeClass = 'paused';
             badgeText = 'Paused';
         } else if (isRemux) {
-            method = 'Remux';
             badgeText = 'Remux';
             badgeClass = 'remux';
         } else if (isDirectStream) {
-            method = 'DirectStream';
             badgeText = 'Direct Stream';
             badgeClass = 'direct-stream';
         } else if (isTranscode) {
-            method = 'Transcode';
             badgeText = 'Transcode';
             badgeClass = 'transcode';
         }
@@ -338,6 +385,21 @@
             return true;
         }
         return false;
+    }
+
+    // The user's own Jellyfin profile avatar (their own chosen image on their own server --
+    // not an external service). Feature-detects the API since this is best-effort polish,
+    // never a required field; returns '' whenever anything is missing or unsupported.
+    function resolveUserAvatarUrl(session, apiClient) {
+        if (!session || !apiClient || !session.UserId) return '';
+        if (typeof apiClient.getUserImageUrl !== 'function') return '';
+        try {
+            var opts = { type: 'Primary', maxWidth: 64, quality: 90 };
+            if (session.UserPrimaryImageTag) opts.tag = session.UserPrimaryImageTag;
+            return apiClient.getUserImageUrl(session.UserId, opts) || '';
+        } catch (_) {
+            return '';
+        }
     }
 
     function resolveArtworkUrls(session, item, apiClient) {
@@ -957,31 +1019,40 @@
                 }
             }
 
-            // Unified Classification
+            // Unified Classification. classification.method is the pure transcode method
+            // (DirectPlay/DirectStream/Remux/Transcode), never overridden by pause -- the
+            // Playing/Paused state is shown as its own separate badge alongside it.
             var classification = classifyPlaybackSession(session);
             var isPaused = classification.isPaused;
-            var badgeClass = classification.badgeClass;
-            var badgeText = classification.badgeText;
             var isVideoDirect = classification.isVideoDirect;
             var isAudioDirect = classification.isAudioDirect;
+
+            var METHOD_LABELS = { DirectPlay: 'Direct Play', DirectStream: 'Direct Stream', Remux: 'Remux', Transcode: 'Transcode' };
+            var METHOD_BADGE_CLASSES = { DirectPlay: 'direct-play', DirectStream: 'direct-stream', Remux: 'remux', Transcode: 'transcode' };
+            var methodLabel = METHOD_LABELS[classification.method] || 'Direct Play';
+            var methodBadgeCls = METHOD_BADGE_CLASSES[classification.method] || 'direct-play';
+            var stateLabel = isPaused ? 'Paused' : 'Playing';
+            var stateBadgeCls = isPaused ? 'paused' : 'playing';
 
             var stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
             if (isPaused) {
                 stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
             }
 
-            var videoBadgeText = (isVideoDirect === true) ? 'Video: Direct' : (isVideoDirect === false ? 'Video: Transcode' : 'Video: Direct');
             var videoBadgeCls = (isVideoDirect === false) ? 'stream-badge video-transcode' : 'stream-badge video-direct';
-
-            var audioBadgeText = (isAudioDirect === true) ? 'Audio: Direct' : (isAudioDirect === false ? 'Audio: Transcode' : 'Audio: Direct');
             var audioBadgeCls = (isAudioDirect === false) ? 'stream-badge audio-transcode' : 'stream-badge audio-direct';
 
-            // Top essential badges
+            // Compact badge priority (section 11): Resolution, HDR/Dynamic range, Method,
+            // Video codec, Bit depth, Audio format/channels, Container -- always shown,
+            // wrapping onto additional lines on narrow screens rather than being cut off.
             var pills = [];
             var resPill = extractResolutionPill(item.Width || (videoStream && videoStream.Width), item.Height || (videoStream && videoStream.Height));
             if (resPill) pills.push({ text: resPill, cls: 'res' });
 
-            pills.push({ text: badgeText, cls: '' });
+            var dynRangePill = extractDynamicRangeCompactPill(videoStream);
+            if (dynRangePill) pills.push({ text: dynRangePill, cls: 'hdr' });
+
+            pills.push({ text: methodLabel, cls: methodBadgeCls });
 
             var vCodec = session.VideoCodec || (tInfo && tInfo.VideoCodec) || (videoStream && videoStream.Codec ? videoStream.Codec.toUpperCase() : '');
             if (vCodec) {
@@ -990,21 +1061,24 @@
                 pills.push({ text: vCodec, cls: '' });
             }
 
+            var bitDepthPill = extractBitDepthPill(videoStream);
+            if (bitDepthPill) pills.push({ text: bitDepthPill, cls: '' });
+
             var audioBadges = extractAudioBadges(audioStream);
             if (audioBadges.length > 0) {
                 pills.push({ text: audioBadges[0], cls: 'audio' });
             }
+
+            var atmosPill = extractAtmosBadge(audioStream);
+            if (atmosPill) pills.push({ text: atmosPill, cls: 'audio' });
 
             var containerVal = (session.Container || (tInfo && tInfo.Container) || item.Container || '').toUpperCase();
             if (containerVal) {
                 pills.push({ text: containerVal, cls: '' });
             }
 
-            // Extended mode badges
+            // Extended mode adds any further, less-essential badges (section 11).
             if (displayMode === 'extended') {
-                var hdrPill = extractDynamicRangePill(videoStream);
-                if (hdrPill) pills.push({ text: hdrPill, cls: 'hdr' });
-
                 if (audioBadges.length > 1) {
                     pills.push({ text: audioBadges[1], cls: 'audio' });
                 }
@@ -1013,9 +1087,7 @@
                 if (subBadge) pills.push({ text: subBadge, cls: 'sub' });
             }
 
-            // Maximum five badges on compact/narrow screens
-            var renderedPills = (displayMode === 'compact' && pills.length > 5) ? pills.slice(0, 5) : pills;
-            var pillHtml = renderedPills.map(function (p) {
+            var pillHtml = pills.map(function (p) {
                 return '<span class="playback-pill ' + p.cls + '">' + escapeHtml(p.text) + '</span>';
             }).join('');
 
@@ -1039,78 +1111,68 @@
                 percent = Math.min(100, Math.max(0, (positionTicks / runtimeTicks) * 100));
             }
 
-            // Truthful telemetry fields
-            var sourceVideoCodec = (videoStream && videoStream.Codec) ? videoStream.Codec.toUpperCase() : (session.VideoCodec ? session.VideoCodec.toUpperCase() : null);
-            var outputVideoCodec = (tInfo && tInfo.VideoCodec) ? tInfo.VideoCodec.toUpperCase() : (isVideoDirect === true ? sourceVideoCodec : null);
+            // Canonical telemetry model (section 8) -- single source of truth shared with
+            // the "Show Details" grid below and the singleton Info drawer, so all three
+            // always agree.
+            var model = buildTelemetryModel(session);
 
-            var sourceAudioCodec = (audioStream && audioStream.Codec) ? audioStream.Codec.toUpperCase() : (session.AudioCodec ? session.AudioCodec.toUpperCase() : null);
-            var outputAudioCodec = (tInfo && tInfo.AudioCodec) ? tInfo.AudioCodec.toUpperCase() : (isAudioDirect === true ? sourceAudioCodec : null);
+            // Extended mode: icon-led summary rows (section 11), truthful values only --
+            // Reason/Engine read "Not applicable" (never a fabricated value) outside Transcode.
+            var extendedRowsHtml = '';
+            if (displayMode === 'extended') {
+                var videoDetail = [
+                    (model.sourceVideoCodec || model.outputVideoCodec) ? escapeHtml((model.sourceVideoCodec || '?') + ' → ' + (model.outputVideoCodec || model.sourceVideoCodec || '?')) : null,
+                    (model.sourceResolution || model.outputResolution) ? escapeHtml((model.sourceResolution || '?') + ' → ' + (model.outputResolution || model.sourceResolution || '?')) : null,
+                    model.frameRateStr ? escapeHtml(model.frameRateStr) : null
+                ].filter(Boolean).join('<span class="playback-ext-sep">&bull;</span>');
 
-            var sourceResolution = (item.Width && item.Height) ? (item.Width + 'x' + item.Height) : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : null);
-            var outputResolution = (tInfo && tInfo.Width && tInfo.Height) ? (tInfo.Width + 'x' + tInfo.Height) : (session.Resolution || (isVideoDirect === true ? sourceResolution : null));
+                var audioDetail = [
+                    (model.sourceAudioCodec || model.outputAudioCodec) ? escapeHtml((model.sourceAudioCodec || '?') + ' → ' + (model.outputAudioCodec || model.sourceAudioCodec || '?')) : null,
+                    model.audioChannelsLayout ? escapeHtml(model.audioChannelsLayout) : null
+                ].filter(Boolean).join('<span class="playback-ext-sep">&bull;</span>');
 
-            var frameRateStr = getTruthfulFrameRate(session, item, videoStream);
+                var containerDetail = (model.sourceContainer || model.outputContainer)
+                    ? escapeHtml((model.sourceContainer || '?') + ' → ' + (model.outputContainer || model.sourceContainer || '?'))
+                    : 'Not reported';
+                if (model.overallBitrateStr) containerDetail += '<span class="playback-ext-sep">&bull;</span>Overall bitrate: ' + escapeHtml(model.overallBitrateStr);
 
-            var rawHw = tInfo ? tInfo.HardwareAccelerationType : session.TranscodeEngine;
-            var hardwareEngineStr = extractTranscoderEngine(rawHw, isVideoDirect);
-
-            var bitrateStr = null;
-            if (tInfo && typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
-                bitrateStr = (tInfo.Bitrate / 1000000).toFixed(1) + ' Mbps';
-            } else if (videoStream && typeof videoStream.BitRate === 'number' && isFinite(videoStream.BitRate) && videoStream.BitRate > 0) {
-                bitrateStr = (videoStream.BitRate / 1000000).toFixed(1) + ' Mbps';
+                extendedRowsHtml = '<div class="playback-ext-rows">' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">Video</span><span class="' + videoBadgeCls + '">' + escapeHtml(model.isVideoDirect === false ? 'Transcode' : 'Direct') + '</span><span class="playback-ext-detail">' + (videoDetail || 'Not reported') + '</span></div>' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">Audio</span><span class="' + audioBadgeCls + '">' + escapeHtml(model.isAudioDirect === false ? 'Transcode' : 'Direct') + '</span><span class="playback-ext-detail">' + (audioDetail || 'Not reported') + '</span></div>' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">Subtitles</span><span class="playback-ext-detail">' + escapeHtml(model.subtitleField || 'Not active') + '</span></div>' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">Container</span><span class="playback-ext-detail">' + containerDetail + '</span></div>' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">HDR</span><span class="playback-ext-detail">' + escapeHtml(model.hdrStatus || 'Not reported') + '<span class="playback-ext-sep">&bull;</span>Tone mapping: ' + escapeHtml(model.hdrToSdrVal) + '</span></div>' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">Engine</span><span class="playback-ext-detail">' + escapeHtml(model.hardwareEngineStr || (classification.method === 'Transcode' ? 'Not reported' : 'Not applicable')) + '</span></div>' +
+                    '<div class="playback-ext-row"><span class="playback-ext-label">Reason</span><span class="playback-ext-detail">' + escapeHtml(model.serverReasons || (classification.method === 'Transcode' ? 'Reason not reported by server' : 'Not applicable')) + '</span></div>' +
+                '</div>';
             }
 
-            var sourceContainer = (item.Container || session.Container || containerVal || '').toUpperCase() || null;
-            var outputContainer = (tInfo && tInfo.Container) ? tInfo.Container.toUpperCase() : (classification.isRemux ? (tInfo && tInfo.Container ? tInfo.Container.toUpperCase() : null) : (isVideoDirect === true && isAudioDirect === true ? sourceContainer : null));
+            // "Show Details" (global toggle, section 10): the full per-field grid, same
+            // canonical fields as the Info drawer minus the identity rows already in the header.
+            var showDetailsGridHtml = showAllDetails ? buildInlineDetailGridHtml(model) : '';
 
-            var containerConversionHtml = '';
-            if (item.Container && tInfo && tInfo.Container && item.Container.toLowerCase() !== tInfo.Container.toLowerCase()) {
-                containerConversionHtml = escapeHtml(item.Container.toUpperCase()) + ' &rarr; ' + escapeHtml(tInfo.Container.toUpperCase());
-            } else if (containerVal) {
-                containerConversionHtml = escapeHtml(containerVal);
-            }
-
-            var serverReasons = getTruthfulTranscodeReasons(session);
-
-            // Extended mode inline summary row (only truthful values, no fabricated QSV or 2191 fps)
-            var metaParts = [];
-            if (hardwareEngineStr) metaParts.push('Engine: ' + escapeHtml(hardwareEngineStr));
-            if (outputVideoCodec || sourceVideoCodec) metaParts.push('Video: ' + escapeHtml(outputVideoCodec || sourceVideoCodec));
-            if (outputAudioCodec || sourceAudioCodec) metaParts.push('Audio: ' + escapeHtml(outputAudioCodec || sourceAudioCodec));
-            if (containerConversionHtml) metaParts.push('Container: ' + containerConversionHtml);
-            if (outputResolution) metaParts.push('Resolution: ' + escapeHtml(outputResolution));
-            if (frameRateStr) metaParts.push(escapeHtml(frameRateStr));
-            if (bitrateStr) metaParts.push('Bitrate: ' + escapeHtml(bitrateStr));
-
-            var cardWhyHtml = '';
-            if (serverReasons) {
-                cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> ' + escapeHtml(serverReasons) + '</div>';
-            } else if (classification.method === 'Transcode') {
-                cardWhyHtml = '<div class="playback-details-row playback-transcode-reasons"><strong>Why:</strong> Reason not reported by server</div>';
-            }
-
-            // Inline "Show Details" technical summary (global toggle, section 10) -- lightweight,
-            // NOT the full 26-field breakdown. The full breakdown lives in the singleton Info drawer.
             var isSummaryOpen = (displayMode === 'extended') || Boolean(showAllDetails);
             var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isSummaryOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
-                '<div class="playback-stream-badges">' +
-                    '<span class="' + videoBadgeCls + '">' + escapeHtml(videoBadgeText) + '</span>' +
-                    '<span class="' + audioBadgeCls + '">' + escapeHtml(audioBadgeText) + '</span>' +
-                '</div>' +
-                (metaParts.length > 0 ? '<div class="playback-details-row playback-extended-summary"><strong>Stream:</strong> ' + metaParts.join(' &bull; ') + '</div>' : '') +
-                cardWhyHtml +
+                extendedRowsHtml +
+                showDetailsGridHtml +
             '</div>';
 
             // Info button: opens the singleton modal Info drawer (section 14), never an inline panel.
             state.cardSessionMap = state.cardSessionMap || {};
             state.cardSessionMap[cardDomId] = session.Id || null;
-            var infoIsOpenForThisCard = Boolean(state.drawer && state.drawer.open && state.drawer.cardDomId === cardDomId);
+            // Compared by stable session ID, not the positional cardDomId -- if session
+            // ordering shifts while the drawer is open, the highlighted Info button must
+            // still track the actual open session, not whichever card now sits in that slot.
+            var infoIsOpenForThisCard = Boolean(state.drawer && state.drawer.open && session.Id && state.drawer.sessionId === session.Id);
             var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-haspopup="dialog" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="playback-drawer-panel" id="btn-info-' + cardDomId + '" title="View full technical stream details">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
             // Artwork
             var apiClient = getApiClient();
+            var userAvatarUrl = resolveUserAvatarUrl(session, apiClient);
+            var userAvatarHtml = userAvatarUrl
+                ? '<img class="playback-user-avatar" src="' + escapeHtml(userAvatarUrl) + '" alt="" onerror="this.remove()" />'
+                : '';
             var art = resolveArtworkUrls(session, item, apiClient);
             var posterUrl = art.posterUrl;
             var backdropUrl = art.backdropUrl;
@@ -1131,12 +1193,13 @@
                         '<div class="playback-card-user-group">' +
                             '<span class="playback-platform-icon" data-client-brand="' + escapeHtml(clientBrand.key) + '" title="' + client + '">' + platformIconSvg + '</span>' +
                             '<div class="playback-card-user-info">' +
-                                '<div class="playback-card-user">' + user + '</div>' +
+                                '<div class="playback-card-user">' + userAvatarHtml + user + '</div>' +
                                 '<div class="playback-card-client">' + clientDevice + '</div>' +
                             '</div>' +
                         '</div>' +
                         '<div class="playback-badge-group">' +
-                            '<span class="playback-badge ' + badgeClass + '">' + stateIcon + ' ' + badgeText + '</span>' +
+                            '<span class="playback-badge state-badge ' + stateBadgeCls + '">' + stateIcon + ' ' + escapeHtml(stateLabel) + '</span>' +
+                            '<span class="playback-badge ' + methodBadgeCls + '">' + escapeHtml(methodLabel) + '</span>' +
                             infoBtnHtml +
                         '</div>' +
                     '</div>' +
@@ -1154,6 +1217,7 @@
                         '</div>' +
                         '<div class="playback-progress-times">' +
                             '<span>' + formatTicks(positionTicks) + '</span>' +
+                            (model.etaText ? '<span class="playback-eta">ETA ' + escapeHtml(model.etaText) + '</span>' : '') +
                             '<span>' + formatTicks(runtimeTicks) + '</span>' +
                         '</div>' +
                     '</div>' +
@@ -1227,8 +1291,15 @@
         var serverReasons = getTruthfulTranscodeReasons(session);
         var hdrStatus = extractDynamicRangePill(videoStream) || (videoStream ? 'SDR' : null);
         var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
+        var audioLanguage = extractAudioLanguage(audioStream);
+        var atmosBadge = extractAtmosBadge(audioStream);
         var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
+        if (audioChannelsLayout && audioLanguage) audioChannelsLayout = audioLanguage + ' ' + audioChannelsLayout;
 
+        // Subtitle delivery method (Encode/Embed/External/Hls) is real, server-reported data --
+        // burned-in ("Encode") subtitles are a genuine, common reason a video gets transcoded
+        // even when its codec is otherwise compatible, so this is surfaced as fact, not guessed.
+        var DELIVERY_METHOD_LABELS = { Encode: 'Burned into video (forces transcode)', Embed: 'Embedded', External: 'External file', Hls: 'Segmented (HLS)', Drop: 'Dropped' };
         var subIndex = (playStateM.SubtitleStreamIndex != null) ? playStateM.SubtitleStreamIndex : ((session && session.SubtitleStreamIndex != null) ? session.SubtitleStreamIndex : -1);
         var subtitleField = null;
         if (subIndex !== -1 && subIndex != null) {
@@ -1239,10 +1310,19 @@
                     var isCC = Boolean(subS.IsHearingImpaired) || subTitle.indexOf('sdh') !== -1 || subTitle.indexOf('cc') !== -1;
                     var subLabel = subS.DisplayTitle || subS.Language || 'Subtitle';
                     subtitleField = (isCC ? 'Closed Captions' : subLabel) + (subS.Codec ? ' (' + String(subS.Codec).toUpperCase() + ')' : '');
+                    var deliveryLabel = subS.DeliveryMethod ? DELIVERY_METHOD_LABELS[subS.DeliveryMethod] : null;
+                    if (deliveryLabel) subtitleField += ' — ' + deliveryLabel;
                     break;
                 }
             }
         }
+
+        // ETA: real wall-clock estimate from remaining runtime, never shown while paused.
+        var positionTicks = (typeof session.PositionTicks === 'number' && isFinite(session.PositionTicks)) ? session.PositionTicks
+            : ((typeof playStateM.PositionTicks === 'number' && isFinite(playStateM.PositionTicks)) ? playStateM.PositionTicks : 0);
+        var runtimeTicks = (typeof session.RunTimeTicks === 'number' && isFinite(session.RunTimeTicks)) ? session.RunTimeTicks
+            : ((typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks)) ? item.RunTimeTicks : 0);
+        var etaText = (!isPaused && runtimeTicks > positionTicks) ? formatEta(runtimeTicks - positionTicks) : null;
 
         var clientBrand = resolveClientBrand({ client: session && session.Client, deviceName: session && session.DeviceName });
 
@@ -1273,7 +1353,10 @@
             hdrStatus: hdrStatus,
             hdrToSdrVal: hdrToSdrVal,
             audioChannelsLayout: audioChannelsLayout,
+            audioLanguage: audioLanguage,
+            atmosBadge: atmosBadge,
             subtitleField: subtitleField,
+            etaText: etaText,
             clientBrand: clientBrand
         };
     }
@@ -1282,19 +1365,20 @@
      * Builds the Info drawer's full, grouped 26-field technical breakdown (section 14) for one session.
      * Pure function of the session -- safe to call independently of any card render/DOM state.
      */
-    function buildDrawerContentHtml(session) {
-        if (!session || typeof session !== 'object') {
-            return '<div class="playback-drawer-empty">No session selected.</div>';
-        }
-
-        var m = buildTelemetryModel(session);
+    /**
+     * Single source of truth for the canonical field list (section 8/14), grouped.
+     * Consumed by both the singleton Info drawer (all 26 fields, grouped with headers)
+     * and the inline per-card "Show Details" grid (same fields minus the identity rows
+     * already shown in the card header, flattened with no group headers).
+     */
+    function buildFieldGroups(m) {
         var c = m.classification;
 
         function row(key, val) {
             return { key: key, val: val };
         }
 
-        var groups = [
+        return [
             {
                 title: 'Playback',
                 rows: [
@@ -1336,30 +1420,56 @@
                     row('Output Container', escapeHtml(m.outputContainer || (m.isVideoDirect === true && m.isAudioDirect === true ? (m.sourceContainer || 'Direct') : 'Not reported'))),
                     row('Video Bitrate', escapeHtml(m.videoBitrateStr || 'Not reported')),
                     row('Overall Stream Bitrate', escapeHtml(m.overallBitrateStr || 'Not reported')),
-                    row('Hardware Engine', escapeHtml(m.hardwareEngineStr || 'Not reported')),
-                    row('Transcode Reason', escapeHtml(m.serverReasons || (c.method === 'Transcode' ? 'Reason not reported by server' : 'Not reported')))
+                    row('Hardware Engine', escapeHtml(m.hardwareEngineStr || (c.method === 'Transcode' ? 'Not reported' : 'Not applicable'))),
+                    row('Transcode Reason', escapeHtml(m.serverReasons || (c.method === 'Transcode' ? 'Reason not reported by server' : 'Not applicable')))
                 ]
             },
             {
                 title: 'Subtitles',
                 rows: [
-                    row('Subtitle Stream / Language', escapeHtml(m.subtitleField || 'None'))
+                    row('Subtitle Stream / Language', escapeHtml(m.subtitleField || 'Not active'))
                 ]
             }
         ];
+    }
+
+    function fieldRowHtml(r, withDrawerAttr) {
+        return '<div class="playback-info-row"' + (withDrawerAttr ? ' data-drawer-field="' + slugifyFieldKey(r.key) + '"' : '') + '>' +
+            '<span class="playback-info-key">' + escapeHtml(r.key) + '</span>' +
+            '<span class="playback-info-val">' + r.val + '</span>' +
+        '</div>';
+    }
+
+    function buildDrawerContentHtml(session) {
+        if (!session || typeof session !== 'object') {
+            return '<div class="playback-drawer-empty">No session selected.</div>';
+        }
+
+        var groups = buildFieldGroups(buildTelemetryModel(session));
 
         return groups.map(function (group) {
-            var rowsHtml = group.rows.map(function (r) {
-                return '<div class="playback-info-row" data-drawer-field="' + slugifyFieldKey(r.key) + '">' +
-                    '<span class="playback-info-key">' + escapeHtml(r.key) + '</span>' +
-                    '<span class="playback-info-val">' + r.val + '</span>' +
-                '</div>';
-            }).join('');
+            var rowsHtml = group.rows.map(function (r) { return fieldRowHtml(r, true); }).join('');
             return '<div class="playback-drawer-group">' +
                 '<h4 class="playback-drawer-group-title">' + escapeHtml(group.title) + '</h4>' +
                 '<div class="playback-info-grid">' + rowsHtml + '</div>' +
             '</div>';
         }).join('');
+    }
+
+    var INLINE_GRID_SKIP_KEYS = { 'User': true, 'Client': true, 'Client Version': true, 'Device': true };
+
+    // The "Show Details" inline per-card grid: the same 22 non-identity fields as the
+    // drawer (User/Client/Client Version/Device are omitted -- already shown in the card
+    // header), flattened into one grid with no group headers.
+    function buildInlineDetailGridHtml(model) {
+        var groups = buildFieldGroups(model);
+        var rowsHtml = groups.reduce(function (acc, group) {
+            group.rows.forEach(function (r) {
+                if (!INLINE_GRID_SKIP_KEYS[r.key]) acc.push(fieldRowHtml(r, false));
+            });
+            return acc;
+        }, []);
+        return '<div class="playback-info-grid">' + rowsHtml.join('') + '</div>';
     }
 
     function calculateSessionCounts(sessions) {
@@ -1453,7 +1563,7 @@
                     '<span class="playback-count-chip count-ds" data-count-method="directStream" data-count-value="' + counts.directStream + '"><span class="count-val">' + counts.directStream + '</span> Direct Stream</span>' +
                     '<span class="playback-count-chip count-remux" data-count-method="remux" data-count-value="' + counts.remux + '"><span class="count-val">' + counts.remux + '</span> Remux</span>' +
                     '<span class="playback-count-chip count-tc" data-count-method="transcode" data-count-value="' + counts.transcode + '"><span class="count-val">' + counts.transcode + '</span> Transcode</span>' +
-                    (counts.paused > 0 ? '<span class="playback-count-chip count-paused" data-count-method="paused" data-count-value="' + counts.paused + '"><span class="count-val">' + counts.paused + '</span> Paused</span>' : '') +
+                    '<span class="playback-count-chip count-paused" data-count-method="paused" data-count-value="' + counts.paused + '"><span class="count-val">' + counts.paused + '</span> Paused</span>' +
                 '</div>' +
             '</div>' +
             '<div class="playback-dashboard-controls">' +
@@ -1665,7 +1775,7 @@
         unlockBodyScroll();
 
         var storedFocusEl = state.drawer.lastFocusEl;
-        var cardDomId = state.drawer.cardDomId;
+        var sessionId = state.drawer.sessionId;
         state.drawer.open = false;
         state.drawer.sessionId = null;
         state.drawer.cardDomId = null;
@@ -1676,10 +1786,23 @@
 
         // The stored trigger element goes stale the moment a poll/re-render rebuilds the
         // cards grid (container.innerHTML replaces every node), so prefer it only while
-        // still attached, and otherwise re-resolve the button fresh by its stable DOM id.
+        // still attached. Otherwise re-resolve the button by the session's CURRENT card
+        // slot (via cardSessionMap), not the positional id captured at open time -- if
+        // session ordering shifted while the drawer was open, that slot may now belong
+        // to a different session entirely.
         var focusTarget = (storedFocusEl && storedFocusEl.isConnected) ? storedFocusEl : null;
-        if (!focusTarget && cardDomId && typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-            focusTarget = document.getElementById('btn-info-' + cardDomId);
+        if (!focusTarget && sessionId && typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+            var freshCardDomId = null;
+            var map = state.cardSessionMap || {};
+            for (var key in map) {
+                if (Object.prototype.hasOwnProperty.call(map, key) && map[key] === sessionId) {
+                    freshCardDomId = key;
+                    break;
+                }
+            }
+            if (freshCardDomId) {
+                focusTarget = document.getElementById('btn-info-' + freshCardDomId);
+            }
         }
         if (focusTarget && typeof focusTarget.focus === 'function') {
             try { focusTarget.focus(); } catch (_) {}
@@ -1972,6 +2095,10 @@
         resolveArtworkUrls: resolveArtworkUrls,
         getPlatformIconSvg: getPlatformIconSvg,
         resolveClientBrand: resolveClientBrand,
+        extractAtmosBadge: extractAtmosBadge,
+        extractAudioLanguage: extractAudioLanguage,
+        formatEta: formatEta,
+        resolveUserAvatarUrl: resolveUserAvatarUrl,
         buildTelemetryModel: buildTelemetryModel,
         buildDrawerContentHtml: buildDrawerContentHtml,
         ensureDrawerMounted: ensureDrawerMounted,

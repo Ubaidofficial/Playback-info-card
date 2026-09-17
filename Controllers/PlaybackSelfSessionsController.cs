@@ -132,12 +132,12 @@ public class PlaybackSelfSessionsController : ControllerBase
                 transcodeEngine = hw;
             }
 
+            // Remux means every stream is being copied without re-encoding (video AND audio direct).
+            // This is true regardless of whether the container itself differs from the source
+            // (e.g. video+audio copied into a different container is still a remux, not a transcode).
+            // Requiring both IsVideoDirect and IsAudioDirect here is what distinguishes a true remux
+            // from a session where audio is actively being re-encoded (which must report as Transcode).
             if (tInfo.IsVideoDirect && tInfo.IsAudioDirect)
-            {
-                isRemux = true;
-            }
-            else if (tInfo.IsVideoDirect && !string.IsNullOrEmpty(tInfo.Container) && !string.IsNullOrEmpty(item?.Container) &&
-                     !tInfo.Container.Equals(item.Container, StringComparison.OrdinalIgnoreCase))
             {
                 isRemux = true;
             }

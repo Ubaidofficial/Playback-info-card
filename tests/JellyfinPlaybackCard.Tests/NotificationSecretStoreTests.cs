@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using Jellyfin.Plugin.PlaybackCard.Notifications;
 using Xunit;
 
@@ -241,5 +244,181 @@ public class NotificationSecretStoreTests : IDisposable
         Assert.Empty(NotificationSecretStore.WindowsDpapi.Unprotect(Array.Empty<byte>()));
         Assert.Empty(NotificationSecretStore.WindowsDpapi.Protect(null!));
         Assert.Empty(NotificationSecretStore.WindowsDpapi.Unprotect(null!));
+    }
+
+    /// <summary>
+    /// Subscribes to <see cref="NotificationSecretStore.DiagnosticWarningRaised"/> for the duration of
+    /// <paramref name="action"/> and returns every warning message raised while it ran.
+    /// </summary>
+    private static List<string> CaptureDiagnosticWarnings(Action action)
+    {
+        var captured = new List<string>();
+        void Handler(string msg) => captured.Add(msg);
+
+        NotificationSecretStore.DiagnosticWarningRaised += Handler;
+        try
+        {
+            action();
+        }
+        finally
+        {
+            NotificationSecretStore.DiagnosticWarningRaised -= Handler;
+        }
+
+        return captured;
+    }
+
+    // ---- Bug 1: weak, guessable fallback encryption key ----
+
+    [Fact]
+    public void GetOrCreateMasterKey_NormalPath_StillWorksAndIsNotUsingFallback()
+    {
+        var store = new NotificationSecretStore(customFilePath: _tempFile);
+
+        Assert.False(store.IsUsingInMemoryFallbackMasterKey);
+
+        var key1 = store.GetMasterKeyForTests();
+        var key2 = store.GetMasterKeyForTests();
+        Assert.Equal(32, key1.Length);
+        Assert.Equal(key1, key2); // stable across repeated calls when nothing failed
+    }
+
+    [Fact]
+    public void GetOrCreateMasterKey_FallsBackToRandomInMemoryKey_WhenKeyFileIoFails()
+    {
+        // Force the master key *file path* itself to be an existing directory rather than a file.
+        // GetOrCreateMasterKey can still write its temp key file (it lands in the same writable
+        // parent directory as the main secrets file), but the final File.Move onto the key path
+        // fails because a directory occupies that exact path -- a reliable, cross-platform I/O
+        // failure that does NOT interfere with the main secrets file's own directory, so we can
+        // still verify a genuine encrypt-then-decrypt round trip through real disk I/O below.
+        var keyPath = Path.ChangeExtension(_tempFile, ".key");
+        Directory.CreateDirectory(keyPath);
+        try
+        {
+            var store1 = new NotificationSecretStore(customFilePath: _tempFile);
+
+            byte[] key1 = null!;
+            var warnings1 = CaptureDiagnosticWarnings(() =>
+            {
+                key1 = store1.GetMasterKeyForTests();
+            });
+
+            Assert.True(store1.IsUsingInMemoryFallbackMasterKey);
+            Assert.Equal(32, key1.Length);
+
+            var derivableKey = SHA256.HashData(Encoding.UTF8.GetBytes(AppContext.BaseDirectory + "_playback_card_fallback"));
+            Assert.NotEqual(derivableKey, key1);
+            Assert.Contains(warnings1, w => w.Contains("in-memory-only", StringComparison.OrdinalIgnoreCase));
+
+            // The fallback key must round-trip correctly for the lifetime of the process: setting
+            // a secret encrypts and persists it to disk under the cached fallback key, and reloading
+            // from that same disk file must decrypt correctly using the SAME cached key.
+            store1.SetDiscordWebhookUrl("https://discord.com/api/webhooks/1/inMemoryFallbackToken");
+            Assert.True(File.Exists(_tempFile));
+            store1.Reload();
+            Assert.Equal("https://discord.com/api/webhooks/1/inMemoryFallbackToken", store1.GetDiscordWebhookUrl());
+
+            // A second, independently constructed instance hitting the same failure must mint its
+            // OWN random key -- not a deterministic one derived from any shared/public input.
+            var store2 = new NotificationSecretStore(customFilePath: _tempFile);
+            var key2 = store2.GetMasterKeyForTests();
+            Assert.True(store2.IsUsingInMemoryFallbackMasterKey);
+            Assert.NotEqual(derivableKey, key2);
+            Assert.NotEqual(key1, key2);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(keyPath, recursive: true);
+            }
+            catch
+            {
+                // best-effort cleanup
+            }
+
+            try
+            {
+                foreach (var stray in Directory.EnumerateFiles(Path.GetTempPath(), Path.GetFileName(keyPath) + ".tmp.*"))
+                {
+                    File.Delete(stray);
+                }
+            }
+            catch
+            {
+                // best-effort cleanup
+            }
+        }
+    }
+
+    // ---- Bug 2: Windows ACL hardening silently no-ops on failure ----
+
+    [Fact]
+    public void ApplyWindowsRestrictedAcl_LogsWarning_WhenIcaclsCannotRun()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"acl_test_{Guid.NewGuid():N}.tmp");
+        File.WriteAllText(path, "test");
+        try
+        {
+            // On any host without a real icacls.exe on PATH/System32 (i.e. this test suite's CI and
+            // local dev environments, which are not Windows), Process.Start throws or the tool is
+            // simply absent -- deterministically exercising the failure path that used to be a bare
+            // `catch { }` with zero logging.
+            var warnings = CaptureDiagnosticWarnings(() =>
+            {
+                NotificationSecretStore.ApplyWindowsRestrictedAcl(path);
+            });
+
+            Assert.NotEmpty(warnings);
+            Assert.Contains(warnings, w => w.Contains(path, StringComparison.Ordinal));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    // ---- Bug 3: master-key mismatch silently wipes stored secrets ----
+
+    [Fact]
+    public void Load_KeyMismatch_WipesInMemoryStateButPreservesEncryptedFileAndLogsWarning()
+    {
+        var store1 = new NotificationSecretStore(customFilePath: _tempFile);
+        store1.SetDiscordWebhookUrl("https://discord.com/api/webhooks/1/keyMismatchTestToken");
+        store1.SetTelegramBotToken("12345:keyMismatchTestToken");
+
+        var keyFile = Path.ChangeExtension(_tempFile, ".key");
+        Assert.True(File.Exists(keyFile));
+        var originalEncryptedBytes = File.ReadAllBytes(_tempFile);
+
+        // Simulate the on-disk master key changing since the file was encrypted (e.g. a prior
+        // process fell back to a different key, or the key file was rotated/replaced). A raw
+        // 32-byte key file is accepted as-is by WindowsDpapi.Unprotect on every platform, so this
+        // is a reliable, cross-platform way to force a genuine key mismatch on the next Load().
+        var differentKey = new byte[32];
+        RandomNumberGenerator.Fill(differentKey);
+        File.WriteAllBytes(keyFile, differentKey);
+
+        NotificationSecretStore store2 = null!;
+        var warnings = CaptureDiagnosticWarnings(() =>
+        {
+            store2 = new NotificationSecretStore(customFilePath: _tempFile);
+        });
+
+        // (a) in-memory state must be empty -- it genuinely cannot be decrypted without the right key
+        Assert.Empty(store2.GetDiscordWebhookUrl());
+        Assert.Empty(store2.GetTelegramBotToken());
+        Assert.Empty(store2.GetConfiguredSecrets());
+
+        // (b) a warning distinguishing a key mismatch from generic corruption must be observable
+        Assert.Contains(warnings, w =>
+            w.Contains("master key", StringComparison.OrdinalIgnoreCase) &&
+            w.Contains("decrypt", StringComparison.OrdinalIgnoreCase));
+
+        // (c) the original encrypted file on disk must NOT be overwritten/destroyed by the failed
+        // load alone, so the data remains recoverable if the correct key is restored later.
+        var afterBytes = File.ReadAllBytes(_tempFile);
+        Assert.Equal(originalEncryptedBytes, afterBytes);
     }
 }

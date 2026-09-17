@@ -181,6 +181,57 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
         return await SendAsync(testPayload, botToken, chatId, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Sender-specific configuration handed to <see cref="WebhookSenderRetryHelper"/>: Telegram
+    /// always needs the response body, both to confirm 2xx responses carry <c>ok:true</c> and to
+    /// extract the human-readable <c>description</c> field on 4xx/429 errors.
+    /// </summary>
+    private static readonly WebhookSenderProfile TelegramProfile = new()
+    {
+        SenderTag = "TelegramSender",
+        ApiDisplayName = "Telegram Bot API",
+        ReadSuccessBody = true,
+        ParseSuccess = (logger, status, body) => ParseTelegramSuccess(logger, status, body),
+        ParseRetryAfter = (response, body) => ParseTelegramRetryAfter(response, body),
+        ReadClientErrorBody = true,
+        DescribeClientError = (status, body) =>
+        {
+            var errorDesc = ParseTelegramErrorDescription(body);
+            return status switch
+            {
+                400 => errorDesc ?? "Bad Request (verify chat ID and bot permissions)",
+                401 => errorDesc ?? "Unauthorized (invalid Telegram bot token)",
+                403 => errorDesc ?? "Forbidden (bot was blocked or lacks chat access)",
+                404 => errorDesc ?? "Not Found (invalid bot token or endpoint on Telegram)",
+                _ => errorDesc
+            };
+        }
+    };
+
+    private static DeliveryResult ParseTelegramSuccess(ILogger logger, int status, string? responseBody)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody ?? string.Empty);
+            if (doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean())
+            {
+                return DeliveryResult.Ok(status);
+            }
+
+            logger.LogWarning("[TelegramSender] Telegram 2xx response lacked ok:true");
+            return DeliveryResult.Failed("InvalidResponse", status, permanent: false);
+        }
+        catch (Exception ex)
+        {
+            // Broad catch preserved intentionally: covers JSON parse failures as well as
+            // unexpected token types (e.g. "ok" present but not a JSON boolean) so a malformed
+            // 2xx body is reported as a non-retried InvalidResponse rather than surfacing as an
+            // unhandled exception to the shared retry helper's outer network-error handling.
+            logger.LogWarning("[TelegramSender] Failed parsing 2xx JSON response: {Error}", SecretRedactor.SanitizeExceptionMessage(ex));
+            return DeliveryResult.Failed("InvalidResponse", status, permanent: false);
+        }
+    }
+
     /// <inheritdoc />
     public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken)
     {
@@ -202,136 +253,14 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             ["disable_web_page_preview"] = true
         });
 
-        return await ExecuteWithRetryAsync(uri!, jsonPayload, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<DeliveryResult> ExecuteWithRetryAsync(Uri uri, string jsonPayload, CancellationToken cancellationToken)
-    {
-        const int maxRetries = 3;
-        const double maxAllowedDelaySecs = 30.0;
-
-        for (var attempt = 0; attempt <= maxRetries; attempt++)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Post, uri);
-            request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-            try
-            {
-                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                var status = (int)response.StatusCode;
-
-                if (status >= 300 && status <= 399)
-                {
-                    _logger.LogWarning("[TelegramSender] Unexpected redirect received ({Status}); aborting.", status);
-                    return DeliveryResult.Failed("InvalidResponse", status, permanent: true);
-                }
-
-                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-                // For every 2xx response, parse JSON and require ok: true
-                if (status >= 200 && status <= 299)
-                {
-                    try
-                    {
-                        using var doc = JsonDocument.Parse(responseBody);
-                        if (doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean())
-                        {
-                            return DeliveryResult.Ok(status);
-                        }
-
-                        _logger.LogWarning("[TelegramSender] Telegram 2xx response lacked ok:true");
-                        return DeliveryResult.Failed("InvalidResponse", status, permanent: false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning("[TelegramSender] Failed parsing 2xx JSON response: {Error}", SecretRedactor.SanitizeExceptionMessage(ex));
-                        return DeliveryResult.Failed("InvalidResponse", status, permanent: false);
-                    }
-                }
-
-                // 429 Rate limited
-                if (status == 429)
-                {
-                    var retryAfter = ParseTelegramRetryAfter(response, responseBody);
-
-                    // If server asks for delay greater than maximum allowed (30s), drop instead of premature retrying
-                    if (retryAfter.HasValue && retryAfter.Value.TotalSeconds > maxAllowedDelaySecs)
-                    {
-                        _logger.LogWarning("[TelegramSender] Rate-limit delay of {Delay}s exceeds maximum threshold; dropping event.", retryAfter.Value.TotalSeconds);
-                        return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
-                    }
-
-                    if (attempt < maxRetries && retryAfter.HasValue)
-                    {
-                        var delay = retryAfter.Value;
-                        _logger.LogInformation("[TelegramSender] Rate limited (429); backing off for {Delay}s", delay.TotalSeconds);
-                        await DelayWaitAsync(delay, cancellationToken).ConfigureAwait(false);
-                        continue;
-                    }
-
-                    return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
-                }
-
-                var errorDesc = ParseTelegramErrorDescription(responseBody);
-                if (status == 400) return DeliveryResult.Failed("BadRequest", 400, permanent: true, description: errorDesc ?? "Bad Request (verify chat ID and bot permissions)");
-                if (status == 401) return DeliveryResult.Failed("Unauthorized", 401, permanent: true, description: errorDesc ?? "Unauthorized (invalid Telegram bot token)");
-                if (status == 403) return DeliveryResult.Failed("Forbidden", 403, permanent: true, description: errorDesc ?? "Forbidden (bot was blocked or lacks chat access)");
-                if (status == 404) return DeliveryResult.Failed("NotFound", 404, permanent: true, description: errorDesc ?? "Not Found (invalid bot token or endpoint on Telegram)");
-
-                if (attempt < maxRetries && (status >= 500 || status == 408 || status == 425))
-                {
-                    var backoff = ComputeBackoff(attempt);
-                    _logger.LogWarning("[TelegramSender] Transient failure ({Status}); retrying in {Backoff}ms", status, backoff);
-                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                return DeliveryResult.Failed("ServerError", status, permanent: false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                return DeliveryResult.Failed("Cancelled", 0, permanent: true, description: "Delivery cancelled by request.");
-            }
-            catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
-            {
-                if (attempt < maxRetries)
-                {
-                    var backoff = ComputeBackoff(attempt);
-                    _logger.LogWarning("[TelegramSender] Timeout contacting Telegram API; retrying in {Backoff}ms", backoff);
-                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                _logger.LogError("[TelegramSender] Delivery timed out after {Max} attempts", maxRetries + 1);
-                return DeliveryResult.Failed("Timeout", 408, permanent: false, description: "Request timed out while connecting to Telegram Bot API.");
-            }
-            catch (Exception ex)
-            {
-                var sanitized = SecretRedactor.SanitizeExceptionMessage(ex);
-                if (attempt < maxRetries)
-                {
-                    var backoff = ComputeBackoff(attempt);
-                    _logger.LogWarning("[TelegramSender] Network error: {Error}; retrying in {Backoff}ms", sanitized, backoff);
-                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                _logger.LogError("[TelegramSender] Delivery failed after retries: {Error}", sanitized);
-                return DeliveryResult.Failed("NetworkError", 0, permanent: false, description: $"Network error connecting to Telegram Bot API: {sanitized}");
-            }
-        }
-
-        return DeliveryResult.Failed("ServerError", 0, permanent: false);
-    }
-
-    private Task DelayWaitAsync(TimeSpan delay, CancellationToken cancellationToken)
-    {
-        if (DelayAsync != null)
-        {
-            return DelayAsync(delay, cancellationToken);
-        }
-
-        return Task.Delay(delay, cancellationToken);
+        return await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
+            _httpClient,
+            _logger,
+            TelegramProfile,
+            uri!,
+            jsonPayload,
+            DelayAsync,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public static TimeSpan? ParseTelegramRetryAfter(HttpResponseMessage response, string? responseBody)
@@ -365,13 +294,6 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
         }
 
         return TimeSpan.FromSeconds(2);
-    }
-
-    private static int ComputeBackoff(int attempt)
-    {
-        var baseMs = (int)Math.Pow(2, attempt) * 1000;
-        var jitter = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100, 500);
-        return Math.Min(30000, baseMs + jitter);
     }
 
     /// <summary>
@@ -578,18 +500,6 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
 #pragma warning restore CA1308
         }
         return stack;
-    }
-
-    private static int CountOccurrences(string source, string pattern)
-    {
-        var count = 0;
-        var idx = 0;
-        while ((idx = source.IndexOf(pattern, idx, StringComparison.OrdinalIgnoreCase)) != -1)
-        {
-            count++;
-            idx += pattern.Length;
-        }
-        return count;
     }
 
     private static string? ParseTelegramErrorDescription(string? responseBody)

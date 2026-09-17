@@ -220,6 +220,31 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
         return await SendAsync(testPayload, webhookUrl, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Sender-specific configuration handed to <see cref="WebhookSenderRetryHelper"/>: how to
+    /// recognize a successful 2xx response, how to parse a 429 Retry-After value, and how to
+    /// describe a permanent 4xx client error. Discord never needs the response body except for
+    /// the 429 case (its 2xx responses are typically 204 No Content, and its 4xx descriptions
+    /// are fixed strings), which this profile preserves exactly.
+    /// </summary>
+    private static readonly WebhookSenderProfile DiscordProfile = new()
+    {
+        SenderTag = "DiscordSender",
+        ApiDisplayName = "Discord Webhook",
+        ReadSuccessBody = false,
+        ParseSuccess = (_, status, _) => DeliveryResult.Ok(status),
+        ParseRetryAfter = (response, body) => ParseRetryAfter(response, body),
+        ReadClientErrorBody = false,
+        DescribeClientError = (status, _) => status switch
+        {
+            400 => "Bad Request (malformed Discord payload or parameters)",
+            401 => "Unauthorized (invalid or revoked Discord webhook token)",
+            403 => "Forbidden (Discord webhook lacks permissions in channel)",
+            404 => "Not Found (Discord webhook URL does not exist or channel was deleted)",
+            _ => null
+        }
+    };
+
     /// <inheritdoc />
     public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken)
     {
@@ -230,122 +255,14 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
         }
 
         var jsonBody = BuildDiscordJsonPayload(payload);
-        return await ExecuteWithRetryAsync(uri!, jsonBody, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<DeliveryResult> ExecuteWithRetryAsync(Uri uri, string jsonPayload, CancellationToken cancellationToken)
-    {
-        const int maxRetries = 3;
-        const double maxAllowedDelaySecs = 30.0;
-
-        for (var attempt = 0; attempt <= maxRetries; attempt++)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Post, uri);
-            request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-            try
-            {
-                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-                var status = (int)response.StatusCode;
-
-                // 2xx Success (including 204 No Content common for Discord webhooks)
-                if (status >= 200 && status <= 299)
-                {
-                    return DeliveryResult.Ok(status);
-                }
-
-                // 3xx Redirect rejected (SSRF protection)
-                if (status >= 300 && status <= 399)
-                {
-                    _logger.LogWarning("[DiscordSender] Unexpected redirect received ({Status}); aborting for security.", status);
-                    return DeliveryResult.Failed("InvalidResponse", status, permanent: true);
-                }
-
-                // 429 Rate limited
-                if (status == 429)
-                {
-                    var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    var retryAfter = ParseRetryAfter(response, responseBody);
-
-                    // If server asks for delay greater than maximum allowed (30s), drop instead of premature retrying
-                    if (retryAfter.HasValue && retryAfter.Value.TotalSeconds > maxAllowedDelaySecs)
-                    {
-                        _logger.LogWarning("[DiscordSender] Rate-limit delay of {Delay}s exceeds maximum threshold; dropping event.", retryAfter.Value.TotalSeconds);
-                        return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
-                    }
-
-                    if (attempt < maxRetries && retryAfter.HasValue)
-                    {
-                        var delay = retryAfter.Value;
-                        _logger.LogInformation("[DiscordSender] Rate limited (429); backing off for {Delay}s", delay.TotalSeconds);
-                        await DelayWaitAsync(delay, cancellationToken).ConfigureAwait(false);
-                        continue;
-                    }
-
-                    return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
-                }
-
-                // Permanent client errors (400, 401, 403, 404)
-                if (status == 400) return DeliveryResult.Failed("BadRequest", 400, permanent: true, description: "Bad Request (malformed Discord payload or parameters)");
-                if (status == 401) return DeliveryResult.Failed("Unauthorized", 401, permanent: true, description: "Unauthorized (invalid or revoked Discord webhook token)");
-                if (status == 403) return DeliveryResult.Failed("Forbidden", 403, permanent: true, description: "Forbidden (Discord webhook lacks permissions in channel)");
-                if (status == 404) return DeliveryResult.Failed("NotFound", 404, permanent: true, description: "Not Found (Discord webhook URL does not exist or channel was deleted)");
-
-                // Transient server errors (5xx, 408, 425)
-                if (attempt < maxRetries && (status >= 500 || status == 408 || status == 425))
-                {
-                    var backoff = ComputeBackoff(attempt);
-                    _logger.LogWarning("[DiscordSender] Transient failure ({Status}); retrying in {Backoff}ms", status, backoff);
-                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                return DeliveryResult.Failed("ServerError", status, permanent: false);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                return DeliveryResult.Failed("Cancelled", 0, permanent: true, description: "Delivery cancelled by request.");
-            }
-            catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
-            {
-                if (attempt < maxRetries)
-                {
-                    var backoff = ComputeBackoff(attempt);
-                    _logger.LogWarning("[DiscordSender] Timeout contacting Discord API; retrying in {Backoff}ms", backoff);
-                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                _logger.LogError("[DiscordSender] Delivery timed out after {Max} attempts", maxRetries + 1);
-                return DeliveryResult.Failed("Timeout", 408, permanent: false, description: "Request timed out while connecting to Discord Webhook.");
-            }
-            catch (Exception ex)
-            {
-                var sanitized = SecretRedactor.SanitizeExceptionMessage(ex);
-                if (attempt < maxRetries)
-                {
-                    var backoff = ComputeBackoff(attempt);
-                    _logger.LogWarning("[DiscordSender] Network error: {Error}; retrying in {Backoff}ms", sanitized, backoff);
-                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                _logger.LogError("[DiscordSender] Delivery failed after retries: {Error}", sanitized);
-                return DeliveryResult.Failed("NetworkError", 0, permanent: false, description: $"Network error connecting to Discord Webhook: {sanitized}");
-            }
-        }
-
-        return DeliveryResult.Failed("ServerError", 0, permanent: false);
-    }
-
-    private Task DelayWaitAsync(TimeSpan delay, CancellationToken cancellationToken)
-    {
-        if (DelayAsync != null)
-        {
-            return DelayAsync(delay, cancellationToken);
-        }
-
-        return Task.Delay(delay, cancellationToken);
+        return await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
+            _httpClient,
+            _logger,
+            DiscordProfile,
+            uri!,
+            jsonBody,
+            DelayAsync,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public static TimeSpan? ParseRetryAfter(HttpResponseMessage response, string? responseBody = null)
@@ -392,13 +309,6 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
         }
 
         return TimeSpan.FromSeconds(2);
-    }
-
-    private static int ComputeBackoff(int attempt)
-    {
-        var baseMs = (int)Math.Pow(2, attempt) * 1000;
-        var jitter = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100, 500);
-        return Math.Min(30000, baseMs + jitter);
     }
 
     /// <summary>
@@ -589,4 +499,193 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
     }
 
     private sealed record DiscordField(string Name, string Value, bool Inline);
+}
+
+/// <summary>
+/// Per-sender configuration describing the parts of outbound HTTP dispatch that legitimately
+/// differ between webhook/bot-API senders (Discord, Telegram): log/description text, whether the
+/// response body needs to be read to determine success or to describe a permanent failure, and
+/// how to interpret that body. Everything else (retry counts, exponential backoff, and the
+/// 429/408/425/5xx transient-failure branching) is identical between senders and lives in
+/// <see cref="WebhookSenderRetryHelper"/>.
+/// </summary>
+internal sealed class WebhookSenderProfile
+{
+    public required string SenderTag { get; init; }
+
+    public required string ApiDisplayName { get; init; }
+
+    public bool ReadSuccessBody { get; init; }
+
+    public required Func<ILogger, int, string?, DeliveryResult> ParseSuccess { get; init; }
+
+    public required Func<HttpResponseMessage, string, TimeSpan?> ParseRetryAfter { get; init; }
+
+    public bool ReadClientErrorBody { get; init; }
+
+    public required Func<int, string?, string?> DescribeClientError { get; init; }
+}
+
+/// <summary>
+/// Shared HTTP dispatch orchestration for outbound webhook/bot-API senders. Discord and Telegram
+/// each dispatch over their own hardened <see cref="HttpClient"/>, but share byte-for-byte
+/// identical exponential-backoff, retry-count, and 429/408/425/5xx transient-failure semantics;
+/// this helper centralizes that orchestration so each sender only supplies the parts that
+/// legitimately differ (see <see cref="WebhookSenderProfile"/>).
+/// </summary>
+internal static class WebhookSenderRetryHelper
+{
+    private const int MaxRetries = 3;
+    private const double MaxAllowedDelaySeconds = 30.0;
+
+    public static async Task<DeliveryResult> ExecuteWithRetryAsync(
+        HttpClient httpClient,
+        ILogger logger,
+        WebhookSenderProfile profile,
+        Uri uri,
+        string jsonPayload,
+        Func<TimeSpan, CancellationToken, Task>? delayOverride,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(uri);
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, uri);
+            request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+            try
+            {
+                using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                var status = (int)response.StatusCode;
+
+                // 3xx Redirect rejected (SSRF protection)
+                if (status >= 300 && status <= 399)
+                {
+                    logger.LogWarning("[{Tag}] Unexpected redirect received ({Status}); aborting for security.", profile.SenderTag, status);
+                    return DeliveryResult.Failed("InvalidResponse", status, permanent: true);
+                }
+
+                // 2xx Success
+                if (status >= 200 && status <= 299)
+                {
+                    string? successBody = null;
+                    if (profile.ReadSuccessBody)
+                    {
+                        successBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    return profile.ParseSuccess(logger, status, successBody);
+                }
+
+                // 429 Rate limited
+                if (status == 429)
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    var retryAfter = profile.ParseRetryAfter(response, responseBody);
+
+                    // If server asks for delay greater than maximum allowed (30s), drop instead of premature retrying
+                    if (retryAfter.HasValue && retryAfter.Value.TotalSeconds > MaxAllowedDelaySeconds)
+                    {
+                        logger.LogWarning("[{Tag}] Rate-limit delay of {Delay}s exceeds maximum threshold; dropping event.", profile.SenderTag, retryAfter.Value.TotalSeconds);
+                        return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
+                    }
+
+                    if (attempt < MaxRetries && retryAfter.HasValue)
+                    {
+                        var delay = retryAfter.Value;
+                        logger.LogInformation("[{Tag}] Rate limited (429); backing off for {Delay}s", profile.SenderTag, delay.TotalSeconds);
+                        await DelayWaitAsync(delay, delayOverride, cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    return DeliveryResult.Failed("RateLimited", 429, permanent: false, retryAfter: retryAfter);
+                }
+
+                // Permanent client errors (400, 401, 403, 404)
+                if (status == 400 || status == 401 || status == 403 || status == 404)
+                {
+                    string? errorBody = null;
+                    if (profile.ReadClientErrorBody)
+                    {
+                        errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    var category = status switch
+                    {
+                        400 => "BadRequest",
+                        401 => "Unauthorized",
+                        403 => "Forbidden",
+                        _ => "NotFound"
+                    };
+
+                    return DeliveryResult.Failed(category, status, permanent: true, description: profile.DescribeClientError(status, errorBody));
+                }
+
+                // Transient server errors (5xx, 408, 425)
+                if (attempt < MaxRetries && (status >= 500 || status == 408 || status == 425))
+                {
+                    var backoff = ComputeBackoff(attempt);
+                    logger.LogWarning("[{Tag}] Transient failure ({Status}); retrying in {Backoff}ms", profile.SenderTag, status, backoff);
+                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), delayOverride, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                return DeliveryResult.Failed("ServerError", status, permanent: false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return DeliveryResult.Failed("Cancelled", 0, permanent: true, description: "Delivery cancelled by request.");
+            }
+            catch (Exception ex) when (ex is TimeoutException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+            {
+                if (attempt < MaxRetries)
+                {
+                    var backoff = ComputeBackoff(attempt);
+                    logger.LogWarning("[{Tag}] Timeout contacting {Api}; retrying in {Backoff}ms", profile.SenderTag, profile.ApiDisplayName, backoff);
+                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), delayOverride, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                logger.LogError("[{Tag}] Delivery timed out after {Max} attempts", profile.SenderTag, MaxRetries + 1);
+                return DeliveryResult.Failed("Timeout", 408, permanent: false, description: $"Request timed out while connecting to {profile.ApiDisplayName}.");
+            }
+            catch (Exception ex)
+            {
+                var sanitized = SecretRedactor.SanitizeExceptionMessage(ex);
+                if (attempt < MaxRetries)
+                {
+                    var backoff = ComputeBackoff(attempt);
+                    logger.LogWarning("[{Tag}] Network error: {Error}; retrying in {Backoff}ms", profile.SenderTag, sanitized, backoff);
+                    await DelayWaitAsync(TimeSpan.FromMilliseconds(backoff), delayOverride, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                logger.LogError("[{Tag}] Delivery failed after retries: {Error}", profile.SenderTag, sanitized);
+                return DeliveryResult.Failed("NetworkError", 0, permanent: false, description: $"Network error connecting to {profile.ApiDisplayName}: {sanitized}");
+            }
+        }
+
+        return DeliveryResult.Failed("ServerError", 0, permanent: false);
+    }
+
+    private static Task DelayWaitAsync(TimeSpan delay, Func<TimeSpan, CancellationToken, Task>? delayOverride, CancellationToken cancellationToken)
+    {
+        if (delayOverride != null)
+        {
+            return delayOverride(delay, cancellationToken);
+        }
+
+        return Task.Delay(delay, cancellationToken);
+    }
+
+    private static int ComputeBackoff(int attempt)
+    {
+        var baseMs = (int)Math.Pow(2, attempt) * 1000;
+        var jitter = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100, 500);
+        return Math.Min(30000, baseMs + jitter);
+    }
 }

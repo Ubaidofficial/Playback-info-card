@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.4.1</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.5.0</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -262,7 +262,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.4.1</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.5.0</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -761,9 +761,9 @@
 }
 
 .playbackMonitorPage .playback-pill.sub {
-    color: #10b981;
-    border-color: rgba(168, 85, 247, 0.25);
-    background: rgba(16, 185, 129, 0.08);
+    color: #f472b6;
+    border-color: rgba(236, 72, 153, 0.25);
+    background: rgba(236, 72, 153, 0.08);
 }
 
 /* Progress Bar */
@@ -1480,6 +1480,158 @@
         transition: none !important;
     }
 }
+
+/* Technical Stream Details panel -- previously had zero matching CSS anywhere on this
+   page, so it rendered as unstyled stacked divs with no separation between key and value. */
+.playbackMonitorPage .playback-details-panel {
+    display: none;
+    margin-top: 0.6rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    gap: 0.5rem;
+    flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.playbackMonitorPage .playback-details-panel.open {
+    display: flex;
+}
+
+.playbackMonitorPage .playback-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.playbackMonitorPage .playback-drawer-title-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #38bdf8;
+}
+
+.playbackMonitorPage .playback-drawer-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #f1f5f9;
+}
+
+.playbackMonitorPage .playback-drawer-close {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.playbackMonitorPage .playback-drawer-close:hover,
+.playbackMonitorPage .playback-drawer-close:focus {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.playbackMonitorPage .playback-stream-badges {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.1rem;
+}
+
+.playbackMonitorPage .stream-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.playbackMonitorPage .stream-badge.video-direct,
+.playbackMonitorPage .stream-badge.audio-direct {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #4ade80;
+}
+
+.playbackMonitorPage .stream-badge.video-transcode,
+.playbackMonitorPage .stream-badge.audio-transcode {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.playbackMonitorPage .playback-details-row {
+    color: #cbd5e1;
+    word-break: break-word;
+}
+
+.playbackMonitorPage .playback-extended-summary {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    padding: 0.2rem 0.4rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+}
+
+.playbackMonitorPage .playback-transcode-reasons {
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.08);
+    border-left: 2px solid #ef4444;
+    padding: 0.25rem 0.45rem;
+    border-radius: 2px;
+}
+
+.playbackMonitorPage .playback-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.4rem 0.6rem;
+    margin-top: 0.4rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.playbackMonitorPage .playback-info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 5px;
+}
+
+.playbackMonitorPage .playback-info-row.full-width {
+    grid-column: 1 / -1;
+}
+
+.playbackMonitorPage .playback-info-key {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+}
+
+.playbackMonitorPage .playback-info-val {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #f8fafc;
+    word-break: break-word;
+}
         </style>
 
         <script type="text/javascript">
@@ -1490,7 +1642,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.4.1';
+    var PLUGIN_VERSION = '0.2.5.0';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -1499,6 +1651,13 @@
     var currentGeneration = 0;
     var isDisposed = false;
     var displayMode = 'compact'; // 'compact' or 'extended'
+
+    // Per-session (not per-card-position) Info panel open state: without this, the panel's
+    // open/closed state was derived only from displayMode on every render, so a manually
+    // opened panel in Compact mode silently closed itself on the very next poll (every 3s),
+    // since fetchSessions() fully rebuilds the grid's innerHTML from scratch each cycle.
+    var openInfoSessionIds = {};
+    var cardSessionMap = {};
 
     // Local Diagnostics Tracking State (air-gapped & offline)
     var diagState = {
@@ -1962,7 +2121,14 @@
             (tInfo && (tInfo.IsVideoDirect === false || tInfo.IsAudioDirect === false))
         );
 
+        // The underlying method is independent of pause state -- a paused Remux is still
+        // a Remux. badgeText/badgeClass (the combined display value) still collapse to
+        // "Paused" when paused; callers needing the pure method must read `method`.
         var method = 'DirectPlay';
+        if (isRemux) method = 'Remux';
+        else if (isDirectStream) method = 'DirectStream';
+        else if (isTranscode) method = 'Transcode';
+
         var badgeText = 'Direct Play';
         var badgeClass = 'direct-play';
 
@@ -1970,15 +2136,12 @@
             badgeClass = 'paused';
             badgeText = 'Paused';
         } else if (isRemux) {
-            method = 'Remux';
             badgeText = 'Remux';
             badgeClass = 'remux';
         } else if (isDirectStream) {
-            method = 'DirectStream';
             badgeText = 'Direct Stream';
             badgeClass = 'direct-stream';
         } else if (isTranscode) {
-            method = 'Transcode';
             badgeText = 'Transcode';
             badgeClass = 'transcode';
         }
@@ -2071,6 +2234,31 @@
         }
 
         return { posterUrl: posterUrl, backdropUrl: backdropUrl };
+    }
+
+    // Reset the per-render card->session correlation map, and drop any "open" Info panel
+    // state for sessions that are no longer present (otherwise openInfoSessionIds would
+    // grow forever as sessions come and go).
+    function prepareRenderPass(sessions) {
+        cardSessionMap = {};
+
+        // Reset per-pass artwork counters. Without this they climbed forever: the whole
+        // grid (and every <img>) is torn down and recreated every poll, so the SAME
+        // unchanged poster kept re-firing onload/onerror and incrementing these each cycle,
+        // making the diagnostics panel show a meaningless, ever-growing "Loaded: 1200+".
+        diagState.artworkLoadedCount = 0;
+        diagState.artworkFallbackCount = 0;
+        diagState.artworkErrorCount = 0;
+
+        var stillPresent = {};
+        for (var i = 0; i < sessions.length; i++) {
+            if (sessions[i] && sessions[i].Id) stillPresent[sessions[i].Id] = true;
+        }
+        for (var sessionId in openInfoSessionIds) {
+            if (Object.prototype.hasOwnProperty.call(openInfoSessionIds, sessionId) && !stillPresent[sessionId]) {
+                delete openInfoSessionIds[sessionId];
+            }
+        }
     }
 
     function renderSessionCard(session, index) {
@@ -2316,11 +2504,14 @@
                 '</div>';
             }).join('');
 
-            var isExtended = (displayMode === 'extended');
-            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isExtended ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle stream details">' +
+            // Persisted per-session (section: not per-card-position), so a manually opened
+            // panel survives the next poll's full grid rebuild instead of silently closing.
+            cardSessionMap[cardDomId] = session.Id || null;
+            var isPanelOpen = (displayMode === 'extended') || Boolean(session.Id && openInfoSessionIds[session.Id]);
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isPanelOpen ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle stream details">' +
                 '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
 
-            var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isExtended ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
+            var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isPanelOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
                 '<div class="playback-drawer-header">' +
                     '<div class="playback-drawer-title-wrap">' +
                         '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' +
@@ -2782,6 +2973,7 @@
                     elements.statusEl.textContent = '';
                     elements.statusEl.className = 'playbackMonitorStatusMsg';
 
+                    prepareRenderPass(sessionsArray);
                     if (sessionsArray.length === 0) {
                         elements.emptyEl.style.display = 'flex';
                         elements.gridEl.innerHTML = '';
@@ -2851,6 +3043,7 @@
                 elements.statusEl.textContent = '';
                 elements.statusEl.className = 'playbackMonitorStatusMsg';
 
+                prepareRenderPass(activeSessions);
                 if (activeSessions.length === 0) {
                     elements.emptyEl.style.display = 'flex';
                     elements.gridEl.innerHTML = '';
@@ -3314,6 +3507,19 @@
                 } else {
                     panel.classList.add('open');
                 }
+
+                // Persist by session ID (not the card's positional DOM id) so this survives
+                // the next poll's full grid rebuild instead of silently closing again.
+                var btnId = btn.getAttribute('id') || '';
+                var cardDomId = btnId.indexOf('btn-info-') === 0 ? btnId.slice('btn-info-'.length) : null;
+                var sessionId = cardDomId ? cardSessionMap[cardDomId] : null;
+                if (sessionId) {
+                    if (isExpanded) {
+                        delete openInfoSessionIds[sessionId];
+                    } else {
+                        openInfoSessionIds[sessionId] = true;
+                    }
+                }
             });
             gridEl.addEventListener('keydown', function (e) {
                 if (e.key === ' ' || e.key === 'Enter' || e.keyCode === 32 || e.keyCode === 13) {
@@ -3486,6 +3692,8 @@
         resolveClientBrand: resolveClientBrand,
         getPlatformIconSvg: getPlatformIconSvg,
         renderSessionCard: renderSessionCard,
+        prepareRenderPass: prepareRenderPass,
+        openInfoSessionIds: openInfoSessionIds,
         buildDiagnosticReport: buildDiagnosticReport,
         validateDiagnosticReport: validateDiagnosticReport,
         checkSensitiveData: checkSensitiveData,
@@ -3493,6 +3701,9 @@
         startPolling: startPolling,
         stopPolling: stopPolling,
         setDisplayMode: function (mode) { displayMode = mode; },
+        updateDiagnosticsDisplay: updateDiagnosticsDisplay,
+        STALE_THRESHOLD_MS: STALE_THRESHOLD_MS,
+        setActivePageForTesting: function (page) { activePage = page; },
         loadNotificationSettings: loadNotificationSettings,
         saveNotificationSettings: saveNotificationSettings,
         clearNotificationSecret: clearNotificationSecret,

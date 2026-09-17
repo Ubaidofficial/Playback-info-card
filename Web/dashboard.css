@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Dashboard Integration Styles (v0.2.4.1)
+ * Playback Info Card - Dashboard Integration Styles (v0.2.5.0)
  * Liquid Glass Dark Theme & Responsive Telemetry Cards
  */
 
@@ -294,6 +294,25 @@
     line-height: 1.25;
     word-break: break-word;
     overflow-wrap: anywhere;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.playback-user-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.playback-eta {
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .playback-card-client {
@@ -356,6 +375,12 @@
     color: #fbbf24;
 }
 
+.playback-badge.playing {
+    background-color: rgba(34, 197, 94, 0.16);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: #4ade80;
+}
+
 .badge-icon {
     width: 10px;
     height: 10px;
@@ -403,12 +428,28 @@
     border-radius: 6px;
     overflow: hidden;
     background: linear-gradient(145deg, #1e293b, #0f172a);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    /* Layered "cinema poster" depth: a tight contact shadow, a soft ambient falloff,
+       and an inner highlight along the top edge to suggest a lit, physical print. */
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.5),
+        0 8px 16px -4px rgba(0, 0, 0, 0.55),
+        0 16px 32px -8px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.playback-card:hover .playback-poster-wrap {
+    transform: translateY(-2px);
+    box-shadow:
+        0 2px 3px rgba(0, 0, 0, 0.55),
+        0 12px 22px -4px rgba(0, 0, 0, 0.6),
+        0 22px 40px -10px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
 .playback-poster {
@@ -593,19 +634,13 @@
     outline: none;
 }
 
-.playback-stream-badges {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.1rem;
-}
-
 .stream-badge {
     font-size: 0.68rem;
     font-weight: 700;
     padding: 0.15rem 0.45rem;
     border-radius: 3px;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
 .stream-badge.video-direct,
@@ -622,25 +657,38 @@
     color: #f87171;
 }
 
-.playback-details-row {
+/* Extended-mode icon-led summary rows (section 11) */
+.playback-ext-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.playback-ext-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.playback-ext-label {
+    flex: 0 0 72px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+}
+
+.playback-ext-detail {
     color: #cbd5e1;
     word-break: break-word;
 }
 
-.playback-extended-summary {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    padding: 0.2rem 0.4rem;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 4px;
-}
-
-.playback-transcode-reasons {
-    color: #fca5a5;
-    background: rgba(239, 68, 68, 0.08);
-    border-left: 2px solid #ef4444;
-    padding: 0.25rem 0.45rem;
-    border-radius: 2px;
+.playback-ext-sep {
+    color: #475569;
+    margin: 0 0.4rem;
 }
 
 /* Grouped 26-Field Technical Breakdown Grid (used inside the singleton Info drawer) */

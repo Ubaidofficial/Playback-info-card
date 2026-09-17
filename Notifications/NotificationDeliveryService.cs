@@ -140,7 +140,17 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         };
     }
 
-    private bool ShouldDedupe(PlaybackEventRecord record, PluginConfiguration config)
+    // Effectively-unbounded dedupe window: used where the original semantics were "dedupe for as
+    // long as the entry exists" (no time-based expiry other than explicit removal or TTL pruning),
+    // as opposed to a rolling cooldown window.
+    private static readonly TimeSpan IndefiniteDedupeWindow = TimeSpan.MaxValue;
+
+    /// <remarks>
+    /// Internal (rather than private) so tests in JellyfinPlaybackCard.Tests (see
+    /// <c>[InternalsVisibleTo]</c> in Plugin.cs) can drive concurrent calls directly to verify the
+    /// atomic dedupe check-and-record behavior below.
+    /// </remarks>
+    internal bool ShouldDedupe(PlaybackEventRecord record, PluginConfiguration config)
     {
         var now = DateTimeOffset.UtcNow;
         var sessionKey = record.InternalSessionKey;
@@ -158,65 +168,71 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             _pauseResumeDedupe.TryRemove(sessionKey, out _);
             _progressDedupe.TryRemove(sessionKey, out _);
 
-            if (_startDedupe.TryGetValue(sessionKey, out var lastStart) && now - lastStart < TimeSpan.FromSeconds(10))
-            {
-                return true; // Start deduplicated within 10s
-            }
-
-            _startDedupe[sessionKey] = now;
-            return false;
+            // Start deduplicated within 10s
+            return IsDuplicateAndRecord(_startDedupe, sessionKey, TimeSpan.FromSeconds(10), now);
         }
 
         if (record.EventType == NotificationEventType.Stop || record.EventType == NotificationEventType.Completion)
         {
-            // Primary dedupe: 1 stop per sessionKey
+            // Primary dedupe: 1 stop per sessionKey (indefinitely, until Start clears it or TTL prunes it)
             if (!string.IsNullOrEmpty(sessionKey))
             {
-                if (_stopDedupe.ContainsKey(sessionKey))
-                {
-                    return true; // Already emitted stop for this play session
-                }
-
-                _stopDedupe[sessionKey] = now;
-                return false;
+                return IsDuplicateAndRecord(_stopDedupe, sessionKey, IndefiniteDedupeWindow, now);
             }
 
             // Fallback dedupe: composite key with 10s cooldown
             var fallbackKey = $"fallback:{record.UserId}:{record.MediaTitle}:{record.ClientName}";
-            if (_stopDedupe.TryGetValue(fallbackKey, out var lastStop) && now - lastStop < TimeSpan.FromSeconds(10))
-            {
-                return true;
-            }
-
-            _stopDedupe[fallbackKey] = now;
-            return false;
+            return IsDuplicateAndRecord(_stopDedupe, fallbackKey, TimeSpan.FromSeconds(10), now);
         }
 
         if (record.EventType == NotificationEventType.Pause || record.EventType == NotificationEventType.Resume)
         {
+            // 5s debounce for pause/resume
             var prKey = $"{sessionKey}:{record.EventType}";
-            if (_pauseResumeDedupe.TryGetValue(prKey, out var lastPr) && now - lastPr < TimeSpan.FromSeconds(5))
-            {
-                return true; // 5s debounce for pause/resume
-            }
-
-            _pauseResumeDedupe[prKey] = now;
-            return false;
+            return IsDuplicateAndRecord(_pauseResumeDedupe, prKey, TimeSpan.FromSeconds(5), now);
         }
 
         if (record.EventType == NotificationEventType.Progress)
         {
+            // Throttled by progress interval
             var intervalMin = Math.Max(5, config.ProgressIntervalMinutes);
-            if (_progressDedupe.TryGetValue(sessionKey, out var lastProgress) && now - lastProgress < TimeSpan.FromMinutes(intervalMin))
-            {
-                return true; // Throttled by progress interval
-            }
-
-            _progressDedupe[sessionKey] = now;
-            return false;
+            return IsDuplicateAndRecord(_progressDedupe, sessionKey, TimeSpan.FromMinutes(intervalMin), now);
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Atomically checks whether <paramref name="now"/> falls within the dedupe <paramref name="window"/>
+    /// of the last recorded timestamp for <paramref name="key"/> and, if not, records <paramref name="now"/>
+    /// as the new "last sent" timestamp for that key.
+    /// This performs the check-then-write as a single atomic <see cref="ConcurrentDictionary{TKey,TValue}"/>
+    /// AddOrUpdate operation so two near-simultaneous calls for the same key cannot both observe "not a duplicate"
+    /// and both proceed to send (the classic TOCTOU race of a separate TryGetValue followed by an
+    /// indexer write). Whichever invocation's result is the one actually committed by the dictionary
+    /// is guaranteed to have been computed from the true current value at the moment it was committed.
+    /// </summary>
+    private static bool IsDuplicateAndRecord(ConcurrentDictionary<string, DateTimeOffset> cache, string key, TimeSpan window, DateTimeOffset now)
+    {
+        var duplicate = false;
+
+        cache.AddOrUpdate(
+            key,
+            addValueFactory: static (_, state) => state,
+            updateValueFactory: (_, existing, state) =>
+            {
+                if (state - existing < window)
+                {
+                    duplicate = true;
+                    return existing; // Not enough time has passed: leave the recorded timestamp untouched.
+                }
+
+                duplicate = false;
+                return state;
+            },
+            factoryArgument: now);
+
+        return duplicate;
     }
 
     private static void PruneCache(ConcurrentDictionary<string, DateTimeOffset> cache, TimeSpan maxAge, DateTimeOffset now)

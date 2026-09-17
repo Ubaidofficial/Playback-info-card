@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.PlaybackCard.Notifications;
 using Jellyfin.Plugin.PlaybackCard.Notifications.Consumers;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Session;
@@ -12,6 +17,30 @@ namespace JellyfinPlaybackCard.Tests;
 
 public class PlaybackEventConsumerTests
 {
+    /// <summary>
+    /// Thread-safe stand-in for <see cref="INotificationDeliveryService"/> that records every
+    /// enqueued record's event type. A plain <see cref="System.Collections.Generic.List{T}"/> (as
+    /// used by the single-threaded <c>TestDeliveryService</c> elsewhere) is not safe to call
+    /// concurrently, so this test uses its own <see cref="ConcurrentQueue{T}"/>-backed stub.
+    /// </summary>
+    private sealed class ConcurrentRecordingDeliveryService : INotificationDeliveryService
+    {
+        private readonly ConcurrentQueue<PlaybackEventRecord> _records = new();
+
+        public PlaybackEventRecord[] Records => _records.ToArray();
+
+        public void Enqueue(PlaybackEventRecord record) => _records.Enqueue(record);
+
+        public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<DeliveryResult> SendTestNotificationAsync(string destination, CancellationToken cancellationToken) =>
+            Task.FromResult(DeliveryResult.Ok());
+
+        public NotificationDiagnosticsSnapshot GetDiagnostics() => new();
+    }
+
     [Fact]
     public void PlaybackEventMapper_MovieMapping_MapsFieldsCorrectly()
     {
@@ -131,5 +160,59 @@ public class PlaybackEventConsumerTests
 
         var payload = record.ToOutboundPayload(includeUsername: false, includeClientDevice: false);
         Assert.NotNull(payload);
+    }
+
+    [Fact]
+    public void OnEvent_ConcurrentPauseTransitionsForSameSession_OnlyOneEmitsPauseNotification()
+    {
+        // Regression test for a TOCTOU race: OnEvent used to read the previous SessionStateEntry via
+        // TryGetValue and then write the new one via a separate indexer assignment, so two
+        // near-simultaneous progress ticks reporting the same Pause transition could both read the
+        // stale "not paused" state and both conclude a transition occurred, double-firing a Pause
+        // notification. With the fix (an atomic ConcurrentDictionary.AddOrUpdate), exactly one of
+        // many concurrent callers may observe the transition; the rest must see the already-updated
+        // state and fall back to a plain Progress tick.
+        //
+        // Real Thread objects (not Task.Run/the thread pool) are used deliberately: the thread pool's
+        // gradual worker-injection throttling would otherwise stagger the calls across many seconds
+        // and mask the race instead of maximizing contention on it. OnEvent's returned Task is
+        // always already-completed synchronous work, so GetAwaiter().GetResult() never blocks.
+        var sessionKey = $"race-session-{Guid.NewGuid():N}";
+        PlaybackProgressConsumer.ResetSessionState(sessionKey); // Baseline: not paused.
+
+        var deliveryService = new ConcurrentRecordingDeliveryService();
+        var consumer = new PlaybackProgressConsumer(deliveryService, new TestLogger<PlaybackProgressConsumer>());
+
+        var session = new SessionInfo(null, null) { Id = sessionKey, UserId = Guid.NewGuid(), Client = "Race Client" };
+        var item = new Movie { Id = Guid.NewGuid(), Name = "Race Movie" };
+
+        const int concurrency = 50;
+        using var barrier = new Barrier(concurrency);
+        var threads = new Thread[concurrency];
+
+        for (var i = 0; i < concurrency; i++)
+        {
+            var eventArgs = new PlaybackProgressEventArgs
+            {
+                Session = session,
+                Item = item,
+                IsPaused = true,
+                PlaybackPositionTicks = TimeSpan.FromMinutes(5).Ticks
+            };
+
+            threads[i] = new Thread(() =>
+            {
+                barrier.SignalAndWait();
+                consumer.OnEvent(eventArgs).GetAwaiter().GetResult();
+            });
+        }
+
+        foreach (var thread in threads) thread.Start();
+        foreach (var thread in threads) thread.Join();
+
+        var records = deliveryService.Records;
+        Assert.Equal(concurrency, records.Length);
+        Assert.Equal(1, records.Count(r => r.EventType == NotificationEventType.Pause));
+        Assert.Equal(concurrency - 1, records.Count(r => r.EventType == NotificationEventType.Progress));
     }
 }

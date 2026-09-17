@@ -20,8 +20,8 @@ public class PlaybackCardDashboardMiddleware
     private readonly ILogger<PlaybackCardDashboardMiddleware> _logger;
 
     private const string DashboardScriptTag =
-        "<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css?v=0.2.4.1\" data-asset-revision=\"0.2.4.1\">\n" +
-        "<script plugin=\"PlaybackCard\" version=\"0.2.4.1\" data-asset-revision=\"0.2.4.1\" src=\"/PlaybackCard/dashboard.js?v=0.2.4.1\" defer></script>\n";
+        "<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css?v=0.2.5.0\" data-asset-revision=\"0.2.5.0\">\n" +
+        "<script plugin=\"PlaybackCard\" version=\"0.2.5.0\" data-asset-revision=\"0.2.5.0\" src=\"/PlaybackCard/dashboard.js?v=0.2.5.0\" defer></script>\n";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaybackCardDashboardMiddleware"/> class.
@@ -87,8 +87,26 @@ public class PlaybackCardDashboardMiddleware
 
         try
         {
+            // Intentionally NOT wrapped in the try/catch below: this middleware's job is to
+            // transform an already-successful HTML response, not to suppress genuine pipeline
+            // failures. If the rest of the Jellyfin pipeline (auth, routing, MVC, etc.) throws,
+            // that exception must propagate so ASP.NET Core's own error handling / status code
+            // behavior applies, rather than being silently swallowed here.
             await _next(context).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Always restore the real response stream, including when _next(context) throws,
+            // so any outer exception handler writes to the actual client stream, not our buffer.
+            context.Response.Body = originalBodyStream;
+        }
 
+        // From here on, _next(context) has completed successfully and the response is fully
+        // buffered in memoryStream. This try/catch is narrowly scoped to the injection logic
+        // itself (decode/inspect/rewrite/re-encode) so that a failure in OUR transformation
+        // gracefully falls back to serving the original, unmodified response.
+        try
+        {
             memoryStream.Seek(0, SeekOrigin.Begin);
 
             var contentType = context.Response.ContentType ?? string.Empty;
@@ -100,11 +118,18 @@ public class PlaybackCardDashboardMiddleware
             {
                 var contentEncoding = context.Response.Headers.ContentEncoding.ToString();
                 var isGzipped = contentEncoding.Contains("gzip", StringComparison.OrdinalIgnoreCase);
+                var isBrotli = contentEncoding.Contains("br", StringComparison.OrdinalIgnoreCase);
 
                 string html;
                 if (isGzipped)
                 {
                     using var decompressor = new GZipStream(memoryStream, CompressionMode.Decompress, leaveOpen: true);
+                    using var reader = new StreamReader(decompressor, Encoding.UTF8);
+                    html = await reader.ReadToEndAsync().ConfigureAwait(false);
+                }
+                else if (isBrotli)
+                {
+                    using var decompressor = new BrotliStream(memoryStream, CompressionMode.Decompress, leaveOpen: true);
                     using var reader = new StreamReader(decompressor, Encoding.UTF8);
                     html = await reader.ReadToEndAsync().ConfigureAwait(false);
                 }
@@ -142,6 +167,21 @@ public class PlaybackCardDashboardMiddleware
                         return;
                     }
 
+                    if (isBrotli)
+                    {
+                        using var compressedStream = new MemoryStream();
+                        using (var brotli = new BrotliStream(compressedStream, CompressionLevel.Fastest, leaveOpen: true))
+                        {
+                            await brotli.WriteAsync(modifiedBytes).ConfigureAwait(false);
+                        }
+
+                        var compressedBytes = compressedStream.ToArray();
+                        context.Response.Headers.ContentEncoding = "br";
+                        context.Response.ContentLength = compressedBytes.Length;
+                        await originalBodyStream.WriteAsync(compressedBytes).ConfigureAwait(false);
+                        return;
+                    }
+
                     context.Response.ContentLength = modifiedBytes.Length;
                     await originalBodyStream.WriteAsync(modifiedBytes).ConfigureAwait(false);
                     return;
@@ -160,10 +200,6 @@ public class PlaybackCardDashboardMiddleware
                 memoryStream.Seek(0, SeekOrigin.Begin);
                 await memoryStream.CopyToAsync(originalBodyStream).ConfigureAwait(false);
             }
-        }
-        finally
-        {
-            context.Response.Body = originalBodyStream;
         }
     }
 

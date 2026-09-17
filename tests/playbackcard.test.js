@@ -28,7 +28,7 @@ function createMockController() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.4.1 Test Suite', () => {
+describe('Playback Info Card v0.2.5.0 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -36,26 +36,23 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.4.1', () => {
-            assert.equal(controller.version, '0.2.4.1');
-            assert.equal(controller.diagState.pluginVersion, '0.2.4.1');
+        it('initializes with default waiting state and version 0.2.5.0', () => {
+            assert.equal(controller.version, '0.2.5.0');
+            assert.equal(controller.diagState.pluginVersion, '0.2.5.0');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
         });
 
-        it('transitions states upon successful or failed session fetch', () => {
-            // Simulate successful poll
+        it('builds diagnostic reports reflecting whatever sessionsApiStatus the poll last set', () => {
+            // buildDiagnosticReport() is the real code under test -- this only checks that
+            // its output tracks diagState, not that diagState itself can be assigned to.
             controller.diagState.sessionsApiStatus = 'OK';
-            controller.diagState.lastSuccessTime = Date.now();
-            assert.equal(controller.diagState.sessionsApiStatus, 'OK');
+            assert.equal(controller.buildDiagnosticReport().sessionsApi, 'ok');
 
-            // Simulate session error
             controller.diagState.sessionsApiStatus = 'Sessions unavailable';
             controller.diagState.lastErrorCategory = 'Sessions unavailable';
-            controller.diagState.lastFailureTime = Date.now();
-            assert.equal(controller.diagState.sessionsApiStatus, 'Sessions unavailable');
-            assert.equal(controller.diagState.lastErrorCategory, 'Sessions unavailable');
+            assert.equal(controller.buildDiagnosticReport().sessionsApi, 'error');
         });
     });
 
@@ -74,32 +71,38 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
     });
 
     describe('3. Stale Polling Detection', () => {
-        it('identifies stalled polling when interval exceeds twice the polling period', () => {
+        // These exercise the real updateDiagnosticsDisplay() staleness check (STALE_THRESHOLD_MS,
+        // exported for testing), not a copy of the threshold logic re-implemented in the test.
+        it('identifies stalled polling when interval exceeds the real STALE_THRESHOLD_MS', () => {
+            controller.setActivePageForTesting({ querySelector: () => null });
             const now = Date.now();
-            controller.diagState.lastSuccessTime = now - 7000; // 7 seconds ago (> 6s threshold)
             controller.diagState.pollingState = 'active';
+            controller.diagState.lastSuccessTime = now - (controller.STALE_THRESHOLD_MS + 1000);
 
-            // Check stale condition logic
-            const isStale = (now - controller.diagState.lastSuccessTime) > 6000;
-            assert.equal(isStale, true);
+            controller.updateDiagnosticsDisplay();
 
-            if (isStale) {
-                controller.diagState.pollingState = 'stalled';
-                controller.diagState.lastErrorCategory = 'Polling stalled';
-            }
-
-            assert.equal(controller.diagState.pollingState, 'stalled');
+            assert.equal(controller.diagState.pollingState, 'stalled', 'Real staleness check must flip pollingState to stalled');
             assert.equal(controller.diagState.lastErrorCategory, 'Polling stalled');
         });
 
-        it('recovers from stalled state upon receiving a fresh poll', () => {
+        it('recovers from stalled state once a fresh poll lands within STALE_THRESHOLD_MS', () => {
+            controller.setActivePageForTesting({ querySelector: () => null });
             controller.diagState.pollingState = 'stalled';
             controller.diagState.lastSuccessTime = Date.now();
-            controller.diagState.pollingState = 'active';
-            controller.diagState.lastErrorCategory = 'OK';
 
-            assert.equal(controller.diagState.pollingState, 'active');
-            assert.equal(controller.diagState.lastErrorCategory, 'OK');
+            controller.updateDiagnosticsDisplay();
+
+            assert.equal(controller.diagState.pollingState, 'active', 'Real recovery check must flip pollingState back to active');
+        });
+
+        it('does NOT flag staleness when the last successful poll is within the threshold', () => {
+            controller.setActivePageForTesting({ querySelector: () => null });
+            controller.diagState.pollingState = 'active';
+            controller.diagState.lastSuccessTime = Date.now() - 1000;
+
+            controller.updateDiagnosticsDisplay();
+
+            assert.equal(controller.diagState.pollingState, 'active', 'Must not falsely mark a healthy poll as stalled');
         });
     });
 
@@ -174,7 +177,7 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.4.1');
+            assert.equal(report.pluginVersion, '0.2.5.0');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -222,7 +225,7 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.4.1',
+                pluginVersion: '0.2.5.0',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -627,9 +630,34 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             assert.ok(html.includes('stream-badge video-direct'));
             assert.ok(html.includes('Video: Direct'));
         });
+
+        it('keeps the Info panel open across a simulated poll re-render (tracked by session ID, not card position)', () => {
+            const session = { Id: 'monitor-persist-1', PlayState: { PlayMethod: 'DirectPlay' }, NowPlayingItem: { Name: 'Long Movie' } };
+
+            // Baseline: closed by default in compact mode.
+            controller.prepareRenderPass([session]);
+            const closedHtml = controller.renderSessionCard(session, 0);
+            assert.ok(closedHtml.includes('aria-expanded="false"'), 'Info panel starts closed');
+
+            // Simulate the user clicking Info (this is what the real click handler does).
+            controller.openInfoSessionIds['monitor-persist-1'] = true;
+
+            // Simulate a poll re-render (a fresh prepareRenderPass + renderSessionCard pass,
+            // exactly like fetchSessions() rebuilding the grid from scratch every 3s).
+            controller.prepareRenderPass([session]);
+            const reopenedHtml = controller.renderSessionCard(session, 0);
+            assert.ok(reopenedHtml.includes('aria-expanded="true"'), 'Info panel survives a poll re-render instead of silently closing');
+            assert.ok(reopenedHtml.includes('class="playback-details-panel open"'), 'Details panel carries the open class');
+
+            // Once the session disappears (stream ended), prepareRenderPass must prune the
+            // stale open-state entry so it can never leak onto an unrelated future session
+            // that happens to reuse the same card position.
+            controller.prepareRenderPass([]);
+            assert.ok(!controller.openInfoSessionIds['monitor-persist-1'], 'Open-info state is pruned once its session is gone');
+        });
     });
 
-    describe('18. Primary Dashboard Integration (v0.2.4.1)', () => {
+    describe('18. Primary Dashboard Integration (v0.2.5.0)', () => {
         const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
         const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
 
@@ -667,10 +695,10 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.4.1', () => {
+        it('initializes with version 0.2.5.0', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.4.1');
-            assert.equal(dash.state.version, '0.2.4.1');
+            assert.equal(dash.version, '0.2.5.0');
+            assert.equal(dash.state.version, '0.2.5.0');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -1233,10 +1261,11 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
                 NowPlayingItem: { Name: 'Transcoded Movie', Container: 'mkv' }
             };
 
-            const html = dash.renderSessionCard(transcodeSessionNoReasons, 1, 'compact', false);
+            // Extended mode reveals the icon-led Reason/Engine rows (compact mode never does).
+            const html = dash.renderSessionCard(transcodeSessionNoReasons, 1, 'extended', false);
             assert.ok(html.includes('Reason not reported by server'), 'Must render exact fallback text');
-            assert.ok(html.includes('Why:'), 'Must include Why transcode row');
-            assert.ok(html.includes('Engine: NVENC'), 'Must include NVENC hardware acceleration badge');
+            assert.ok(html.includes('<span class="playback-ext-label">Reason</span>'), 'Must include labeled Reason row');
+            assert.ok(html.includes('<span class="playback-ext-label">Engine</span><span class="playback-ext-detail">NVENC</span>'), 'Must include NVENC hardware acceleration value');
         });
 
         it('reports truthful human-readable transcode reasons when reported by server', () => {
@@ -1255,13 +1284,13 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
                 NowPlayingItem: { Name: 'Moonfin Test Media', Container: 'avi' }
             };
 
-            const html = dash.renderSessionCard(transcodeSessionWithReasons, 1, 'compact', false);
+            const html = dash.renderSessionCard(transcodeSessionWithReasons, 1, 'extended', false);
             assert.ok(html.includes('Container not supported'));
             assert.ok(html.includes('Video codec not supported'));
             assert.ok(!html.includes('Reason not reported by server'));
         });
 
-        it('enforces mobile layout constraints by capping compact mode to top 5 essential badges', () => {
+        it('shows the full compact badge priority list uncapped, wrapping via CSS rather than truncating', () => {
             const dash = createMockDashboard();
             const richMediaSession = {
                 Id: 's-rich',
@@ -1275,28 +1304,32 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
                     Height: 2160,
                     Container: 'mkv',
                     MediaStreams: [
-                        { Type: 'Video', Codec: 'hevc', Width: 3840, Height: 2160, VideoRange: 'HDR' },
+                        { Type: 'Video', Codec: 'hevc', Width: 3840, Height: 2160, VideoRange: 'HDR', BitDepth: 10 },
                         { Type: 'Audio', Codec: 'truehd', Channels: 8, ChannelLayout: '7.1' },
                         { Type: 'Subtitle', Index: 2, Language: 'eng' }
                     ]
                 }
             };
 
-            // Compact mode
+            // Compact mode: section 11's full priority list renders every time (Resolution,
+            // HDR/Dynamic range, Method, Video codec, Bit depth, Audio, Container) -- excess
+            // badges wrap onto additional lines via CSS flex-wrap rather than being cut off.
             const compactHtml = dash.renderSessionCard(richMediaSession, 1, 'compact', false);
             const compactPills = (compactHtml.match(/<span class="playback-pill/g) || []).length;
-            assert.ok(compactPills <= 5, 'Compact mode must cap visible badges to 5 max, got: ' + compactPills);
-            assert.ok(compactHtml.includes('4K'), 'Must include 1. Resolution');
-            assert.ok(compactHtml.includes('Direct Play'), 'Must include 2. Play Method');
-            assert.ok(compactHtml.includes('HEVC'), 'Must include 3. Video Codec');
-            assert.ok(compactHtml.includes('7.1'), 'Must include 4. Audio Channels');
-            assert.ok(compactHtml.includes('MKV'), 'Must include 5. Container');
+            assert.equal(compactPills, 7, 'Compact mode renders the full priority badge list uncapped, got: ' + compactPills);
+            assert.ok(compactHtml.includes('4K'), 'Must include Resolution');
+            assert.ok(compactHtml.includes('HDR'), 'Must include HDR/Dynamic range');
+            assert.ok(compactHtml.includes('Direct Play'), 'Must include Playback Method');
+            assert.ok(compactHtml.includes('HEVC'), 'Must include Video Codec');
+            assert.ok(compactHtml.includes('10-bit'), 'Must include Bit depth');
+            assert.ok(compactHtml.includes('7.1'), 'Must include Audio Channels');
+            assert.ok(compactHtml.includes('MKV'), 'Must include Container');
+            assert.ok(compactHtml.includes('class="playback-pill-row"'), 'Pill row uses CSS flex-wrap for overflow, not JS-side capping');
 
-            // Extended mode renders secondary badges as well
+            // Extended mode adds secondary badges (2nd audio format, active subtitle) on top.
             const extendedHtml = dash.renderSessionCard(richMediaSession, 1, 'extended', false);
             const extendedPills = (extendedHtml.match(/<span class="playback-pill/g) || []).length;
-            assert.ok(extendedPills >= 5, 'Extended mode renders all badges');
-            assert.ok(extendedHtml.includes('HDR'), 'Extended mode includes HDR');
+            assert.ok(extendedPills > compactPills, 'Extended mode renders additional secondary badges beyond compact');
         });
 
         it('guarantees non-admin user isolation via PlaybackCard/Self/Sessions', async () => {
@@ -1559,7 +1592,7 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             assert.ok(!html.includes('pill-hw'), 'Card must NOT render hardware pill during remux');
             // Check the Info drawer's full breakdown (built independently of the card's own HTML)
             const drawerHtml = dash.buildDrawerContentHtml(remuxSession);
-            assert.ok(drawerHtml.includes('<span class="playback-info-key">Hardware Engine</span><span class="playback-info-val">Not reported</span>'), 'Info drawer must report Not reported for hardware engine during remux');
+            assert.ok(drawerHtml.includes('<span class="playback-info-key">Hardware Engine</span><span class="playback-info-val">Not applicable</span>'), 'Info drawer must report Not applicable for hardware engine during remux');
         });
 
         it('validates framerate strictly and rejects impossible values like 2191 fps', () => {
@@ -1603,7 +1636,8 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
                     MediaStreams: [{ Type: 'Video', RealFrameRate: 23.976 }]
                 }
             };
-            const html = dash.renderSessionCard(fullSession, 0, 'compact', false);
+            // Frame rate only surfaces inline in extended mode (or the Show Details/drawer grid).
+            const html = dash.renderSessionCard(fullSession, 0, 'extended', false);
             assert.ok(!html.includes('2191 fps'), 'Must NEVER render 2191 fps');
             assert.ok(html.includes('23.976 fps'), 'Must render truthful 23.976 fps');
         });
@@ -1651,7 +1685,7 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             assert.equal(dash.classifyPlaybackSession(remuxNoReasons).method, 'Remux', 'Fixture must classify as Remux');
             const remuxDrawerHtml = dash.buildDrawerContentHtml(remuxNoReasons);
             assert.ok(!remuxDrawerHtml.includes('Reason not reported by server'), 'Remux must never show the Transcode-only fallback reason text');
-            assert.ok(remuxDrawerHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not reported</span>'), 'Remux Transcode Reason field must read Not reported');
+            assert.ok(remuxDrawerHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not applicable</span>'), 'Remux Transcode Reason field must read Not applicable');
         });
 
         it('resolves artwork with TV series poster fallback and slate SVG placeholder', () => {
@@ -1785,7 +1819,7 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             const sparseHtml = dash.buildDrawerContentHtml(sparseSession);
             assert.ok(sparseHtml.includes('Not reported'), 'Missing technical fields must display "Not reported"');
             assert.ok(!sparseHtml.includes('Reason not reported by server'), 'DirectPlay must never show the Transcode-only fallback reason text');
-            assert.ok(sparseHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not reported</span>'), 'DirectPlay Transcode Reason field must read Not reported');
+            assert.ok(sparseHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not applicable</span>'), 'DirectPlay Transcode Reason field must read Not applicable');
         });
 
         it('keeps the singleton Info drawer open across simulated polling and closes only after confirmed session disappearance', () => {
@@ -1902,6 +1936,167 @@ describe('Playback Info Card v0.2.4.1 Test Suite', () => {
             assert.ok(deviceHtml.includes('data-client-brand="safari"'), 'Connected Devices card tags the same resolved brand key');
             assert.ok(deviceHtml.includes('data-connected-device-card="true"'), 'Connected device card carries its diagnostic hook');
             assert.ok(!deviceHtml.includes('brand-parity'), 'Raw session ID must never be written into the DOM');
+        });
+    });
+
+    describe('21. Redesigned Card Layout (state badge, bit depth, Show Details grid, drawer targeting)', () => {
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+
+        function createMockDashboard(env = {}) {
+            const mockModule = { exports: {} };
+            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {}, ...env.window };
+            const mockDocument = { getElementById: (id) => null, querySelector: () => null, querySelectorAll: () => [], createElement: (tag) => ({ id: '', tagName: tag.toUpperCase(), style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete', ...env.document };
+            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+            return mockModule.exports;
+        }
+
+        it('shows a separate Playing/Paused state badge alongside the method badge, both always visible', () => {
+            const dash = createMockDashboard();
+            const remuxSession = {
+                Id: 's-dual-badge', UserName: 'U', Client: 'Jellyfin Web', DeviceName: 'Safari iPhone',
+                TranscodingInfo: { IsVideoDirect: true, IsAudioDirect: true, Container: 'mp4' },
+                NowPlayingItem: { Name: 'Con City', Container: 'mkv' }
+            };
+
+            const playingHtml = dash.renderSessionCard(remuxSession, 0, 'compact', false);
+            assert.ok(playingHtml.includes('playback-badge state-badge playing'), 'Playing state badge renders with its own class');
+            assert.ok(playingHtml.includes('Playing</span>'), 'Playing label renders');
+            assert.ok(playingHtml.includes('playback-badge remux'), 'Method badge renders independently of state');
+            assert.ok(playingHtml.includes('>Remux</span>'), 'Method label renders');
+
+            remuxSession.IsPaused = true;
+            const pausedHtml = dash.renderSessionCard(remuxSession, 0, 'compact', false);
+            assert.ok(pausedHtml.includes('playback-badge state-badge paused'), 'Paused state badge renders with its own class');
+            assert.ok(pausedHtml.includes('Paused</span>'), 'Paused label renders');
+            assert.ok(pausedHtml.includes('playback-badge remux'), 'Method badge still reads Remux while paused, not overridden');
+            assert.ok(pausedHtml.includes('>Remux</span>'), 'Method label is untouched by pause');
+        });
+
+        it('includes a bit-depth badge in the compact priority list when reported', () => {
+            const dash = createMockDashboard();
+            const session = {
+                Id: 's-bitdepth', NowPlayingItem: {
+                    Name: 'HDR Movie', Width: 3840, Height: 2160,
+                    MediaStreams: [{ Type: 'Video', Codec: 'hevc', VideoRange: 'HDR', BitDepth: 10, Width: 3840, Height: 2160 }]
+                }
+            };
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(html.includes('10-bit'), 'Bit-depth badge renders when the source reports BitDepth');
+
+            const sdSession = { Id: 's-nodepth', NowPlayingItem: { Name: 'No Depth Info' } };
+            const sdHtml = dash.renderSessionCard(sdSession, 1, 'compact', false);
+            assert.ok(!sdHtml.includes('-bit<'), 'Bit-depth badge is omitted (never guessed) when not reported');
+        });
+
+        it('always shows the Paused header chip, including zero, matching the other method chips', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+            dash.renderDashboardContainer(container, [], []);
+            assert.ok(container.innerHTML.includes('data-count-method="paused" data-count-value="0"'), 'Paused chip renders at zero just like Direct Play/Direct Stream/Remux/Transcode');
+        });
+
+        it('Show Details reveals the full non-identity field grid inline on the card and hides it again on toggle-off', () => {
+            const dash = createMockDashboard();
+            const session = {
+                Id: 's-show-details', UserName: 'DetailUser', Client: 'Jellyfin Web', DeviceName: 'Chrome',
+                NowPlayingItem: { Name: 'Show Details Test', Container: 'mkv', MediaStreams: [{ Type: 'Video', Codec: 'h264', Width: 1920, Height: 1080 }] }
+            };
+
+            const closedHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(!closedHtml.includes('<span class="playback-info-key">Source Video Codec</span>'), 'Full field grid is absent when Show Details is off');
+
+            const openHtml = dash.renderSessionCard(session, 0, 'compact', true);
+            assert.ok(openHtml.includes('<span class="playback-info-key">Source Video Codec</span>'), 'Full field grid appears when Show Details is on');
+            assert.ok(openHtml.includes('<span class="playback-info-key">Playback Method</span>'), 'Grid includes Playback Method');
+            assert.ok(!openHtml.includes('<span class="playback-info-key">User</span>'), 'Grid omits identity fields already shown in the card header');
+            assert.ok(!openHtml.includes('<span class="playback-info-key">Client</span>'), 'Grid omits Client (already in header)');
+            assert.ok(openHtml.includes('class="playback-details-panel open"'), 'Details panel carries the open class when Show Details is on');
+
+            const reclosedHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(!reclosedHtml.includes('<span class="playback-info-key">Source Video Codec</span>'), 'Toggling Show Details back off hides the grid again');
+        });
+
+        it('highlights the Info button by session identity, not card position, when session order shifts', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+            const sessionA = { Id: 'session-a', UserName: 'A', NowPlayingItem: { Name: 'Movie A' } };
+            const sessionB = { Id: 'session-b', UserName: 'B', NowPlayingItem: { Name: 'Movie B' } };
+
+            // Open the drawer for session B while it is in the second slot.
+            dash.renderDashboardContainer(container, [sessionA, sessionB], [sessionA, sessionB]);
+            dash.openInfoDrawer('dash-card-2');
+            assert.equal(dash.state.drawer.sessionId, 'session-b');
+
+            // Session order flips (B now renders first, in what used to be A's slot) -- as
+            // a real poll re-render would do if one session started/stopped.
+            dash.renderDashboardContainer(container, [sessionB, sessionA], [sessionB, sessionA]);
+            assert.equal(dash.state.drawer.sessionId, 'session-b', 'Drawer content remains targeted at session B by ID regardless of position');
+
+            const cardChunks = container.innerHTML.split('<div class="playback-card"').slice(1);
+            const movieBCard = cardChunks.find((c) => c.includes('Movie B'));
+            const movieACard = cardChunks.find((c) => c.includes('Movie A'));
+            assert.ok(movieBCard.includes('aria-expanded="true"'), 'Session B\'s Info button is highlighted, since its drawer is actually open');
+            assert.ok(movieACard.includes('aria-expanded="false"'), 'Session A\'s Info button is NOT highlighted, even though it now occupies B\'s old slot');
+        });
+    });
+
+    describe('22. v0.2.5.0 additions (ETA, Atmos/DTS:X, audio language, subtitle delivery method, avatar)', () => {
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+        function createMockDashboard() {
+            const mockModule = { exports: {} };
+            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
+            const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
+            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+            return mockModule.exports;
+        }
+        const dash = createMockDashboard();
+
+        it('detects Atmos and DTS:X from real stream profile/title data, never guessed', () => {
+            assert.equal(dash.extractAtmosBadge({ Profile: 'Dolby Atmos' }).toLowerCase(), 'atmos');
+            assert.equal(dash.extractAtmosBadge({ Title: 'DTS:X' }), 'DTS:X');
+            assert.equal(dash.extractAtmosBadge({ Codec: 'truehd' }), '', 'Plain TrueHD with no Atmos marker must not show Atmos');
+            assert.equal(dash.extractAtmosBadge(null), '');
+        });
+
+        it('extracts a 3-letter audio language code truthfully', () => {
+            assert.equal(dash.extractAudioLanguage({ Language: 'eng' }), 'ENG');
+            assert.equal(dash.extractAudioLanguage({}), '');
+        });
+
+        it('formats a real ETA from remaining ticks, and never fabricates one with zero remaining time', () => {
+            const now = new Date(2026, 0, 1, 20, 0, 0).getTime(); // 8:00 PM
+            const oneHourTicks = 3600 * 10000000;
+            assert.equal(dash.formatEta(oneHourTicks, now), '9:00 PM');
+            assert.equal(dash.formatEta(0, now), null);
+            assert.equal(dash.formatEta(-5, now), null);
+        });
+
+        it('never shows an ETA on a paused session, and shows one on an actively playing session with real remaining time', () => {
+            const playing = { Id: 's-eta-1', PlayState: { IsPaused: false }, PositionTicks: 0, RunTimeTicks: 3600 * 10000000, NowPlayingItem: { Name: 'X' } };
+            const paused = { Id: 's-eta-2', IsPaused: true, PositionTicks: 0, RunTimeTicks: 3600 * 10000000, NowPlayingItem: { Name: 'X' } };
+            assert.ok(dash.renderSessionCard(playing, 0, 'compact', false).includes('playback-eta'), 'Playing session with remaining time shows an ETA');
+            assert.ok(!dash.renderSessionCard(paused, 1, 'compact', false).includes('playback-eta'), 'Paused session never shows an ETA');
+        });
+
+        it('surfaces the real subtitle delivery method, including burned-in as a genuine transcode cause', () => {
+            const burnedIn = {
+                Id: 's-sub-burn', PlayState: { SubtitleStreamIndex: 1 },
+                NowPlayingItem: { Name: 'X', MediaStreams: [{ Type: 'Video' }, { Type: 'Subtitle', Index: 1, Language: 'eng', Codec: 'srt', DeliveryMethod: 'Encode' }] }
+            };
+            const grid = dash.buildDrawerContentHtml(burnedIn);
+            assert.ok(grid.includes('Burned into video (forces transcode)'), 'Burned-in subtitles are surfaced as a real, factual cause, not inferred');
+        });
+
+        it('resolves a user avatar from the session\'s own UserId when the API client supports it, and degrades cleanly otherwise', () => {
+            const session = { Id: 's-avatar', UserId: 'user-123', UserPrimaryImageTag: 'tag1' };
+            const apiClient = { getUserImageUrl: (id, opts) => '/Users/' + id + '/Images/Primary?tag=' + opts.tag };
+            assert.equal(dash.resolveUserAvatarUrl(session, apiClient), '/Users/user-123/Images/Primary?tag=tag1');
+            assert.equal(dash.resolveUserAvatarUrl(session, {}), '', 'No getUserImageUrl support -> empty, never throws');
+            assert.equal(dash.resolveUserAvatarUrl({}, apiClient), '', 'No UserId -> empty');
         });
     });
 });

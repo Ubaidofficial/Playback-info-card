@@ -45,6 +45,58 @@ public sealed class NotificationSecretStore : INotificationSecretStore
     private readonly object _lock = new();
     private SecretData _data = new();
 
+    /// <summary>
+    /// A random, process-lifetime-only master key used when the real (persisted, DPAPI-protected)
+    /// master key cannot be read, created, or persisted due to an I/O or permission failure.
+    /// Never derived from any predictable/public value (see <see cref="GetOrCreateMasterKey"/>).
+    /// Once set, it is reused for the remainder of this instance's lifetime so that secrets
+    /// encrypted under it earlier in the process's run can still be decrypted later in the same run.
+    /// </summary>
+    private byte[]? _inMemoryFallbackKey;
+
+    /// <summary>
+    /// Raised whenever this store detects and works around a degraded security condition it cannot
+    /// safely ignore: the persistent master key could not be read/created/persisted (forcing a
+    /// random in-memory-only fallback key), Windows ACL hardening on a secret-bearing file failed,
+    /// or a master-key mismatch prevented decrypting previously stored secrets. This class is
+    /// constructed directly by the plugin's DI registration (in a file this change must not touch),
+    /// so it has no injected <c>ILogger</c>; this event plus <see cref="Trace.TraceWarning(string)"/>
+    /// and standard error are the supported ways to observe these conditions.
+    /// </summary>
+    internal static event Action<string>? DiagnosticWarningRaised;
+
+    private static void RaiseWarning(string message)
+    {
+        var formatted = "[PlaybackCard.NotificationSecretStore] " + message;
+
+        try
+        {
+            Trace.TraceWarning(formatted);
+        }
+        catch
+        {
+            // Diagnostics reporting must never crash secret handling
+        }
+
+        try
+        {
+            Console.Error.WriteLine("WARNING: " + formatted);
+        }
+        catch
+        {
+            // Ignore
+        }
+
+        try
+        {
+            DiagnosticWarningRaised?.Invoke(message);
+        }
+        catch
+        {
+            // A misbehaving subscriber must never affect secret handling
+        }
+    }
+
     public NotificationSecretStore(IApplicationPaths? applicationPaths = null, string? customFilePath = null)
     {
         string? configDir = null;
@@ -88,6 +140,15 @@ public sealed class NotificationSecretStore : INotificationSecretStore
 
     private byte[] GetOrCreateMasterKey()
     {
+        // Once we've fallen back to a random in-memory-only key for this process, keep using it
+        // consistently instead of intermittently retrying disk I/O. Otherwise a transient recovery
+        // mid-run (e.g. a network share becoming writable again) could return a *different* real key
+        // than the one secrets were just encrypted under, making them undecryptable within the same run.
+        if (_inMemoryFallbackKey != null)
+        {
+            return _inMemoryFallbackKey;
+        }
+
         try
         {
             if (File.Exists(_keyPath))
@@ -118,12 +179,38 @@ public sealed class NotificationSecretStore : INotificationSecretStore
 
             return newKey;
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback to deterministic machine-local key if filesystem permission error occurs
-            return SHA256.HashData(Encoding.UTF8.GetBytes(AppContext.BaseDirectory + "_playback_card_fallback"));
+            // NEVER fall back to a key derivable from public/predictable information (e.g. the
+            // plugin's own install path) -- that would make the "encryption" trivially reversible
+            // by anyone who can read the install path. Instead, mint a genuinely random key that
+            // lives only in memory for the remainder of this process. Secrets will not persist
+            // across restarts until the underlying I/O issue is resolved, so warn loudly.
+            var fallbackKey = RandomNumberGenerator.GetBytes(32);
+            _inMemoryFallbackKey = fallbackKey;
+
+            RaiseWarning(
+                "Could not read, create, or persist the master key file at '" + _keyPath + "' (" +
+                ex.GetType().Name + ": " + ex.Message + "). Falling back to a random, in-memory-only " +
+                "master key for this process. Discord/Telegram secrets will NOT persist across restarts " +
+                "until the underlying storage/permission issue is resolved.");
+
+            return fallbackKey;
         }
     }
+
+    /// <summary>
+    /// True once this instance has fallen back to a random in-memory-only master key because the
+    /// real, persisted master key could not be read, created, or persisted. Exposed internally so
+    /// diagnostics/tests can observe the degraded state without leaking key material.
+    /// </summary>
+    internal bool IsUsingInMemoryFallbackMasterKey => _inMemoryFallbackKey != null;
+
+    /// <summary>
+    /// Test-only accessor for the master key currently in effect (real or in-memory fallback).
+    /// Only reachable from the test assembly via <c>InternalsVisibleTo</c>; never exposed publicly.
+    /// </summary>
+    internal byte[] GetMasterKeyForTests() => GetOrCreateMasterKey();
 
     private void Load()
     {
@@ -153,10 +240,31 @@ public sealed class NotificationSecretStore : INotificationSecretStore
                         Buffer.BlockCopy(fileBytes, MagicHeader.Length + NonceSize, tag, 0, TagSize);
                         Buffer.BlockCopy(fileBytes, MagicHeader.Length + NonceSize + TagSize, cipherBytes, 0, cipherLength);
 
-                        using var aes = new AesGcm(key, TagSize);
-                        aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
+                        try
+                        {
+                            using var aes = new AesGcm(key, TagSize);
+                            aes.Decrypt(nonce, cipherBytes, tag, plainBytes);
 
-                        _data = JsonSerializer.Deserialize<SecretData>(plainBytes) ?? new SecretData();
+                            _data = JsonSerializer.Deserialize<SecretData>(plainBytes) ?? new SecretData();
+                        }
+                        catch (CryptographicException ex)
+                        {
+                            // The stored ciphertext failed authentication under the current master key.
+                            // This is almost always a master-key MISMATCH (e.g. a prior run fell back to
+                            // a different in-memory key, or the on-disk key file was replaced/rotated) --
+                            // not a corrupt/tampered file. Distinguish it clearly in the warning, and do
+                            // NOT let this failure alone trigger a save: only explicit Set/Clear calls may
+                            // overwrite the (still intact, potentially recoverable-with-the-right-key)
+                            // encrypted file on disk from here on.
+                            RaiseWarning(
+                                "Failed to decrypt secrets file '" + _filePath + "': the master key does not " +
+                                "match the key used to encrypt this file (" + ex.GetType().Name + "). This " +
+                                "usually means the master key changed since the file was last saved, not that " +
+                                "the file is corrupt. Configured Discord/Telegram secrets could not be loaded " +
+                                "and will appear unset until the correct master key is restored. The encrypted " +
+                                "file on disk has NOT been modified by this failed load.");
+                            _data = new SecretData();
+                        }
                     }
                     else
                     {
@@ -258,7 +366,11 @@ public sealed class NotificationSecretStore : INotificationSecretStore
         }
     }
 
-    private static void ApplyWindowsRestrictedAcl(string path)
+    /// <remarks>
+    /// Internal rather than private so tests (via <c>InternalsVisibleTo</c>) can exercise the
+    /// failure/logging path directly without depending on a Windows host or icacls.exe availability.
+    /// </remarks>
+    internal static void ApplyWindowsRestrictedAcl(string path)
     {
         try
         {
@@ -306,11 +418,38 @@ public sealed class NotificationSecretStore : INotificationSecretStore
                 RedirectStandardError = true
             };
             using var proc = Process.Start(psi);
-            proc?.WaitForExit(2000);
+            if (proc == null)
+            {
+                RaiseWarning(
+                    "Failed to harden Windows file permissions on '" + path + "': icacls.exe could not be " +
+                    "started (Process.Start returned null). This file may remain readable/writable by more " +
+                    "than the current user.");
+                return;
+            }
+
+            var exited = proc.WaitForExit(2000);
+            if (!exited)
+            {
+                RaiseWarning(
+                    "Failed to harden Windows file permissions on '" + path + "': icacls.exe did not exit " +
+                    "within 2000ms (timed out). This file may remain readable/writable by more than the " +
+                    "current user.");
+                return;
+            }
+
+            if (proc.ExitCode != 0)
+            {
+                RaiseWarning(
+                    "Failed to harden Windows file permissions on '" + path + "': icacls.exe exited with " +
+                    "code " + proc.ExitCode + ". This file may remain readable/writable by more than the " +
+                    "current user.");
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Best effort fallback
+            RaiseWarning(
+                "Failed to harden Windows file permissions on '" + path + "': " + ex.GetType().Name + ": " +
+                ex.Message + ". This file may remain readable/writable by more than the current user.");
         }
     }
 

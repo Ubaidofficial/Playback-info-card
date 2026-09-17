@@ -91,29 +91,26 @@ public sealed class PlaybackProgressConsumer : IEventConsumer<PlaybackProgressEv
             var now = DateTimeOffset.UtcNow;
             PruneAbandonedStates(now);
 
+            // Atomically read the previous state and write the new one as a single ConcurrentDictionary
+            // operation. A separate TryGetValue-then-indexer-write here would let two near-simultaneous
+            // calls for the same session both observe the same stale previous state and both conclude
+            // a transition occurred, double-firing a Pause/Resume notification.
             var eventType = NotificationEventType.Progress;
-
-            // Check if there was a verified pause/resume transition
-            if (SessionStates.TryGetValue(sessionId, out var previousEntry))
-            {
-                if (previousEntry.IsPaused != isPaused)
+            SessionStates.AddOrUpdate(
+                sessionId,
+                addValueFactory: _ =>
                 {
-                    // True transition observed
-                    eventType = isPaused ? NotificationEventType.Pause : NotificationEventType.Resume;
-                    SessionStates[sessionId] = new SessionStateEntry(isPaused, now);
-                }
-                else
+                    // First progress tick: record current state without emitting false Pause or Resume
+                    eventType = NotificationEventType.Progress;
+                    return new SessionStateEntry(isPaused, now);
+                },
+                updateValueFactory: (_, previousEntry) =>
                 {
-                    // Refresh timestamp
-                    SessionStates[sessionId] = new SessionStateEntry(isPaused, now);
-                }
-            }
-            else
-            {
-                // First progress tick: record current state without emitting false Pause or Resume
-                SessionStates[sessionId] = new SessionStateEntry(isPaused, now);
-                eventType = NotificationEventType.Progress;
-            }
+                    eventType = previousEntry.IsPaused != isPaused
+                        ? (isPaused ? NotificationEventType.Pause : NotificationEventType.Resume) // True transition observed
+                        : NotificationEventType.Progress; // Refresh timestamp only
+                    return new SessionStateEntry(isPaused, now);
+                });
 
             var record = PlaybackEventMapper.Map(
                 eventType,
