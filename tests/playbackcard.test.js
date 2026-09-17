@@ -373,7 +373,7 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
             assert.ok(html.includes('Transcode'));
             assert.ok(html.includes('Engine: QSV'));
             assert.ok(html.includes('4.5 Mbps'));
-            assert.ok(html.includes('ContainerNotSupported'));
+            assert.ok(html.includes('Container not supported'));
         });
 
         it('renders Paused badge with paused styling', () => {
@@ -608,8 +608,8 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
             assert.ok(html.includes('Engine: NVENC'));
             assert.ok(html.includes('Video: H264'));
             assert.ok(html.includes('Audio: AAC'));
-            assert.ok(html.includes('ContainerNotSupported (Container format not supported by client player)'));
-            assert.ok(html.includes('VideoCodecNotSupported (Video codec incompatible with device decoder)'));
+            assert.ok(html.includes('Container not supported'));
+            assert.ok(html.includes('Video codec not supported'));
         });
 
         it('renders UserPlaybackSessionDto from personal sessions endpoint cleanly', () => {
@@ -654,6 +654,26 @@ describe('Playback Info Card v0.2.5.0 Test Suite', () => {
             // that happens to reuse the same card position.
             controller.prepareRenderPass([]);
             assert.ok(!controller.openInfoSessionIds['monitor-persist-1'], 'Open-info state is pruned once its session is gone');
+        });
+
+        it('mirrors the v0.2.5.0 additions on this page too (ETA, Atmos, audio language, subtitle delivery method, avatar)', () => {
+            const session = {
+                Id: 'monitor-additions-1', UserId: 'u-1', UserName: 'X',
+                PlayState: { IsPaused: false, SubtitleStreamIndex: 2 },
+                PositionTicks: 0, RunTimeTicks: 3600 * 10000000,
+                NowPlayingItem: {
+                    Name: 'X', MediaStreams: [
+                        { Type: 'Audio', Channels: 8, Language: 'eng', Profile: 'Atmos', Codec: 'truehd' },
+                        { Type: 'Subtitle', Index: 2, Language: 'eng', Codec: 'srt', DeliveryMethod: 'Encode' }
+                    ]
+                }
+            };
+            const html = controller.renderSessionCard(session, 0);
+            assert.ok(html.includes('playback-eta'), 'ETA renders on this page too');
+            assert.ok(html.includes('Atmos'), 'Atmos badge renders');
+            assert.ok(html.includes('ENG'), 'Audio language enriches the channel-layout field');
+            assert.ok(html.includes('Burned into video (forces transcode)'), 'Subtitle delivery method is surfaced');
+            assert.equal(controller.resolveUserAvatarUrl(session, { getUserImageUrl: (id) => '/u/' + id }), '/u/u-1');
         });
     });
 

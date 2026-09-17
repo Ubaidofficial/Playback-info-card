@@ -593,6 +593,25 @@
     line-height: 1.25;
     word-break: break-word;
     overflow-wrap: anywhere;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.playbackMonitorPage .playback-user-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.playbackMonitorPage .playback-eta {
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
 .playbackMonitorPage .playback-card-client {
@@ -1864,43 +1883,83 @@
     }
 
     function extractResolutionPill(width, height) {
-        var w = typeof width === 'number' ? width : 0;
-        var h = typeof height === 'number' ? height : 0;
-        if (w >= 3800 || h >= 2100) return '4K';
+        if (!width && !height) return '';
+        var w = Number(width) || 0;
+        var h = Number(height) || 0;
+        if (w >= 3800 || h >= 2000) return '4K';
         if (w >= 2500 || h >= 1400) return '1440p';
         if (w >= 1900 || h >= 1000) return '1080p';
         if (w >= 1200 || h >= 700) return '720p';
-        if (h > 0 || w > 0) return 'SD';
+        if (w >= 700 || h >= 460) return '480p';
+        if (h > 0) return h + 'p';
         return '';
     }
 
     function extractDynamicRangePill(videoStream) {
         if (!videoStream) return '';
-        var vRange = (videoStream.VideoRange || videoStream.VideoRangeType || '').toUpperCase();
-        if (vRange.indexOf('DOVI') !== -1 || vRange.indexOf('DOLBY') !== -1) return 'Dolby Vision';
-        if (vRange.indexOf('HDR10+') !== -1 || vRange.indexOf('HDR10PLUS') !== -1) return 'HDR10+';
-        if (vRange.indexOf('HDR') !== -1) return 'HDR';
+        var range = (videoStream.VideoRange || videoStream.VideoRangeType || '').toUpperCase();
+        if (range.indexOf('DOVI') !== -1 || range.indexOf('DOLBY') !== -1) return 'DV';
+        if (range.indexOf('HDR10+') !== -1) return 'HDR10+';
+        if (range.indexOf('HDR') !== -1) return 'HDR';
+        if (range.indexOf('HLG') !== -1) return 'HLG';
         return '';
+    }
+
+    function extractAtmosBadge(audioStream) {
+        if (!audioStream) return '';
+        var text = ((audioStream.Profile || '') + ' ' + (audioStream.Title || '') + ' ' + (audioStream.DisplayTitle || '')).toLowerCase();
+        if (text.indexOf('atmos') !== -1) return 'Atmos';
+        if (text.indexOf('dts:x') !== -1 || text.indexOf('dts-x') !== -1 || text.indexOf('dtsx') !== -1) return 'DTS:X';
+        return '';
+    }
+
+    function extractAudioLanguage(audioStream) {
+        if (!audioStream || !audioStream.Language) return '';
+        var lang = String(audioStream.Language).toUpperCase();
+        return lang.length > 3 ? lang.substring(0, 3) : lang;
+    }
+
+    function formatEta(remainingTicks, nowMs) {
+        if (typeof remainingTicks !== 'number' || !isFinite(remainingTicks) || remainingTicks <= 0) return null;
+        var finish = new Date((typeof nowMs === 'number' ? nowMs : Date.now()) + Math.round(remainingTicks / 10000));
+        var hours = finish.getHours();
+        var minutes = finish.getMinutes();
+        var ampm = hours >= 12 ? 'PM' : 'AM';
+        var hours12 = hours % 12;
+        if (hours12 === 0) hours12 = 12;
+        var paddedMinutes = minutes < 10 ? '0' + minutes : String(minutes);
+        return hours12 + ':' + paddedMinutes + ' ' + ampm;
+    }
+
+    // The user's own Jellyfin profile avatar (their own chosen image on their own server).
+    function resolveUserAvatarUrl(session, apiClient) {
+        if (!session || !apiClient || !session.UserId) return '';
+        if (typeof apiClient.getUserImageUrl !== 'function') return '';
+        try {
+            var opts = { type: 'Primary', maxWidth: 64, quality: 90 };
+            if (session.UserPrimaryImageTag) opts.tag = session.UserPrimaryImageTag;
+            return apiClient.getUserImageUrl(session.UserId, opts) || '';
+        } catch (_) {
+            return '';
+        }
     }
 
     function extractAudioBadges(audioStream) {
         if (!audioStream) return [];
         var badges = [];
-        var title = (audioStream.DisplayTitle || audioStream.Title || '').toLowerCase();
-        var profile = (audioStream.Profile || '').toLowerCase();
-        if (title.indexOf('atmos') !== -1 || profile.indexOf('atmos') !== -1) {
-            badges.push('Atmos');
-        }
+        var layout = audioStream.ChannelLayout || '';
         var channels = audioStream.Channels;
-        if (channels === 8) badges.push('7.1');
-        else if (channels === 6) badges.push('5.1');
+        if (layout.indexOf('7.1') !== -1 || channels === 8) badges.push('7.1');
+        else if (layout.indexOf('5.1') !== -1 || channels === 6) badges.push('5.1');
         else if (channels === 2) badges.push('Stereo');
         else if (channels === 1) badges.push('Mono');
+        else if (channels) badges.push(channels + ' ch');
 
         var codec = (audioStream.Codec || '').toUpperCase();
         if (codec) {
-            if (codec === 'EAC3') codec = 'E-AC3';
+            if (codec === 'EAC3' || codec === 'EC-3') codec = 'E-AC3';
             else if (codec === 'TRUEHD') codec = 'TrueHD';
+            else if (codec === 'DTS-HD') codec = 'DTS-HD';
             badges.push(codec);
         }
         return badges;
@@ -2030,18 +2089,24 @@
         if (!reason) return '';
         var r = String(reason);
         var map = {
-            'ContainerNotSupported': 'ContainerNotSupported (Container format not supported by client player)',
-            'VideoCodecNotSupported': 'VideoCodecNotSupported (Video codec incompatible with device decoder)',
-            'AudioCodecNotSupported': 'AudioCodecNotSupported (Audio codec incompatible with client player)',
-            'SubtitleCodecNotSupported': 'SubtitleCodecNotSupported (Subtitle codec incompatible with client player)',
-            'ContainerBitrateExceedsLimit': 'ContainerBitrateExceedsLimit (Bitrate exceeds client network profile limit)',
-            'AudioBitrateNotSupported': 'AudioBitrateNotSupported (Audio bitrate exceeds client decoder capabilities)',
-            'AudioChannelsNotSupported': 'AudioChannelsNotSupported (Audio channel layout exceeds playback target)',
-            'VideoResolutionNotSupported': 'VideoResolutionNotSupported (Video resolution exceeds display hardware capabilities)',
-            'DirectPlayError': 'DirectPlayError (Direct playback encountered an unexpected client error)',
-            'VideoBitrateNotSupported': 'VideoBitrateNotSupported (Video bitrate exceeds allowable maximum)',
-            'VideoProfileNotSupported': 'VideoProfileNotSupported (Video profile not supported by device)',
-            'SecondaryAudioNotSupported': 'SecondaryAudioNotSupported (Secondary audio stream format incompatible)'
+            'ContainerNotSupported': 'Container not supported',
+            'VideoCodecNotSupported': 'Video codec not supported',
+            'AudioCodecNotSupported': 'Audio codec not supported',
+            'SubtitleCodecNotSupported': 'Subtitle codec not supported',
+            'AudioIsExternal': 'External audio track',
+            'SecondaryAudioNotSupported': 'Secondary audio track not supported',
+            'VideoProfileNotSupported': 'Video profile not supported',
+            'VideoLevelNotSupported': 'Video level not supported',
+            'VideoResolutionNotSupported': 'Resolution exceeds client limit',
+            'VideoBitrateNotSupported': 'Bitrate exceeds allowable maximum',
+            'VideoFramerateNotSupported': 'Framerate exceeds display capability',
+            'RefFramesNotSupported': 'Reference frames not supported',
+            'AnamorphicVideoNotSupported': 'Anamorphic video not supported',
+            'InterlacedVideoNotSupported': 'Interlaced video requires deinterlacing',
+            'DirectPlayError': 'Direct playback error occurred',
+            'ContainerBitrateExceedsLimit': 'Container bitrate exceeds client network profile limit',
+            'AudioBitrateNotSupported': 'Audio bitrate exceeds client decoder capabilities',
+            'AudioChannelsNotSupported': 'Audio channel layout exceeds playback target'
         };
         return map[r] || r;
     }
@@ -2373,6 +2438,9 @@
                 pills.push({ text: audioBadges[0], cls: 'audio' });
             }
 
+            var atmosPill = extractAtmosBadge(audioStream);
+            if (atmosPill) pills.push({ text: atmosPill, cls: 'audio' });
+
             var containerVal = (session.Container || (tInfo && tInfo.Container) || item.Container || '').toUpperCase();
             if (containerVal) {
                 pills.push({ text: containerVal, cls: '' });
@@ -2469,7 +2537,34 @@
             // Info Drawer Complete 22-Field Technical Breakdown
             var hdrStatus = extractDynamicRangePill(videoStream) || 'SDR';
             var hdrToSdrVal = isHdrToSdr(videoStream, tInfo) ? 'Active (Tone mapping)' : 'Not reported';
+            var audioLanguage = extractAudioLanguage(audioStream);
             var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
+            if (audioChannelsLayout && audioLanguage) audioChannelsLayout = audioLanguage + ' ' + audioChannelsLayout;
+
+            // Subtitle delivery method (Encode/Embed/External/Hls) is real, server-reported
+            // data -- burned-in ("Encode") subtitles are a genuine, common reason a video
+            // gets transcoded even when its codec is otherwise compatible.
+            var SUBTITLE_DELIVERY_LABELS = { Encode: 'Burned into video (forces transcode)', Embed: 'Embedded', External: 'External file', Hls: 'Segmented (HLS)', Drop: 'Dropped' };
+            var subtitleFieldVal = 'None';
+            var subIndexForGrid = (playState && playState.SubtitleStreamIndex != null) ? playState.SubtitleStreamIndex : (session.SubtitleStreamIndex != null ? session.SubtitleStreamIndex : -1);
+            if (subIndexForGrid !== -1 && subIndexForGrid != null) {
+                for (var sgi = 0; sgi < mediaStreams.length; sgi++) {
+                    if (mediaStreams[sgi].Type === 'Subtitle' && (mediaStreams[sgi].Index === subIndexForGrid || subIndexForGrid === -2)) {
+                        var sg = mediaStreams[sgi];
+                        var sgLabel = sg.DisplayTitle || sg.Language || 'Subtitle';
+                        subtitleFieldVal = sgLabel + (sg.Codec ? ' (' + String(sg.Codec).toUpperCase() + ')' : '');
+                        var sgDelivery = sg.DeliveryMethod ? SUBTITLE_DELIVERY_LABELS[sg.DeliveryMethod] : null;
+                        if (sgDelivery) subtitleFieldVal += ' — ' + sgDelivery;
+                        break;
+                    }
+                }
+            }
+
+            var positionTicksForEta = (typeof session.PositionTicks === 'number' && isFinite(session.PositionTicks)) ? session.PositionTicks
+                : ((playState && typeof playState.PositionTicks === 'number' && isFinite(playState.PositionTicks)) ? playState.PositionTicks : 0);
+            var runtimeTicksForEta = (typeof session.RunTimeTicks === 'number' && isFinite(session.RunTimeTicks)) ? session.RunTimeTicks
+                : ((item && typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks)) ? item.RunTimeTicks : 0);
+            var etaText = (!isPaused && runtimeTicksForEta > positionTicksForEta) ? formatEta(runtimeTicksForEta - positionTicksForEta) : null;
 
             var gridRows = [
                 { key: 'User', val: escapeHtml(session.UserName || 'Not reported') },
@@ -2494,7 +2589,8 @@
                 { key: 'Output Container', val: escapeHtml(outputContainer || (isVideoDirect === true && isAudioDirect === true ? (sourceContainer || 'Direct') : 'Not reported')) },
                 { key: 'Bitrate', val: escapeHtml(bitrateStr || 'Not reported') },
                 { key: 'Hardware Engine', val: escapeHtml(hardwareEngineStr || 'Not reported') },
-                { key: 'Transcode Reason', val: escapeHtml(serverReasons || (classification.method === 'Transcode' ? 'Reason not reported by server' : 'Not reported')), fullWidth: true }
+                { key: 'Transcode Reason', val: escapeHtml(serverReasons || (classification.method === 'Transcode' ? 'Reason not reported by server' : 'Not reported')), fullWidth: true },
+                { key: 'Subtitle Stream', val: escapeHtml(subtitleFieldVal), fullWidth: true }
             ];
 
             var gridRowsHtml = gridRows.map(function (row) {
@@ -2532,6 +2628,10 @@
 
             // Poster & Backdrop handling
             var apiClient = getApiClient();
+            var userAvatarUrl = resolveUserAvatarUrl(session, apiClient);
+            var userAvatarHtml = userAvatarUrl
+                ? '<img class="playback-user-avatar" src="' + escapeHtml(userAvatarUrl) + '" alt="" onerror="this.remove()" />'
+                : '';
             var art = resolveArtworkUrls(session, item, apiClient);
             var posterUrl = art.posterUrl;
             var backdropUrl = art.backdropUrl;
@@ -2552,7 +2652,7 @@
                         '<div class="playback-card-user-group">' +
                             '<span class="playback-platform-icon" title="' + client + '">' + platformIconSvg + '</span>' +
                             '<div class="playback-card-user-info">' +
-                                '<div class="playback-card-user">' + user + '</div>' +
+                                '<div class="playback-card-user">' + userAvatarHtml + user + '</div>' +
                                 '<div class="playback-card-client">' + clientDevice + '</div>' +
                             '</div>' +
                         '</div>' +
@@ -2575,6 +2675,7 @@
                         '</div>' +
                         '<div class="playback-progress-times">' +
                             '<span>' + formatTicks(positionTicks) + '</span>' +
+                            (etaText ? '<span class="playback-eta">ETA ' + escapeHtml(etaText) + '</span>' : '') +
                             '<span>' + formatTicks(runtimeTicks) + '</span>' +
                         '</div>' +
                     '</div>' +
@@ -3691,6 +3792,10 @@
         extractTranscoderEngine: extractTranscoderEngine,
         resolveClientBrand: resolveClientBrand,
         getPlatformIconSvg: getPlatformIconSvg,
+        extractAtmosBadge: extractAtmosBadge,
+        extractAudioLanguage: extractAudioLanguage,
+        formatEta: formatEta,
+        resolveUserAvatarUrl: resolveUserAvatarUrl,
         renderSessionCard: renderSessionCard,
         prepareRenderPass: prepareRenderPass,
         openInfoSessionIds: openInfoSessionIds,

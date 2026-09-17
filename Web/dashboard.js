@@ -257,7 +257,10 @@
             'RefFramesNotSupported': 'Reference frames not supported',
             'AnamorphicVideoNotSupported': 'Anamorphic video not supported',
             'InterlacedVideoNotSupported': 'Interlaced video requires deinterlacing',
-            'DirectPlayError': 'Direct playback error occurred'
+            'DirectPlayError': 'Direct playback error occurred',
+            'ContainerBitrateExceedsLimit': 'Container bitrate exceeds client network profile limit',
+            'AudioBitrateNotSupported': 'Audio bitrate exceeds client decoder capabilities',
+            'AudioChannelsNotSupported': 'Audio channel layout exceeds playback target'
         };
         return map[r] || r;
     }
