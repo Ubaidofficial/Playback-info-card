@@ -13,6 +13,7 @@ labels: ["bug", "responsive", "ui"]
 ### Environment Details
 - **Plugin Version**: 0.2.3.1
 - **Jellyfin Server Version**:
+- **Installation Method**: (e.g., Method 1 Plugin Repository Manifest, Manual ZIP extraction)
 - **Device Model**: (e.g., iPhone 15, Pixel 8, iPad Air, Android Tablet)
 - **Viewport Width / Screen Resolution**: (e.g., 390px, 412px, 768px)
 - **Browser / Client**: (e.g., Mobile Safari, Chrome Mobile, Firefox Mobile)

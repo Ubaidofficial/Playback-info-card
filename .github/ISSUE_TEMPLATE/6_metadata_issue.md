@@ -14,7 +14,8 @@ labels: ["bug", "metadata"]
 - **Plugin Version**: 0.2.3.1
 - **Jellyfin Server Version**:
 - **Server Operating System**:
-- **Client App & Version**: (e.g., Jellyfin Web 10.9.11, Jellyfin Android TV 0.16.11, Infuse 7.7)
+- **Installation Method**: (e.g., Method 1 Plugin Repository Manifest, Manual ZIP extraction)
+- **Browser / Client**: (e.g., Jellyfin Web / Chrome, Jellyfin Android TV 0.16.11, Moonfin, Infuse 7.7)
 
 ### Playback Type
 - [ ] Direct Play
@@ -29,10 +30,15 @@ labels: ["bug", "metadata"]
 - **Audio Channels / Codec**: (e.g., 7.1 TrueHD, 5.1 EAC3, Stereo AAC)
 - **Active Subtitle**: (e.g., English SRT, French ASS, Closed Captions)
 
-### Expected Metadata Display
+### Exact Steps to Reproduce
+1. Start playback on the client app.
+2. Open Jellyfin Web as administrator and navigate to Playback Monitor.
+3. Observe the reported metadata badges on the session card.
+
+### Expected Result
 What badges, codecs, or details should be shown?
 
-### Actual Metadata Display
+### Actual Result
 What does the monitor card show instead? (e.g., shows Stereo instead of 5.1, transcode reason missing, subtitle badge absent)
 
 ### Redacted Diagnostic Report
