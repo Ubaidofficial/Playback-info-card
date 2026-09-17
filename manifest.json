@@ -13,8 +13,8 @@
         "changelog": "Release v0.2.3.4 - Restore primary default Dashboard integration above Devices section, autonomous loading, session count summary, compact mode default, and transcode breakdown.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.4/jellyfin-plugin-playbackcard.zip",
-        "checksum": "2f7dd9cbf64002c9849ca70b7ee7e004",
-        "timestamp": "2026-09-17T14:53:00Z"
+        "checksum": "87fe697ed204121903f50d7f8895d7d2",
+        "timestamp": "2026-09-17T14:55:00Z"
       },
       {
         "version": "0.2.3.3",
