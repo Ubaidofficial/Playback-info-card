@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.5.0",
+        "changelog": "Release v0.2.5.0 - Truthful transcode diagnostics additions: estimated finish time (ETA), Dolby Atmos/DTS:X detection, audio track language, and subtitle delivery method (surfaces burned-in subtitles as a genuine transcode cause) -- none inferred, all read directly from server-reported fields. Adds the user's own avatar next to their name and a layered cinema-poster shadow on artwork. Fixes a Remux/Transcode misclassification in the personal My Playback API, hardens secret storage (no more guessable fallback key, no silent ACL failures, no silent secret wipe on key mismatch), fixes a notification dedupe race condition, adds Brotli response support to the dashboard injector, and brings the Info-panel persistence fix to the standalone Playback Monitor page.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.5.0/jellyfin-plugin-playbackcard.zip",
+        "checksum": "8c82a529828f023eac79b8bf36994a32",
+        "timestamp": "2026-09-17T20:20:00Z"
+      },
+      {
         "version": "0.2.4.1",
         "changelog": "Release v0.2.4.1 - Singleton Info drawer that survives polling (fixes Info closing itself every 3s), real brand-accurate client logos (Chrome/Safari/Edge/Firefox/Brave and ~20 third-party/device clients replacing single-color placeholders), Remux/DirectPlay no longer show the Transcode-only \"Reason not reported by server\" text, corrected header method-count chip order (Direct Play/Direct Stream/Remux/Transcode/Paused, Remux always shown), expanded 26-field grouped technical breakdown, extended artwork fallback chain, and removal of a raw session-ID DOM leak in Connected Devices.",
         "targetAbi": "10.9.0.0",
@@ -39,54 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.6/jellyfin-plugin-playbackcard.zip",
         "checksum": "b62ddc5570b2676e1dab9ade1bb68ea5",
         "timestamp": "2026-09-17T16:11:00Z"
-      },
-      {
-        "version": "0.2.3.5",
-        "changelog": "Release v0.2.3.5 - Corrective patch completely replacing stock Devices section with NOW PLAYING card on Jellyfin Dashboard, with empty state No active playback, autonomous loading, and zero duplicate mounting.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.5/jellyfin-plugin-playbackcard.zip",
-        "checksum": "a796df9b0ef96cbef066223d9a1fb6d4",
-        "timestamp": "2026-09-17T15:32:00Z"
-      },
-      {
-        "version": "0.2.3.4",
-        "changelog": "Release v0.2.3.4 - Restore primary default Dashboard integration above Devices section, autonomous loading, session count summary, compact mode default, and transcode breakdown.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.4/jellyfin-plugin-playbackcard.zip",
-        "checksum": "87fe697ed204121903f50d7f8895d7d2",
-        "timestamp": "2026-09-17T14:55:00Z"
-      },
-      {
-        "version": "0.2.3.3",
-        "changelog": "Release v0.2.3.3 - Fix notification route dispatch, preserve partial settings, protect masked secrets, and refine diagnostics.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.3/jellyfin-plugin-playbackcard.zip",
-        "checksum": "35a01a7df96c54983274f3cb02d0b5e1",
-        "timestamp": "2026-09-17T12:00:00Z"
-      },
-      {
-        "version": "0.2.3.2",
-        "changelog": "Release v0.2.3.2 - Native Discord/Telegram notifications, transcode details, and My Playback view.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.2/jellyfin-plugin-playbackcard.zip",
-        "checksum": "eeaaa13518e46284a03929528c91854e",
-        "timestamp": "2026-09-17T09:44:00Z"
-      },
-      {
-        "version": "0.2.3.1",
-        "changelog": "Release v0.2.3.1 - Safe internal monitor page, local diagnostics, and issue reporting.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3.1/jellyfin-plugin-playbackcard.zip",
-        "checksum": "7f8b967095d196da5b477c1ebc40f835",
-        "timestamp": "2026-09-16T23:44:05Z"
-      },
-      {
-        "version": "0.2.3.0",
-        "changelog": "Release v0.2.3",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.3/jellyfin-plugin-playbackcard.zip",
-        "checksum": "98f4003069da35fb619546402ca6b871",
-        "timestamp": "2026-09-16T08:20:42Z"
       }
     ]
   }
