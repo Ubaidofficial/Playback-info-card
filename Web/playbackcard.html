@@ -881,27 +881,6 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Transcode Details (Extended View) */
-.playbackMonitorPage .playback-card-transcode-details {
-    margin-top: 0.35rem;
-    padding: 0.6rem 0.8rem;
-    background: rgba(0, 0, 0, 0.35);
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    font-size: 0.76rem;
-    color: #cbd5e1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    min-width: 0;
-}
-
-.playbackMonitorPage .playback-transcode-meta {
-    line-height: 1.4;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-}
-
 .playbackMonitorPage .playback-transcode-reasons {
     color: #fca5a5;
     font-size: 0.75rem;
@@ -1085,15 +1064,6 @@
 
 .playbackMonitorPage .playback-details-panel.open {
     display: flex;
-}
-
-.playbackMonitorPage .playback-details-section-title {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;
-    margin-bottom: 0.15rem;
 }
 
 .playbackMonitorPage .playback-details-row {
@@ -2132,18 +2102,10 @@
     /**
      * Resolves the correct locally-bundled brand icon for a session.
      * Priority: exact Jellyfin application -> browser -> streaming/device platform -> operating system -> neutral fallback.
-     * Accepts either resolveClientBrand({client, deviceName, appVersion}) or legacy positional (clientName, deviceName).
      */
-    function resolveClientBrand(input, legacyDeviceName) {
-        var clientName = '';
-        var deviceName = '';
-        if (typeof input === 'object' && input !== null) {
-            clientName = input.client || input.clientName || '';
-            deviceName = input.deviceName || '';
-        } else {
-            clientName = input || '';
-            deviceName = legacyDeviceName || '';
-        }
+    function resolveClientBrand(input) {
+        var clientName = (input && input.client) || '';
+        var deviceName = (input && input.deviceName) || '';
 
         var c = String(clientName).toLowerCase();
         var d = String(deviceName).toLowerCase();
@@ -3703,7 +3665,7 @@
                 var chkUser = page.querySelector('#chkUsernameDisclosure');
                 var chkDev = page.querySelector('#chkClientDeviceDisclosure');
 
-                var isMaster = data.notificationsEnabled != null ? data.notificationsEnabled : data.enabled;
+                var isMaster = data.notificationsEnabled;
                 if (chkMaster) chkMaster.checked = Boolean(isMaster);
                 if (chkDiscord) chkDiscord.checked = Boolean(data.discordEnabled);
                 if (txtDiscord) {
@@ -3757,15 +3719,15 @@
                         : (data.telegramEnabled ? 'Save a Bot Token and Chat ID before testing' : 'Enable Telegram Delivery and save a Bot Token and Chat ID before testing');
                 }
 
-                if (chkStart) chkStart.checked = Boolean(data.notifyOnStart != null ? data.notifyOnStart : data.notifyOnPlaybackStart);
-                if (chkStop) chkStop.checked = Boolean(data.notifyOnStop != null ? data.notifyOnStop : data.notifyOnPlaybackStop);
-                if (chkComp) chkComp.checked = Boolean(data.notifyOnCompletion != null ? data.notifyOnCompletion : data.notifyOnPlaybackCompletion);
-                if (chkPause) chkPause.checked = Boolean(data.notifyOnPauseResume != null ? data.notifyOnPauseResume : data.notifyOnPlaybackPauseResume);
-                if (chkProg) chkProg.checked = Boolean(data.notifyOnProgress != null ? data.notifyOnProgress : data.notifyOnPlaybackProgress);
-                if (numProg) numProg.value = data.progressIntervalMinutes || data.playbackProgressIntervalMinutes || 15;
+                if (chkStart) chkStart.checked = Boolean(data.notifyOnStart);
+                if (chkStop) chkStop.checked = Boolean(data.notifyOnStop);
+                if (chkComp) chkComp.checked = Boolean(data.notifyOnCompletion);
+                if (chkPause) chkPause.checked = Boolean(data.notifyOnPauseResume);
+                if (chkProg) chkProg.checked = Boolean(data.notifyOnProgress);
+                if (numProg) numProg.value = data.progressIntervalMinutes || 15;
 
-                if (chkUser) chkUser.checked = Boolean(data.usernameDisclosure != null ? data.usernameDisclosure : data.includeUserAccountName);
-                if (chkDev) chkDev.checked = Boolean(data.clientDeviceDisclosure != null ? data.clientDeviceDisclosure : data.includeClientAndDeviceName);
+                if (chkUser) chkUser.checked = Boolean(data.usernameDisclosure);
+                if (chkDev) chkDev.checked = Boolean(data.clientDeviceDisclosure);
 
                 // Update local diag state
                 var notifs = diagState.notifications;
@@ -3776,14 +3738,14 @@
                     notifs.discordQueueDepth = data.diagnostics.discordQueueDepth || 0;
                     notifs.telegramQueueDepth = data.diagnostics.telegramQueueDepth || 0;
                     notifs.droppedProgressCount = data.diagnostics.droppedProgressCount || 0;
-                    notifs.dedupeCount = data.diagnostics.deduplicatedEventsCount || data.diagnostics.dedupeCount || 0;
-                    notifs.retryCount = data.diagnostics.retryAttemptsCount || data.diagnostics.retryCount || 0;
-                    notifs.lastAttempt = data.diagnostics.lastDeliveryAttemptUtc || data.diagnostics.lastAttemptTimestamp ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastDeliveryAttemptUtc || data.diagnostics.lastAttemptTimestamp).getTime()) : 'None';
-                    notifs.lastSuccess = data.diagnostics.lastSuccessfulDeliveryUtc || data.diagnostics.lastSuccessTimestamp ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastSuccessfulDeliveryUtc || data.diagnostics.lastSuccessTimestamp).getTime()) : 'None';
-                    notifs.lastFailureCategory = data.diagnostics.lastFailureCategory || data.diagnostics.lastSanitizedFailureCategory || 'OK';
+                    notifs.dedupeCount = data.diagnostics.dedupeCount || 0;
+                    notifs.retryCount = data.diagnostics.retryCount || 0;
+                    notifs.lastAttempt = data.diagnostics.lastDeliveryAttemptUtc ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastDeliveryAttemptUtc).getTime()) : 'None';
+                    notifs.lastSuccess = data.diagnostics.lastSuccessfulDeliveryUtc ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastSuccessfulDeliveryUtc).getTime()) : 'None';
+                    notifs.lastFailureCategory = data.diagnostics.lastFailureCategory || 'OK';
                     notifs.lastFailureDescription = data.diagnostics.lastFailureDescription || '';
-                    notifs.discordAvailability = data.diagnostics.discordAvailability || data.diagnostics.discordAvailabilityState || 'Available';
-                    notifs.telegramAvailability = data.diagnostics.telegramAvailability || data.diagnostics.telegramAvailabilityState || 'Available';
+                    notifs.discordAvailability = data.diagnostics.discordAvailability || 'Available';
+                    notifs.telegramAvailability = data.diagnostics.telegramAvailability || 'Available';
                 }
 
                 updateDiagnosticsDisplay();
@@ -3800,7 +3762,6 @@
         if (section === 'master') {
             var chkMaster = page.querySelector('#chkNotificationsEnabled');
             payload.notificationsEnabled = chkMaster ? chkMaster.checked : false;
-            payload.enabled = payload.notificationsEnabled;
         } else if (section === 'discord-toggle') {
             // Just the switch, same as 'master' -- deliberately does NOT touch the
             // webhook field, so flipping this can never blank out a saved webhook.
@@ -3839,21 +3800,13 @@
             var chkDev = page.querySelector('#chkClientDeviceDisclosure');
 
             payload.notifyOnStart = chkStart ? chkStart.checked : false;
-            payload.notifyOnPlaybackStart = payload.notifyOnStart;
             payload.notifyOnStop = chkStop ? chkStop.checked : false;
-            payload.notifyOnPlaybackStop = payload.notifyOnStop;
             payload.notifyOnCompletion = chkComp ? chkComp.checked : false;
-            payload.notifyOnPlaybackCompletion = payload.notifyOnCompletion;
             payload.notifyOnPauseResume = chkPause ? chkPause.checked : false;
-            payload.notifyOnPlaybackPauseResume = payload.notifyOnPauseResume;
             payload.notifyOnProgress = chkProg ? chkProg.checked : false;
-            payload.notifyOnPlaybackProgress = payload.notifyOnProgress;
             payload.progressIntervalMinutes = numProg ? Math.max(5, Math.min(120, parseInt(numProg.value, 10) || 15)) : 15;
-            payload.playbackProgressIntervalMinutes = payload.progressIntervalMinutes;
             payload.usernameDisclosure = chkUser ? chkUser.checked : false;
-            payload.includeUserAccountName = payload.usernameDisclosure;
             payload.clientDeviceDisclosure = chkDev ? chkDev.checked : false;
-            payload.includeClientAndDeviceName = payload.clientDeviceDisclosure;
         }
 
         callNotificationApi('PlaybackCard/Notifications/Configuration', {
@@ -3951,7 +3904,6 @@
                 if (!data) return;
                 var notifs = diagState.notifications;
                 if (typeof data.notificationsEnabled === 'boolean') notifs.enabled = data.notificationsEnabled;
-                else if (typeof data.enabled === 'boolean') notifs.enabled = data.enabled;
                 if (typeof data.discordEnabled === 'boolean') notifs.discordEnabled = data.discordEnabled;
                 if (typeof data.telegramEnabled === 'boolean') notifs.telegramEnabled = data.telegramEnabled;
                 notifs.discordQueueDepth = data.discordQueueDepth || 0;
@@ -3960,20 +3912,18 @@
                 notifs.droppedCriticalCount = data.droppedCriticalCount || 0;
                 notifs.coalescedProgressCount = data.coalescedProgressCount || 0;
                 notifs.rateLimitDropCount = data.rateLimitDropCount || 0;
-                notifs.dedupeCount = data.deduplicatedEventsCount || data.dedupeCount || 0;
-                notifs.retryCount = data.retryAttemptsCount || data.retryCount || 0;
+                notifs.dedupeCount = data.dedupeCount || 0;
+                notifs.retryCount = data.retryCount || 0;
                 notifs.queueCapacity = data.queueCapacity || 100;
                 notifs.validationFailureCount = data.validationFailureCount || 0;
                 notifs.workerState = data.workerState || 'Idle';
-                notifs.lastHttpStatus = data.lastHttpStatus != null ? data.lastHttpStatus : null;
-                var attemptTime = data.lastDeliveryAttemptUtc || data.lastAttemptTimestamp;
-                notifs.lastAttempt = attemptTime ? formatRelativeTime(Date.now() - new Date(attemptTime).getTime()) : 'None';
-                var successTime = data.lastSuccessfulDeliveryUtc || data.lastSuccessTimestamp;
-                notifs.lastSuccess = successTime ? formatRelativeTime(Date.now() - new Date(successTime).getTime()) : 'None';
-                notifs.lastFailureCategory = data.lastFailureCategory || data.lastSanitizedFailureCategory || 'OK';
+                notifs.lastHttpStatus = data.lastHttpStatus;
+                notifs.lastAttempt = data.lastDeliveryAttemptUtc ? formatRelativeTime(Date.now() - new Date(data.lastDeliveryAttemptUtc).getTime()) : 'None';
+                notifs.lastSuccess = data.lastSuccessfulDeliveryUtc ? formatRelativeTime(Date.now() - new Date(data.lastSuccessfulDeliveryUtc).getTime()) : 'None';
+                notifs.lastFailureCategory = data.lastFailureCategory || 'OK';
                 notifs.lastFailureDescription = data.lastFailureDescription || '';
-                notifs.discordAvailability = data.discordAvailability || data.discordAvailabilityState || 'Available';
-                notifs.telegramAvailability = data.telegramAvailability || data.telegramAvailabilityState || 'Available';
+                notifs.discordAvailability = data.discordAvailability || 'Available';
+                notifs.telegramAvailability = data.telegramAvailability || 'Available';
                 updateDiagnosticsDisplay();
             })
             .catch(function () {

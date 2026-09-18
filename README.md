@@ -1,4 +1,4 @@
-# PlayInfo for Jellyfin
+<img src="banner.png" alt="PlayInfo - real-time Jellyfin playback telemetry" width="500">
 
 *(formerly "Playback Info Card")*
 

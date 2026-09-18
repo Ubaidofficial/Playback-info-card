@@ -11,7 +11,7 @@ labels: ["bug", "ui"]
 > Use the **"Copy diagnostic report"** button on the Playback Monitor page for safe, redacted diagnostic output.
 
 ### Environment Details
-- **Plugin Version**: 0.2.3.1
+- **Plugin Version**:
 - **Jellyfin Server Version**:
 - **Server Operating System**:
 - **Installation Method**:

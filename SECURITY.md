@@ -18,4 +18,4 @@ If you discover a potential security vulnerability in this project:
 
 1. Please **do not** open a public GitHub issue.
 2. Submit your report through GitHub's [Private Vulnerability Reporting](https://github.com/Ubaidofficial/Playback-info-card/security/advisories/new).
-3. We will review and acknowledge within 48 hours and coordinate a patched release promptly.
+3. I'll acknowledge within 48 hours and work on a patched release from there.

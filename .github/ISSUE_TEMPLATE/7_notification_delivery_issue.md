@@ -12,7 +12,7 @@ labels: ["bug", "notifications"]
 > Use the **"Copy diagnostic report"** button on the Playback Monitor page for safe, redacted diagnostic output.
 
 ### Environment Details
-- **Plugin Version**: 0.2.3.1
+- **Plugin Version**:
 - **Jellyfin Server Version**:
 - **Server Operating System**: (e.g. Ubuntu 24.04, Debian 12, TrueNAS, Windows Server)
 - **Installation Method**: (e.g. Method 1 Plugin Repository Manifest, Manual ZIP extraction)

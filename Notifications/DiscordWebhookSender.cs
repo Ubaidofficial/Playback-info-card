@@ -193,29 +193,7 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
     /// <inheritdoc />
     public async Task<DeliveryResult> SendTestAsync(string webhookUrl, CancellationToken cancellationToken)
     {
-        var testPayload = new PlaybackNotificationPayload
-        {
-            EventType = NotificationEventType.Start,
-            Timestamp = DateTimeOffset.UtcNow,
-            MediaTitle = "Synthetic Test Stream (2026)",
-            ItemType = "Movie",
-            PlayMethod = "DirectPlay",
-            Position = TimeSpan.FromMinutes(12),
-            TotalDuration = TimeSpan.FromHours(2),
-            PlaybackPercentage = 10,
-            VideoStatus = "Video Direct",
-            AudioStatus = "Audio Direct",
-            IsVideoDirect = true,
-            IsAudioDirect = true,
-            VideoCodec = "HEVC",
-            AudioCodec = "EAC3",
-            Container = "MKV",
-            Resolution = "3840x2160",
-            DynamicRange = "HDR10",
-            AudioChannels = "5.1",
-            Bitrate = 18_500_000,
-            TranscodeReasonsWhy = "Reason not reported by server"
-        };
+        var testPayload = PlaybackNotificationPayload.CreateSyntheticTest();
 
         return await SendAsync(testPayload, webhookUrl, cancellationToken).ConfigureAwait(false);
     }

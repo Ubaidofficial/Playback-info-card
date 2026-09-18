@@ -1349,10 +1349,6 @@
         }
     }
 
-    function slugifyFieldKey(key) {
-        return String(key).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-+|-+$)/g, '');
-    }
-
     function formatBitrate(bitsPerSecond) {
         if (typeof bitsPerSecond !== 'number' || !isFinite(bitsPerSecond) || bitsPerSecond <= 0) return null;
         if (bitsPerSecond >= 1000000) return (bitsPerSecond / 1000000).toFixed(1) + ' Mbps';

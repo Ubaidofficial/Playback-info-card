@@ -507,12 +507,9 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
 
         public DestinationQueue(string name, int capacity = 100, int reservedCritical = 20)
         {
-            Name = name;
             _capacity = capacity;
             _nonCriticalLimit = Math.Max(1, capacity - reservedCritical);
         }
-
-        public string Name { get; }
 
         public int DroppedProgressCount => Volatile.Read(ref _droppedProgressCount);
         public int DroppedCriticalCount => Volatile.Read(ref _droppedCriticalCount);
