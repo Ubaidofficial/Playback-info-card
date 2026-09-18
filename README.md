@@ -66,4 +66,4 @@ One-person side project. I use Claude Code for a meaningful share of the impleme
 
 ## License
 
-[GNU General Public License v3.0](LICENSE) (GPL-3.0) — the same license used by [Tautulli](https://github.com/Tautulli/Tautulli), this project's original inspiration. Modified versions must also be distributed under GPL-3.0 with source available.
+[GNU General Public License v3.0](LICENSE) — same as [Tautulli](https://github.com/Tautulli/Tautulli), this project's inspiration.
