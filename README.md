@@ -84,4 +84,4 @@ One-person project. I use Claude Code for a chunk of the implementation, but I w
 
 ## License
 
-[GNU General Public License v3.0](LICENSE) — same as [Tautulli](https://github.com/Tautulli/Tautulli), this project's inspiration.
+[GNU General Public License v3.0](LICENSE)
