@@ -31,6 +31,16 @@ unzip -o jellyfin-plugin-playbackcard.zip -d /var/lib/jellyfin/plugins/PlaybackC
 sudo systemctl start jellyfin
 ```
 
+## Duplicate/stale plugin version folders
+
+Jellyfin's plugin loader is supposed to keep only the newest installed version of a plugin on disk, but this hasn't always happened reliably in practice (see [jellyfin/jellyfin#12959](https://github.com/jellyfin/jellyfin/issues/12959)) — an update can leave an old `PlayInfo_x.y.z.w` folder sitting next to the new one in your `plugins` directory, and Jellyfin can end up loading the older one. When that happens, fixes from newer releases silently don't apply — nothing crashes or errors, features just quietly stop working as if the update never happened.
+
+This plugin checks for that condition itself:
+- At every startup it looks for older sibling `PlayInfo_*` folders next to the build that's actually running and logs a warning if it finds any.
+- If any are found, the plugin's own dashboard (System Diagnostics section) shows a banner naming them, with a **Remove** button per folder.
+
+Removal is always an explicit, one-click, admin-confirmed action — never automatic — and it refuses to run unless it can positively confirm the target folder belongs to this plugin and is strictly older than the version currently running. If you ever see this banner, it's worth deleting the older folder and restarting to confirm the "Loaded assembly" line in your server log now points at the version you expect.
+
 ## Compatibility
 
 - Built against Jellyfin 10.9.11 (`Jellyfin.Controller` / `Jellyfin.Model`), targeting `.NET 8.0`, ABI `10.9.0.0`.

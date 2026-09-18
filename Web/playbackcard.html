@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">PlayInfo</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.7.3</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.7.4</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -260,10 +260,19 @@
 
                     <div id="diagnosticsFeedback" class="diagnosticsFeedback" style="display: none;"></div>
 
+                    <div id="pluginVersionConflictBanner" class="pluginVersionWarningBanner" style="display: none;">
+                        <div class="pluginVersionWarningText">
+                            <strong>Multiple installed versions detected.</strong>
+                            <span id="pluginVersionConflictDetail"></span>
+                            Jellyfin may be running the older build instead of this one, silently missing later fixes.
+                        </div>
+                        <div id="pluginVersionConflictActions" class="pluginVersionWarningActions"></div>
+                    </div>
+
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.7.3</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.7.4</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -1576,6 +1585,58 @@
     color: #fca5a5;
 }
 
+.playbackMonitorPage .pluginVersionWarningBanner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    color: #fcd34d;
+}
+
+.playbackMonitorPage .pluginVersionWarningText {
+    flex: 1 1 320px;
+}
+
+.playbackMonitorPage .pluginVersionWarningText strong {
+    color: #fde68a;
+}
+
+.playbackMonitorPage .pluginVersionWarningActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.playbackMonitorPage .btnRemoveStaleVersion {
+    background: rgba(245, 158, 11, 0.18);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: #fde68a;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.playbackMonitorPage .btnRemoveStaleVersion:hover {
+    background: rgba(245, 158, 11, 0.3);
+}
+
+.playbackMonitorPage .btnRemoveStaleVersion:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 .playbackMonitorPage .diagnosticsGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1933,7 +1994,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.7.3';
+    var PLUGIN_VERSION = '0.2.7.4';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -3673,6 +3734,92 @@
         });
     }
 
+    function loadPluginVersionHealth(page) {
+        if (!page) return Promise.resolve();
+
+        return callNotificationApi('PlaybackCard/Maintenance/VersionHealth', { method: 'GET' })
+            .then(function (data) {
+                renderPluginVersionHealth(page, data);
+            })
+            .catch(function (err) {
+                // Non-critical diagnostic -- never surface this as a page-level error.
+                console.error('[PlaybackCard] Failed to load plugin version health:', err);
+            });
+    }
+
+    function renderPluginVersionHealth(page, data) {
+        var banner = page.querySelector('#pluginVersionConflictBanner');
+        var detailEl = page.querySelector('#pluginVersionConflictDetail');
+        var actionsEl = page.querySelector('#pluginVersionConflictActions');
+        if (!banner || !detailEl || !actionsEl) return;
+
+        var olderVersions = (data && data.hasOlderSiblingVersions && Array.isArray(data.olderVersionFolders))
+            ? data.olderVersionFolders
+            : [];
+
+        if (olderVersions.length === 0) {
+            banner.style.display = 'none';
+            actionsEl.innerHTML = '';
+            return;
+        }
+
+        detailEl.textContent = ' Found: ' + olderVersions.join(', ') + '.';
+        actionsEl.innerHTML = '';
+
+        olderVersions.forEach(function (folderName) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btnRemoveStaleVersion';
+            btn.textContent = 'Remove ' + folderName;
+            btn.addEventListener('click', function () {
+                removeStaleVersionFolder(page, folderName, btn);
+            });
+            actionsEl.appendChild(btn);
+        });
+
+        banner.style.display = 'flex';
+    }
+
+    function showDiagnosticsBannerFeedback(page, message, isError) {
+        if (!page) return;
+        var feedbackEl = page.querySelector('#diagnosticsFeedback');
+        if (!feedbackEl) return;
+        feedbackEl.className = 'diagnosticsFeedback ' + (isError ? 'error' : 'success');
+        feedbackEl.textContent = message;
+        feedbackEl.style.display = 'block';
+        setTimeout(function () {
+            if (feedbackEl) feedbackEl.style.display = 'none';
+        }, 6000);
+    }
+
+    function removeStaleVersionFolder(page, folderName, buttonEl) {
+        var confirmed = window.confirm(
+            'Permanently delete the plugin folder "' + folderName + '" from disk?\n\n' +
+            'This only removes an older, superseded version -- never the version currently running.'
+        );
+        if (!confirmed) return;
+
+        if (buttonEl) {
+            buttonEl.disabled = true;
+            buttonEl.textContent = 'Removing…';
+        }
+
+        callNotificationApi('PlaybackCard/Maintenance/RemoveStaleVersion', {
+            method: 'POST',
+            body: { folderName: folderName }
+        }).then(function () {
+            showDiagnosticsBannerFeedback(page, 'Removed stale version folder "' + folderName + '".', false);
+            return loadPluginVersionHealth(page);
+        }).catch(function (err) {
+            console.error('[PlaybackCard] Failed to remove stale version folder:', err);
+            showDiagnosticsBannerFeedback(page, 'Could not remove "' + folderName + '": ' + (err && err.message ? err.message : 'Unknown error'), true);
+            if (buttonEl) {
+                buttonEl.disabled = false;
+                buttonEl.textContent = 'Remove ' + folderName;
+            }
+        });
+    }
+
     function loadNotificationSettings(page) {
         if (!page) return Promise.resolve();
         notifSettingsRequestId++;
@@ -4206,6 +4353,7 @@
                 }
                 bindNotificationControls(page);
                 loadNotificationSettings(page);
+                loadPluginVersionHealth(page);
             }
 
             fetchSessions(page, capturedGen, isAdmin);
