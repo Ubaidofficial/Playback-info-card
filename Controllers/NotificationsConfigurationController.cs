@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.PlaybackCard.Notifications;
 using Microsoft.AspNetCore.Authorization;
@@ -306,42 +307,80 @@ public class NotificationsConfigurationController : ControllerBase
 /// <summary>
 /// Masked DTO returned to client for safe rendering.
 /// Never contains plaintext Discord webhook URLs or Telegram bot tokens.
+/// Explicit <see cref="JsonPropertyNameAttribute"/> on every property: this controller is
+/// discovered by Jellyfin's own plugin assembly scanning rather than going through a locally
+/// configured MVC pipeline, and its actual JSON output does not follow camelCase by default
+/// (unlike what the hand-written frontend JS assumes) -- confirmed live: the browser's Network
+/// tab showed "NotificationsEnabled": true on the wire while the JS read `data.notificationsEnabled`
+/// (lowercase n), which is a different, always-undefined property in JS. That silently produced
+/// `Boolean(undefined) === false` on every single load, regardless of the real saved value -- not
+/// a save bug, a read bug, invisible to any test that mocks the fetch response or inspects the C#
+/// DTO directly instead of the real serialized JSON.
 /// </summary>
 public sealed class NotificationConfigurationDto
 {
+    [JsonPropertyName("notificationsEnabled")]
     public bool NotificationsEnabled { get; init; }
+    [JsonPropertyName("enabled")]
     public bool Enabled => NotificationsEnabled;
 
+    [JsonPropertyName("discordEnabled")]
     public bool DiscordEnabled { get; init; }
+    [JsonPropertyName("hasDiscordWebhook")]
     public bool HasDiscordWebhook { get; init; }
+    [JsonPropertyName("discordWebhookMasked")]
     public string DiscordWebhookMasked { get; init; } = string.Empty;
+    [JsonPropertyName("discordWebhookUrlMasked")]
     public string DiscordWebhookUrlMasked => DiscordWebhookMasked;
 
+    [JsonPropertyName("telegramEnabled")]
     public bool TelegramEnabled { get; init; }
+    [JsonPropertyName("hasTelegramBotToken")]
     public bool HasTelegramBotToken { get; init; }
+    [JsonPropertyName("telegramBotTokenMasked")]
     public string TelegramBotTokenMasked { get; init; } = string.Empty;
+    [JsonPropertyName("telegramChatId")]
     public string TelegramChatId { get; init; } = string.Empty;
 
+    [JsonPropertyName("notifyOnStart")]
     public bool NotifyOnStart { get; init; }
+    [JsonPropertyName("notifyOnPlaybackStart")]
     public bool NotifyOnPlaybackStart => NotifyOnStart;
+    [JsonPropertyName("notifyOnStop")]
     public bool NotifyOnStop { get; init; }
+    [JsonPropertyName("notifyOnPlaybackStop")]
     public bool NotifyOnPlaybackStop => NotifyOnStop;
+    [JsonPropertyName("notifyOnPauseResume")]
     public bool NotifyOnPauseResume { get; init; }
+    [JsonPropertyName("notifyOnPlaybackPauseResume")]
     public bool NotifyOnPlaybackPauseResume => NotifyOnPauseResume;
+    [JsonPropertyName("notifyOnProgress")]
     public bool NotifyOnProgress { get; init; }
+    [JsonPropertyName("notifyOnPlaybackProgress")]
     public bool NotifyOnPlaybackProgress => NotifyOnProgress;
+    [JsonPropertyName("progressIntervalMinutes")]
     public int ProgressIntervalMinutes { get; init; }
+    [JsonPropertyName("playbackProgressIntervalMinutes")]
     public int PlaybackProgressIntervalMinutes => ProgressIntervalMinutes;
+    [JsonPropertyName("notifyOnCompletion")]
     public bool NotifyOnCompletion { get; init; }
+    [JsonPropertyName("notifyOnPlaybackCompletion")]
     public bool NotifyOnPlaybackCompletion => NotifyOnCompletion;
 
+    [JsonPropertyName("usernameDisclosure")]
     public bool UsernameDisclosure { get; init; }
+    [JsonPropertyName("includeUserAccountName")]
     public bool IncludeUserAccountName => UsernameDisclosure;
+    [JsonPropertyName("clientDeviceDisclosure")]
     public bool ClientDeviceDisclosure { get; init; }
+    [JsonPropertyName("includeClientAndDeviceName")]
     public bool IncludeClientAndDeviceName => ClientDeviceDisclosure;
+    [JsonPropertyName("userFilterMode")]
     public UserFilterMode UserFilterMode { get; init; }
+    [JsonPropertyName("selectedUserIds")]
     public IReadOnlyList<string> SelectedUserIds { get; init; } = Array.Empty<string>();
 
+    [JsonPropertyName("diagnostics")]
     public NotificationDiagnosticsSnapshot? Diagnostics { get; init; }
 }
 

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.PlaybackCard;
 using Jellyfin.Plugin.PlaybackCard.Controllers;
+using Jellyfin.Plugin.PlaybackCard.Notifications;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -117,6 +119,64 @@ public class NotificationsConfigurationControllerTests
 
         Assert.IsType<OkObjectResult>(result.Result);
         Assert.True(config.NotificationsEnabled);
+    }
+
+    /// <summary>
+    /// Reproduces the actual live bug, caught only by inspecting a real browser's Network tab:
+    /// every existing test either called this controller's C# methods directly (inspecting the
+    /// DTO object, never its serialized form) or mocked the frontend's fetch response by hand
+    /// with lowercase keys -- neither would ever catch a real JSON-casing mismatch. This test
+    /// runs the DTO through System.Text.Json with no naming policy configured (matching this
+    /// plugin's actual default behavior, confirmed live: the wire response was
+    /// "NotificationsEnabled": true, not "notificationsEnabled") and asserts the JSON the
+    /// frontend actually receives has the lowercase-first keys it reads by name.
+    /// </summary>
+    [Fact]
+    public void NotificationConfigurationDto_SerializesWithCamelCaseKeys_MatchingWhatFrontendJsReads()
+    {
+        var config = new PluginConfiguration { NotificationsEnabled = true, TelegramEnabled = true };
+        var controller = CreateController(config);
+
+        var dto = Assert.IsType<NotificationConfigurationDto>(Assert.IsType<OkObjectResult>(controller.GetConfiguration().Result).Value);
+
+        var json = JsonSerializer.Serialize(dto);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("notificationsEnabled", out var notificationsEnabled), $"Expected lowercase-first \"notificationsEnabled\" key in: {json}");
+        Assert.True(notificationsEnabled.GetBoolean());
+        Assert.True(root.TryGetProperty("telegramEnabled", out var telegramEnabled), $"Expected lowercase-first \"telegramEnabled\" key in: {json}");
+        Assert.True(telegramEnabled.GetBoolean());
+        Assert.True(root.TryGetProperty("discordEnabled", out _), $"Expected lowercase-first \"discordEnabled\" key in: {json}");
+        Assert.False(root.TryGetProperty("NotificationsEnabled", out _), "Must not also serialize the PascalCase key -- that's what the frontend never reads.");
+    }
+
+    [Fact]
+    public void NotificationDiagnosticsSnapshot_SerializesWithCamelCaseKeys()
+    {
+        var snapshot = new NotificationDiagnosticsSnapshot { NotificationsEnabled = true, WorkerState = "Running", DedupeCount = 3 };
+
+        var json = JsonSerializer.Serialize(snapshot);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("notificationsEnabled", out _), $"Expected lowercase-first \"notificationsEnabled\" key in: {json}");
+        Assert.True(root.TryGetProperty("workerState", out _), $"Expected lowercase-first \"workerState\" key in: {json}");
+        Assert.True(root.TryGetProperty("dedupeCount", out _), $"Expected lowercase-first \"dedupeCount\" key in: {json}");
+    }
+
+    [Fact]
+    public void DeliveryResult_SerializesWithCamelCaseKeys()
+    {
+        var result = DeliveryResult.Ok(200, "all good");
+
+        var json = JsonSerializer.Serialize(result);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("success", out var success), $"Expected lowercase-first \"success\" key in: {json}");
+        Assert.True(success.GetBoolean());
+        Assert.True(root.TryGetProperty("category", out _), $"Expected lowercase-first \"category\" key in: {json}");
     }
 
     [Fact]
