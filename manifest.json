@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.5.4",
+        "changelog": "Release v0.2.5.4 - Broadened client/device icon coverage: macOS and Linux sessions (previously falling through to the generic icon), non-Android smart TVs (Vizio, Hisense, and other VIDAA/SmartCast devices), and two more real third-party clients (Fladder, Jellyfin MPV Shim). Same resolver logic and icon set on both the dashboard widget and the standalone Playback Monitor page.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.5.4/jellyfin-plugin-playbackcard.zip",
+        "checksum": "49fa1e49652eb957165297cc005baf7c",
+        "timestamp": "2026-09-18T01:05:56Z"
+      },
+      {
         "version": "0.2.5.3",
         "changelog": "Release v0.2.5.3 - Merged the two sidebar entries (Playback Monitor / My Playback) into one: admins see every active session, non-admin users see only their own, decided by role instead of registering the same page twice. The dashboard widget's Info button no longer opens a slide-out side panel -- it now expands the same full field grid inline on that card, tracked by session ID so it survives polling, matching how the standalone page already worked and restoring the original in-card design.",
         "targetAbi": "10.9.0.0",
@@ -39,14 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.5.0/jellyfin-plugin-playbackcard.zip",
         "checksum": "8c82a529828f023eac79b8bf36994a32",
         "timestamp": "2026-09-17T20:20:00Z"
-      },
-      {
-        "version": "0.2.4.1",
-        "changelog": "Release v0.2.4.1 - Singleton Info drawer that survives polling (fixes Info closing itself every 3s), real brand-accurate client logos (Chrome/Safari/Edge/Firefox/Brave and ~20 third-party/device clients replacing single-color placeholders), Remux/DirectPlay no longer show the Transcode-only \"Reason not reported by server\" text, corrected header method-count chip order (Direct Play/Direct Stream/Remux/Transcode/Paused, Remux always shown), expanded 26-field grouped technical breakdown, extended artwork fallback chain, and removal of a raw session-ID DOM leak in Connected Devices.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.4.1/jellyfin-plugin-playbackcard.zip",
-        "checksum": "9514fd5677c82188ac9527e23a9337ab",
-        "timestamp": "2026-09-17T19:23:15Z"
       }
     ]
   }
