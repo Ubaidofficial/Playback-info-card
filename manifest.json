@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.2",
+        "changelog": "Release v0.2.7.2 - Fixed the real cause of notification toggles (Master Switch, Discord, Telegram) always showing as off/disabled even when they were saved correctly: the settings API's JSON response used PascalCase field names while the page's JavaScript read camelCase, so every reload silently read undefined instead of the real value. Also fixed the same issue for the Test Discord/Test Telegram buttons and the System Diagnostics telemetry tiles, which had the identical bug. Added a lock around notification config saves to prevent two rapid saves (e.g. flipping the Master Switch and a destination toggle back to back) from racing each other server-side. Removed dead code and consolidated duplicated logic in the notification delivery and session-classification paths; fixed a related bug where a video-direct, audio-transcoding session with a different output container could be mislabeled 'Remux' in Discord/Telegram alerts instead of 'Transcode'.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.2/jellyfin-plugin-playbackcard.zip",
+        "checksum": "51fcb8862f9e0f2f7ec320c9c7fb58a8",
+        "timestamp": "2026-09-18T18:07:29Z"
+      },
+      {
         "version": "0.2.7.1",
         "changelog": "Release v0.2.7.1 - Fixed a bug where the Master Switch (and the Discord/Telegram enable switches) could visually revert a few seconds after showing 'saved successfully' -- a slow settings request left over from page load could resolve after a save's own reload and silently overwrite it. Discord and Telegram enable switches now save immediately when flipped instead of requiring a separate Save click. The Test button for each destination stays disabled with an explanatory tooltip until that destination is actually configured, and a successful test now notes if the Master Switch is still off. Fixed a whitespace-only Telegram Chat ID being treated as configured. Added a redacted last-failure description to the diagnostics report for easier remote troubleshooting.",
         "targetAbi": "10.9.0.0",
