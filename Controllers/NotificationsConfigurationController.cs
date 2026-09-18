@@ -26,6 +26,14 @@ public class NotificationsConfigurationController : ControllerBase
     private readonly PluginConfiguration? _testConfig;
     private readonly ILogger _logger;
 
+    // ASP.NET Core creates a new controller instance per request, but Plugin.Instance.Configuration
+    // is one shared mutable object. Two saves fired close together (e.g. flipping the Master Switch
+    // and a destination toggle within the same second, which auto-save independently) run on
+    // different threads and can otherwise interleave their read-modify-write of that object, so one
+    // save's SaveConfiguration() call persists a snapshot that doesn't yet include the other's
+    // change. This serializes the whole read-modify-write-persist sequence per process.
+    private static readonly object ConfigLock = new();
+
     public NotificationsConfigurationController(
         INotificationDeliveryService deliveryService,
         INotificationSecretStore secretStore)
@@ -109,6 +117,14 @@ public class NotificationsConfigurationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "PluginNotLoaded" });
         }
 
+        lock (ConfigLock)
+        {
+            return ApplyConfigurationUpdate(config, request);
+        }
+    }
+
+    private ActionResult<NotificationConfigurationDto> ApplyConfigurationUpdate(PluginConfiguration config, UpdateNotificationConfigurationRequest request)
+    {
         // 1. Update switches and event preferences first (only overwrite when explicitly
         // supplied). These must not be lost just because a credential further down turns
         // out to be malformed -- a rejected bot token shouldn't silently revert the

@@ -54,13 +54,15 @@ Configure from the PlayInfo page (**Playback Notifications**, admins only) — n
 
 Runs only against your own server. The diagnostics panel redacts anything sensitive before you can copy it, and Discord/Telegram secrets are encrypted at rest. Full policy and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 
+Every push and every release build runs through [CodeQL](https://github.com/Ubaidofficial/Playback-info-card/security/code-scanning) (static security analysis, C# and JS) and a ClamAV antivirus scan before the zip is published — both are part of the public [build workflow](.github/workflows/build.yml), not something run privately and taken on faith. Each release also ships a `SHA256SUMS.txt`/`MD5SUMS.txt` alongside the zip so you can verify the download yourself; `manifest.json`'s checksums are cross-checked against these before being published.
+
 ## Known limitations
 
 Native apps report sessions into the grid but don't render this plugin's own UI (web-dashboard only). Device names are whatever the client self-reports.
 
 ## How this is built
 
-One-person side project. I use Claude Code for a meaningful share of the implementation and review — I write the requirements and test every change against a real Jellyfin server before it ships.
+One-person side project. I use Claude Code for a meaningful share of the implementation and review, but every change is my own requirement, gets read by me, and is tested against a real Jellyfin server before it ships — nothing goes out on AI output alone. If you're wondering whether that means this plugin could do something sketchy to your server: no differently than any other open-source plugin — the source is all here to read, the [build is public](.github/workflows/build.yml), and the security scanning described above runs on every release, not just the ones I remember to check by hand.
 
 ## License
 

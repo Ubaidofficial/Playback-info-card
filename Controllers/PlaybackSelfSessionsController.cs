@@ -101,9 +101,6 @@ public class PlaybackSelfSessionsController : ControllerBase
             percent = (int)Math.Clamp(Math.Round((double)positionTicks / runTimeTicks * 100.0), 0, 100);
         }
 
-        bool? isVideoDirect = null;
-        bool? isAudioDirect = null;
-        var isRemux = false;
         string? videoCodec = null;
         string? audioCodec = null;
         string? container = item?.Container;
@@ -115,8 +112,6 @@ public class PlaybackSelfSessionsController : ControllerBase
 
         if (tInfo != null)
         {
-            isVideoDirect = tInfo.IsVideoDirect;
-            isAudioDirect = tInfo.IsAudioDirect;
             container = tInfo.Container ?? container;
             videoCodec = tInfo.VideoCodec;
             audioCodec = tInfo.AudioCodec;
@@ -132,42 +127,20 @@ public class PlaybackSelfSessionsController : ControllerBase
                 transcodeEngine = hw;
             }
 
-            // Remux means every stream is being copied without re-encoding (video AND audio direct).
-            // This is true regardless of whether the container itself differs from the source
-            // (e.g. video+audio copied into a different container is still a remux, not a transcode).
-            // Requiring both IsVideoDirect and IsAudioDirect here is what distinguishes a true remux
-            // from a session where audio is actively being re-encoded (which must report as Transcode).
-            if (tInfo.IsVideoDirect && tInfo.IsAudioDirect)
-            {
-                isRemux = true;
-            }
-
             var rStr = tInfo.TranscodeReasons.ToString();
             if (!string.IsNullOrWhiteSpace(rStr) && !rStr.Equals("0", StringComparison.OrdinalIgnoreCase) && !rStr.Equals("None", StringComparison.OrdinalIgnoreCase))
             {
                 rawReasons.AddRange(rStr.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             }
         }
-        else if (rawMethod == PlayMethod.DirectPlay)
-        {
-            isVideoDirect = true;
-            isAudioDirect = true;
-        }
 
-        string playMethod;
-        if (isRemux) playMethod = "Remux";
-        else if (rawMethod == PlayMethod.DirectPlay) playMethod = "DirectPlay";
-        else if (rawMethod == PlayMethod.DirectStream) playMethod = "DirectStream";
-        else if (rawMethod == PlayMethod.Transcode || tInfo != null) playMethod = "Transcode";
-        else playMethod = rawMethod.HasValue ? rawMethod.Value.ToString() : "Unavailable";
-
-        var videoStatus = isVideoDirect.HasValue
-            ? (isVideoDirect.Value ? "Video Direct" : "Video Transcoded")
-            : (playMethod == "DirectPlay" ? "Video Direct" : "Video status unavailable");
-
-        var audioStatus = isAudioDirect.HasValue
-            ? (isAudioDirect.Value ? "Audio Direct" : "Audio Transcoded")
-            : (playMethod == "DirectPlay" ? "Audio Direct" : "Audio status unavailable");
+        var classification = PlaybackEventMapper.ClassifyPlayback(tInfo, rawMethod);
+        var isVideoDirect = classification.IsVideoDirect;
+        var isAudioDirect = classification.IsAudioDirect;
+        var isRemux = classification.IsContainerRemux;
+        var playMethod = classification.PlayMethod;
+        var videoStatus = classification.VideoStatus;
+        var audioStatus = classification.AudioStatus;
 
         var reasonsWhy = PlaybackEventMapper.MapTranscodeReasons(rawReasons);
 

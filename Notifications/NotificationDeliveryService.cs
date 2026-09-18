@@ -253,25 +253,48 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         _logger.LogInformation("[Notifications] Playback notification delivery engine started.");
         _workerState = "Running";
 
-        var discordTask = ProcessDiscordQueueAsync(stoppingToken);
-        var telegramTask = ProcessTelegramQueueAsync(stoppingToken);
+        var discordTask = ProcessQueueAsync(
+            _discordQueue,
+            cfg => cfg.DiscordEnabled && !string.IsNullOrWhiteSpace(_secretStore.GetDiscordWebhookUrl()),
+            (payload, cfg, ct) => _discordSender.SendAsync(payload, _secretStore.GetDiscordWebhookUrl(), ct),
+            value => _discordAvailability = value,
+            "DiscordWorker",
+            stoppingToken);
+
+        var telegramTask = ProcessQueueAsync(
+            _telegramQueue,
+            cfg => cfg.TelegramEnabled && !string.IsNullOrWhiteSpace(_secretStore.GetTelegramBotToken()) && !string.IsNullOrWhiteSpace(cfg.TelegramChatId),
+            (payload, cfg, ct) => _telegramSender.SendAsync(payload, _secretStore.GetTelegramBotToken(), cfg.TelegramChatId, ct),
+            value => _telegramAvailability = value,
+            "TelegramWorker",
+            stoppingToken);
 
         await Task.WhenAll(discordTask, telegramTask).ConfigureAwait(false);
         _workerState = "Stopped";
     }
 
-    private async Task ProcessDiscordQueueAsync(CancellationToken stoppingToken)
+    /// <summary>
+    /// Drains one destination's queue for the process lifetime, sharing the dispatch/telemetry
+    /// logic that's otherwise identical between Discord and Telegram -- only the readiness check,
+    /// the actual send call, and which availability field it updates differ per destination.
+    /// </summary>
+    private async Task ProcessQueueAsync(
+        DestinationQueue queue,
+        Func<PluginConfiguration, bool> isConfigured,
+        Func<PlaybackNotificationPayload, PluginConfiguration, CancellationToken, Task<DeliveryResult>> send,
+        Action<string> setAvailability,
+        string workerName,
+        CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var record = await _discordQueue.DequeueAsync(stoppingToken).ConfigureAwait(false);
+                var record = await queue.DequeueAsync(stoppingToken).ConfigureAwait(false);
                 if (record == null) continue;
 
                 var config = Plugin.Instance?.Configuration;
-                var webhookUrl = _secretStore.GetDiscordWebhookUrl();
-                if (config == null || !config.DiscordEnabled || string.IsNullOrWhiteSpace(webhookUrl))
+                if (config == null || !isConfigured(config))
                 {
                     continue;
                 }
@@ -279,20 +302,20 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
                 var payload = record.ToOutboundPayload(config.UsernameDisclosure, config.ClientDeviceDisclosure);
 
                 _lastAttemptTimestamp = DateTimeOffset.UtcNow;
-                var result = await _discordSender.SendAsync(payload, webhookUrl, stoppingToken).ConfigureAwait(false);
+                var result = await send(payload, config, stoppingToken).ConfigureAwait(false);
 
                 _lastHttpStatus = result.StatusCode;
 
                 if (result.Success)
                 {
                     _lastSuccessTimestamp = DateTimeOffset.UtcNow;
-                    _discordAvailability = "Available";
+                    setAvailability("Available");
                 }
                 else
                 {
                     _lastFailureCategory = result.Category;
                     _lastFailureDescription = result.Description;
-                    _discordAvailability = result.IsPermanentFailure ? "Unavailable" : "Degraded";
+                    setAvailability(result.IsPermanentFailure ? "Unavailable" : "Degraded");
 
                     if (result.StatusCode == 429)
                     {
@@ -315,69 +338,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             }
             catch (Exception ex)
             {
-                _logger.LogError("[DiscordWorker] Unexpected loop error: {Error}", SecretRedactor.SanitizeExceptionMessage(ex));
-            }
-        }
-    }
-
-    private async Task ProcessTelegramQueueAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                var record = await _telegramQueue.DequeueAsync(stoppingToken).ConfigureAwait(false);
-                if (record == null) continue;
-
-                var config = Plugin.Instance?.Configuration;
-                var botToken = _secretStore.GetTelegramBotToken();
-                if (config == null || !config.TelegramEnabled ||
-                    string.IsNullOrWhiteSpace(botToken) ||
-                    string.IsNullOrWhiteSpace(config.TelegramChatId))
-                {
-                    continue;
-                }
-
-                var payload = record.ToOutboundPayload(config.UsernameDisclosure, config.ClientDeviceDisclosure);
-
-                _lastAttemptTimestamp = DateTimeOffset.UtcNow;
-                var result = await _telegramSender.SendAsync(payload, botToken, config.TelegramChatId, stoppingToken).ConfigureAwait(false);
-
-                _lastHttpStatus = result.StatusCode;
-
-                if (result.Success)
-                {
-                    _lastSuccessTimestamp = DateTimeOffset.UtcNow;
-                    _telegramAvailability = "Available";
-                }
-                else
-                {
-                    _lastFailureCategory = result.Category;
-                    _lastFailureDescription = result.Description;
-                    _telegramAvailability = result.IsPermanentFailure ? "Unavailable" : "Degraded";
-
-                    if (result.StatusCode == 429)
-                    {
-                        Interlocked.Increment(ref _rateLimitDropCount);
-                    }
-                    else if (result.Category.Equals("InvalidConfiguration", StringComparison.OrdinalIgnoreCase))
-                    {
-                        Interlocked.Increment(ref _validationFailureCount);
-                    }
-
-                    if (result.StatusCode >= 500 || result.StatusCode == 408)
-                    {
-                        Interlocked.Increment(ref _retryCount);
-                    }
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("[TelegramWorker] Unexpected loop error: {Error}", SecretRedactor.SanitizeExceptionMessage(ex));
+                _logger.LogError("[{Worker}] Unexpected loop error: {Error}", workerName, SecretRedactor.SanitizeExceptionMessage(ex));
             }
         }
     }

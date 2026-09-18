@@ -11,6 +11,20 @@ using MediaBrowser.Model.Session;
 namespace Jellyfin.Plugin.PlaybackCard.Notifications.Consumers;
 
 /// <summary>
+/// Truthful play-method classification of a session's transcoding state, shared by every consumer
+/// that needs to know whether a stream is really Direct, a Remux, or a Transcode.
+/// </summary>
+public readonly struct TranscodeClassification
+{
+    public string PlayMethod { get; init; }
+    public bool? IsVideoDirect { get; init; }
+    public bool? IsAudioDirect { get; init; }
+    public bool IsContainerRemux { get; init; }
+    public string VideoStatus { get; init; }
+    public string AudioStatus { get; init; }
+}
+
+/// <summary>
 /// Safe mapper that projects Jellyfin SessionInfo and BaseItem into a minimal internal PlaybackEventRecord.
 /// Strictly enforces privacy-by-omission: never touches or maps RemoteEndPoint, IP addresses,
 /// file paths, auth tokens, cookies, or raw session JSON.
@@ -18,6 +32,63 @@ namespace Jellyfin.Plugin.PlaybackCard.Notifications.Consumers;
 /// </summary>
 public static class PlaybackEventMapper
 {
+    /// <summary>
+    /// Derives play method, direct/transcode status per stream, and the truthful "Remux" distinction
+    /// shared by every consumer that reads Jellyfin's <see cref="TranscodingInfo"/> -- the notification
+    /// payload mapper here and <c>PlaybackSelfSessionsController.MapSessionToDto</c> both need the exact
+    /// same classification of the same session data.
+    /// </summary>
+    public static TranscodeClassification ClassifyPlayback(TranscodingInfo? transcodingInfo, PlayMethod? rawPlayMethod)
+    {
+        bool? isVideoDirect = null;
+        bool? isAudioDirect = null;
+        var isContainerRemux = false;
+
+        if (transcodingInfo != null)
+        {
+            isVideoDirect = transcodingInfo.IsVideoDirect;
+            isAudioDirect = transcodingInfo.IsAudioDirect;
+
+            // Remux means every stream is being copied without re-encoding (video AND audio direct).
+            // Requiring both is what distinguishes a true remux from a session where audio is actively
+            // being re-encoded, which must report as Transcode even though video itself is direct.
+            if (transcodingInfo.IsVideoDirect && transcodingInfo.IsAudioDirect)
+            {
+                isContainerRemux = true;
+            }
+        }
+        else if (rawPlayMethod == PlayMethod.DirectPlay)
+        {
+            isVideoDirect = true;
+            isAudioDirect = true;
+        }
+
+        string playMethod;
+        if (isContainerRemux) playMethod = "Remux";
+        else if (rawPlayMethod == PlayMethod.DirectPlay) playMethod = "DirectPlay";
+        else if (rawPlayMethod == PlayMethod.DirectStream) playMethod = "DirectStream";
+        else if (rawPlayMethod == PlayMethod.Transcode || transcodingInfo != null) playMethod = "Transcode";
+        else playMethod = rawPlayMethod.HasValue ? rawPlayMethod.Value.ToString() : "Unavailable";
+
+        var videoStatus = isVideoDirect.HasValue
+            ? (isVideoDirect.Value ? "Video Direct" : "Video Transcoded")
+            : (playMethod == "DirectPlay" ? "Video Direct" : "Video status unavailable");
+
+        var audioStatus = isAudioDirect.HasValue
+            ? (isAudioDirect.Value ? "Audio Direct" : "Audio Transcoded")
+            : (playMethod == "DirectPlay" ? "Audio Direct" : "Audio status unavailable");
+
+        return new TranscodeClassification
+        {
+            PlayMethod = playMethod,
+            IsVideoDirect = isVideoDirect,
+            IsAudioDirect = isAudioDirect,
+            IsContainerRemux = isContainerRemux,
+            VideoStatus = videoStatus,
+            AudioStatus = audioStatus
+        };
+    }
+
     public static PlaybackEventRecord Map(
         NotificationEventType eventType,
         SessionInfo? session,
@@ -89,10 +160,6 @@ public static class PlaybackEventMapper
         string? transcodeEngine = null;
         var rawTranscodeReasons = new List<string>();
 
-        bool? isVideoDirect = null;
-        bool? isAudioDirect = null;
-        var isContainerRemux = false;
-
         var tInfo = session?.TranscodingInfo;
         var rawPlayMethod = session?.PlayState?.PlayMethod;
 
@@ -124,20 +191,6 @@ public static class PlaybackEventMapper
                 transcodeEngine = hwType;
             }
 
-            isVideoDirect = tInfo.IsVideoDirect;
-            isAudioDirect = tInfo.IsAudioDirect;
-
-            // Remux detection: video and audio direct, but container differs or remux indicated
-            if (tInfo.IsVideoDirect && tInfo.IsAudioDirect)
-            {
-                isContainerRemux = true;
-            }
-            else if (tInfo.IsVideoDirect && !string.IsNullOrEmpty(tInfo.Container) && !string.IsNullOrEmpty(sourceContainer) &&
-                     !tInfo.Container.Equals(sourceContainer, StringComparison.OrdinalIgnoreCase))
-            {
-                isContainerRemux = true;
-            }
-
             var reasonsStr = tInfo.TranscodeReasons.ToString();
             if (!string.IsNullOrWhiteSpace(reasonsStr) && !reasonsStr.Equals("0", StringComparison.OrdinalIgnoreCase) && !reasonsStr.Equals("None", StringComparison.OrdinalIgnoreCase))
             {
@@ -145,43 +198,14 @@ public static class PlaybackEventMapper
                 rawTranscodeReasons.AddRange(split);
             }
         }
-        else if (rawPlayMethod == PlayMethod.DirectPlay)
-        {
-            isVideoDirect = true;
-            isAudioDirect = true;
-        }
 
-        // Determine derived PlayMethod
-        string playMethod;
-        if (isContainerRemux)
-        {
-            playMethod = "Remux";
-        }
-        else if (rawPlayMethod == PlayMethod.DirectPlay)
-        {
-            playMethod = "DirectPlay";
-        }
-        else if (rawPlayMethod == PlayMethod.DirectStream)
-        {
-            playMethod = "DirectStream";
-        }
-        else if (rawPlayMethod == PlayMethod.Transcode || tInfo != null)
-        {
-            playMethod = "Transcode";
-        }
-        else
-        {
-            playMethod = rawPlayMethod.HasValue ? rawPlayMethod.Value.ToString() : "Unavailable";
-        }
-
-        // Derive truthful VideoStatus and AudioStatus
-        var videoStatus = isVideoDirect.HasValue
-            ? (isVideoDirect.Value ? "Video Direct" : "Video Transcoded")
-            : (playMethod == "DirectPlay" ? "Video Direct" : "Video status unavailable");
-
-        var audioStatus = isAudioDirect.HasValue
-            ? (isAudioDirect.Value ? "Audio Direct" : "Audio Transcoded")
-            : (playMethod == "DirectPlay" ? "Audio Direct" : "Audio status unavailable");
+        var classification = ClassifyPlayback(tInfo, rawPlayMethod);
+        var playMethod = classification.PlayMethod;
+        var isVideoDirect = classification.IsVideoDirect;
+        var isAudioDirect = classification.IsAudioDirect;
+        var isContainerRemux = classification.IsContainerRemux;
+        var videoStatus = classification.VideoStatus;
+        var audioStatus = classification.AudioStatus;
 
         // Map truthful "Why" transcode reasons
         var transcodeReasonsWhy = MapTranscodeReasons(rawTranscodeReasons);

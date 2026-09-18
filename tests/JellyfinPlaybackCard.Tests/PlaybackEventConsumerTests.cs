@@ -142,6 +142,36 @@ public class PlaybackEventConsumerTests
     }
 
     [Fact]
+    public void PlaybackEventMapper_VideoDirectButAudioTranscodingWithContainerChange_ReportsTranscodeNotRemux()
+    {
+        // Regression test, mirrors PlaybackSelfSessionsControllerTests' equivalent case for the
+        // other consumer of ClassifyPlayback: video is direct-copied into a different container
+        // while audio is actively being re-encoded. This must NEVER be reported as "Remux" -- real
+        // re-encoding work (audio) is happening, so truthful telemetry requires "Transcode".
+        var session = new SessionInfo(null, null)
+        {
+            Id = "sess-video-direct-audio-transcode",
+            UserId = Guid.NewGuid(),
+            PlayState = new PlayerStateInfo { PlayMethod = PlayMethod.Transcode, PositionTicks = 0 },
+            TranscodingInfo = new TranscodingInfo
+            {
+                IsVideoDirect = true,
+                IsAudioDirect = false,
+                Container = "mp4"
+            }
+        };
+
+        var movie = new Movie { Name = "Mismatched Container Movie", Container = "mkv" };
+
+        var record = PlaybackEventMapper.Map(NotificationEventType.Progress, session, movie);
+
+        Assert.Equal("Transcode", record.PlayMethod);
+        Assert.False(record.IsContainerRemux);
+        Assert.True(record.IsVideoDirect);
+        Assert.False(record.IsAudioDirect);
+    }
+
+    [Fact]
     public void PlaybackEventMapper_NullSessionAndItem_HandlesGracefullyWithoutThrowing()
     {
         var record = PlaybackEventMapper.Map(

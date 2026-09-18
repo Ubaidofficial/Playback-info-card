@@ -28,6 +28,20 @@ function createMockController() {
     return mockModule.exports;
 }
 
+// Shared by every describe block that only needs a bare dashboard.js sandbox with no
+// window/document interaction mocked beyond the minimum the module needs to load.
+const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
+
+function createMockDashboard() {
+    const mockModule = { exports: {} };
+    const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
+    const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
+    const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
+    runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
+    return mockModule.exports;
+}
+
 describe('Playback Info Card v0.2.7.1 Test Suite', () => {
     let controller;
 
@@ -1887,18 +1901,6 @@ describe('Playback Info Card v0.2.7.1 Test Suite', () => {
     });
 
     describe('20. Client Brand Resolver Matrix', () => {
-        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
-        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
-
-        function createMockDashboard() {
-            const mockModule = { exports: {} };
-            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
-            const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
-            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
-            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
-            return mockModule.exports;
-        }
-
         const dash = createMockDashboard();
 
         const cases = [
@@ -2071,16 +2073,6 @@ describe('Playback Info Card v0.2.7.1 Test Suite', () => {
     });
 
     describe('22. v0.2.5.3 additions (ETA, Atmos/DTS:X, audio language, subtitle delivery method, avatar)', () => {
-        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
-        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
-        function createMockDashboard() {
-            const mockModule = { exports: {} };
-            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
-            const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
-            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
-            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
-            return mockModule.exports;
-        }
         const dash = createMockDashboard();
 
         it('detects Atmos and DTS:X from real stream profile/title data, never guessed', () => {
@@ -2129,17 +2121,6 @@ describe('Playback Info Card v0.2.7.1 Test Suite', () => {
     });
 
     describe('23. v0.2.5.3 additions (summary strip, pill icons, progress-under-title layout)', () => {
-        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
-        const dashboardJsContent = fs.readFileSync(dashboardJsPath, 'utf8');
-        function createMockDashboard() {
-            const mockModule = { exports: {} };
-            const mockWindow = { location: { hash: '#/dashboard', pathname: '/web/index.html' }, addEventListener: () => {}, removeEventListener: () => {}, setInterval: () => 123, clearInterval: () => {} };
-            const mockDocument = { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({ id: '', style: {}, classList: { contains: () => false, add: () => {}, remove: () => {} }, setAttribute: () => {}, getAttribute: () => null, appendChild: () => {}, insertBefore: () => {} }), addEventListener: () => {}, removeEventListener: () => {}, readyState: 'complete' };
-            const runner = new Function('module', 'exports', 'window', 'document', 'globalThis', dashboardJsContent);
-            runner(mockModule, mockModule.exports, mockWindow, mockDocument, mockWindow);
-            return mockModule.exports;
-        }
-
         it('summary strip shows the real active/direct/transcoding split and is absent when there is nothing playing', () => {
             const dash = createMockDashboard();
             const container = { innerHTML: '' };
