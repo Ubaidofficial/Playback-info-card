@@ -2,67 +2,85 @@
 
 *(formerly "Playback Info Card")*
 
+[![Latest Release](https://img.shields.io/github/v/release/Ubaidofficial/Playback-info-card?label=release)](https://github.com/Ubaidofficial/Playback-info-card/releases/latest)
+[![Build](https://github.com/Ubaidofficial/Playback-info-card/actions/workflows/build.yml/badge.svg)](https://github.com/Ubaidofficial/Playback-info-card/actions/workflows/build.yml)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+
 ![PlayInfo Now Playing grid showing active sessions with live transcode telemetry](screenshots/dashboard-desktop.png)
 
-A Now Playing monitor for Jellyfin: a live grid of active streams — play state, resolution, HDR, codecs, hardware transcode engine — read straight from what Jellyfin reports, never guessed. Optional native Discord/Telegram notifications for playback events. No analytics, no external calls, no telemetry.
-
-Last tagged release: **v0.2.7.1** — [changelog](https://github.com/Ubaidofficial/Playback-info-card/releases).
-
-## Where to find it
-
-**Dashboard → Now Playing** replaces the stock Devices widget automatically, with Connected Devices restyled to match. **Dashboard → Server → PlayInfo** is the same session grid as a dedicated view — admins see every session, everyone else sees only their own, decided by role, one sidebar entry for both.
-
-## Features
-
-- Compact/extended/show-details modes, summary strip with a real Direct vs. Transcode split.
-- Full telemetry: resolution, HDR, codecs, bit depth, channels, subtitles, framerate, bitrate — visible in Compact mode too, not locked behind Extended.
-- A completion ring on the poster and real elapsed watch time next to ETA, so progress reads at a glance.
-- Transcode diagnostics (hardware engine, container, reason) sourced only from what the server actually reports — never fabricated — shown as a highlighted callout instead of buried in a field list.
-- Show Details groups everything into Playback/Video/Audio/Stream/Subtitles sections, and each card's panel expands and collapses independently of the others.
-- ETA, Atmos/DTS:X detection, audio language, subtitle delivery method.
-- ~35 brand-accurate inline client/OS logos (browsers, native apps, TVs, consoles — no CDN).
-- **Tautulli-style card**: poster art bleeds flush to the card's edge and spans its full height, with a vivid blurred backdrop and a colored status ring (green/blue/purple/red) matching the session's real playback method — a grid of sessions reads at a glance.
-- **Admin session controls**: send an on-screen message or stop a session's playback directly from the card, via Jellyfin's own Session API. Admin-only, and Stop always confirms first.
-
-![PlayInfo Extended mode with the full technical stream breakdown](screenshots/dashboard-extended.png)
+A Now Playing monitor for Jellyfin. Live grid of active streams — play state, resolution, HDR, codecs, hardware transcode engine — read straight from what Jellyfin reports. Optional Discord/Telegram notifications for playback events. No analytics, no external calls, no telemetry.
 
 ## Installation
 
-**Catalog (recommended):** Dashboard → Plugins → Repositories → add `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json` → Catalog → install **PlayInfo** → restart Jellyfin.
+**Catalog (recommended)**
+1. Dashboard → Plugins → Repositories → Add Repository
+2. Repository URL: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
+3. Dashboard → Plugins → Catalog → install **PlayInfo**
+4. Restart Jellyfin
 
-**Manual:** download the zip from the [latest release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest), extract into `plugins/PlaybackCard/`, restart.
+**Manual**
+1. Download the zip from the [latest release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest)
+2. Extract into `plugins/PlaybackCard/`
+3. Restart Jellyfin
 
-Platform paths, Docker/reverse-proxy notes, and rollback steps: [docs/ADVANCED.md](docs/ADVANCED.md).
-
-### Building from Source
-
-To build and install directly from source instead of the catalog or a release zip:
-
+**From source**
 ```bash
 git clone https://github.com/Ubaidofficial/Playback-info-card.git
 cd Playback-info-card
 dotnet build -c Release
 ```
+Copy `bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll` and `plugin.json` into `plugins/PlaybackCard/`, restart Jellyfin. Same GUID and assembly name every release, so this replaces an existing install instead of duplicating it.
 
-The Web assets (`Web/dashboard.js`, `Web/dashboard.css`, `Web/playbackcard.html`) are compiled directly into the DLL as embedded resources — nothing else to copy. Take `bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll` and this repo's `plugin.json`, drop them into your `plugins/PlaybackCard/` directory as in Manual install above, and restart Jellyfin. The plugin GUID and assembly name never change between releases, so this safely replaces an existing install rather than creating a duplicate.
+Docker, reverse proxies, and rollback steps: [docs/ADVANCED.md](docs/ADVANCED.md)
+
+## Where to find it
+
+- **Dashboard → Now Playing** — replaces the stock Devices widget automatically
+- **Dashboard → Server → PlayInfo** — the same session grid as its own page. Admins see every session; everyone else sees only their own
+
+## Features
+
+- Compact, Extended, and Show Details view modes
+- Summary strip with a real Direct vs. Transcode split
+- Full telemetry in Compact mode too — resolution, HDR, codecs, bit depth, channels, subtitles, framerate, bitrate
+- Completion ring on the poster, elapsed watch time next to ETA
+- Transcode diagnostics (hardware engine, container, reason) straight from the server, shown as a highlighted callout
+- Show Details grouped into Playback / Video / Audio / Stream / Subtitles sections — each card expands independently
+- ETA, Atmos/DTS:X detection, audio language, subtitle delivery method
+- ~35 brand-accurate client/OS logos, bundled locally, no CDN
+- Tautulli-style cards — full-height poster art, blurred backdrop, status ring colored by playback method
+- Admin controls — send a message or stop a session directly from the card via Jellyfin's own Session API (Stop always confirms first)
+
+![PlayInfo Extended mode with the full technical stream breakdown](screenshots/dashboard-extended.png)
 
 ## Notifications (Discord & Telegram)
 
-Configure from the PlayInfo page (**Playback Notifications**, admins only) — no external plugin needed. Flipping a switch or hitting Save applies it immediately; Test stays disabled until there's actually something to test against. Usernames/device names are off by default; Discord mentions are disabled; Telegram output is HTML-escaped. Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md).
+Configure from the PlayInfo page under Playback Notifications (admins only). Toggles and Save apply immediately.
+
+- Usernames and device names are off by default
+- Discord mentions are disabled
+- Telegram output is HTML-escaped
+
+Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md)
 
 ## Privacy & security
 
-Runs only against your own server. The diagnostics panel redacts anything sensitive before you can copy it, and Discord/Telegram secrets are encrypted at rest. Full policy and how to report a vulnerability: [SECURITY.md](SECURITY.md).
+- Runs only against your own server
+- Diagnostics panel redacts anything sensitive before you can copy it
+- Discord/Telegram secrets are encrypted at rest
+- Every push and release build runs through [CodeQL](https://github.com/Ubaidofficial/Playback-info-card/security/code-scanning) and a ClamAV scan — see the [build workflow](.github/workflows/build.yml)
+- Every release ships `SHA256SUMS.txt`/`MD5SUMS.txt` so you can verify the download yourself
 
-Every push and every release build runs through [CodeQL](https://github.com/Ubaidofficial/Playback-info-card/security/code-scanning) (static security analysis, C# and JS) and a ClamAV antivirus scan before the zip is published — both are part of the public [build workflow](.github/workflows/build.yml), not something run privately and taken on faith. Each release also ships a `SHA256SUMS.txt`/`MD5SUMS.txt` alongside the zip so you can verify the download yourself; `manifest.json`'s checksums are cross-checked against these before being published.
+Full policy and how to report a vulnerability: [SECURITY.md](SECURITY.md)
 
 ## Known limitations
 
-Native apps report sessions into the grid but don't render this plugin's own UI (web-dashboard only). Device names are whatever the client self-reports.
+- Native apps show up in the session grid but don't render this plugin's own UI — web dashboard only
+- Device names are whatever the client reports
 
 ## How this is built
 
-One-person side project. I use Claude Code for a meaningful share of the implementation and review, but every change is my own requirement, gets read by me, and is tested against a real Jellyfin server before it ships — nothing goes out on AI output alone. If you're wondering whether that means this plugin could do something sketchy to your server: no differently than any other open-source plugin — the source is all here to read, the [build is public](.github/workflows/build.yml), and the security scanning described above runs on every release, not just the ones I remember to check by hand.
+One-person project. I use Claude Code for a chunk of the implementation, but I write the requirements, review the changes, and test against a real Jellyfin server before anything ships.
 
 ## License
 
