@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.3",
+        "changelog": "Release v0.2.7.3 - Replaced hand-drawn approximate client icons with verified real logos: Apple, Apple TV, Linux, Firefox, Microsoft Edge, Brave, Windows, Xbox, PlayStation, Chromecast, Kodi, Google TV, and Chrome (the real current multi-color logo). Official Jellyfin apps (Web/Mobile/Android TV/Desktop) now show Jellyfin's actual mascot mark instead of a generic device outline. Moonfin, Finamp, and Streamyfin icons now match their real app logos instead of approximate shapes. Fixed the original bug properly: the Apple TV and Linux icons weren't just small, they were using a near-black fill against a near-black card background and were rendering as almost invisible. Added a small PlayInfo watermark badge to the corner of every card so the data source is identifiable at a glance.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.3/jellyfin-plugin-playbackcard.zip",
+        "checksum": "5002f02ed472b41495f39d62782ac282",
+        "timestamp": "2026-09-18T19:08:28Z"
+      },
+      {
         "version": "0.2.7.2",
         "changelog": "Release v0.2.7.2 - Fixed the real cause of notification toggles (Master Switch, Discord, Telegram) always showing as off/disabled even when they were saved correctly: the settings API's JSON response used PascalCase field names while the page's JavaScript read camelCase, so every reload silently read undefined instead of the real value. Also fixed the same issue for the Test Discord/Test Telegram buttons and the System Diagnostics telemetry tiles, which had the identical bug. Added a lock around notification config saves to prevent two rapid saves (e.g. flipping the Master Switch and a destination toggle back to back) from racing each other server-side. Removed dead code and consolidated duplicated logic in the notification delivery and session-classification paths; fixed a related bug where a video-direct, audio-transcoding session with a different output container could be mislabeled 'Remux' in Discord/Telegram alerts instead of 'Transcode'.",
         "targetAbi": "10.9.0.0",
