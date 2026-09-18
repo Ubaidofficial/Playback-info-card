@@ -617,6 +617,39 @@
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
 }
 
+/* Small watermark badge, like a TV channel bug -- a glance at any card identifies it as
+   PlayInfo data, not a stock Jellyfin widget. Deliberately subtle: low opacity at rest,
+   brightens slightly on card hover, never competes with the poster or telemetry for attention. */
+.playback-brand-badge {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.2rem 0.5rem 0.2rem 0.38rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #fb923c, #ea580c);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    opacity: 0.8;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+
+.playback-card:hover .playback-brand-badge {
+    opacity: 1;
+}
+
+.playback-brand-badge span {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #fff;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
 /* Glanceable completion ring on the poster corner -- only rendered when there's a real
    duration to measure against (see runtimeTicks check at the call site). */
 .playback-poster-progress {

@@ -42,7 +42,7 @@ function createMockDashboard() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.7.2 Test Suite', () => {
+describe('Playback Info Card v0.2.7.3 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -50,9 +50,9 @@ describe('Playback Info Card v0.2.7.2 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.7.2', () => {
-            assert.equal(controller.version, '0.2.7.2');
-            assert.equal(controller.diagState.pluginVersion, '0.2.7.2');
+        it('initializes with default waiting state and version 0.2.7.3', () => {
+            assert.equal(controller.version, '0.2.7.3');
+            assert.equal(controller.diagState.pluginVersion, '0.2.7.3');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -191,7 +191,7 @@ describe('Playback Info Card v0.2.7.2 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.7.2');
+            assert.equal(report.pluginVersion, '0.2.7.3');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -239,7 +239,7 @@ describe('Playback Info Card v0.2.7.2 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.7.2',
+                pluginVersion: '0.2.7.3',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -794,10 +794,10 @@ describe('Playback Info Card v0.2.7.2 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.7.2', () => {
+        it('initializes with version 0.2.7.3', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.7.2');
-            assert.equal(dash.state.version, '0.2.7.2');
+            assert.equal(dash.version, '0.2.7.3');
+            assert.equal(dash.state.version, '0.2.7.3');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
