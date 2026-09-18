@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using System.Text.Json.Serialization;
 using Jellyfin.Plugin.PlaybackCard.Notifications.Consumers;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
@@ -178,61 +177,41 @@ public class PlaybackSelfSessionsController : ControllerBase
 /// <summary>
 /// Sanitized playback session DTO returned to normal authenticated users.
 /// Strictly excludes RemoteEndPoint, client IP, server IP, file paths, tokens, session IDs, and other users' data.
-/// Explicit <see cref="JsonPropertyNameAttribute"/> on every property: this controller's actual
-/// JSON output does not follow camelCase by default, unlike what the frontend JS assumes -- same
-/// underlying issue as NotificationConfigurationDto.
+/// Deliberately PascalCase, NOT camelCase (unlike NotificationConfigurationDto/etc.) -- both
+/// dashboard.js and playbackcard.html's session-rendering code is shared between this endpoint
+/// and Jellyfin's own native /Sessions API, and reads fields like session.MediaTitle,
+/// session.PlayMethod, session.IsVideoDirect in PascalCase throughout to match Jellyfin's own
+/// convention. Adding JsonPropertyName camelCase overrides here would break that shared renderer,
+/// not fix anything -- this is the one response DTO where this controller's actual (PascalCase)
+/// default output is what every consumer was actually written against.
 /// </summary>
 public sealed class UserPlaybackSessionDto
 {
-    [JsonPropertyName("itemId")]
     public string? ItemId { get; init; }
-    [JsonPropertyName("mediaTitle")]
     public string MediaTitle { get; init; } = string.Empty;
-    [JsonPropertyName("seriesName")]
     public string? SeriesName { get; init; }
-    [JsonPropertyName("seasonNumber")]
     public int? SeasonNumber { get; init; }
-    [JsonPropertyName("episodeNumber")]
     public int? EpisodeNumber { get; init; }
-    [JsonPropertyName("productionYear")]
     public int? ProductionYear { get; init; }
 
-    [JsonPropertyName("playMethod")]
     public string PlayMethod { get; init; } = string.Empty;
-    [JsonPropertyName("isPaused")]
     public bool IsPaused { get; init; }
-    [JsonPropertyName("positionTicks")]
     public long PositionTicks { get; init; }
-    [JsonPropertyName("runTimeTicks")]
     public long RunTimeTicks { get; init; }
-    [JsonPropertyName("playbackPercentage")]
     public int PlaybackPercentage { get; init; }
 
-    [JsonPropertyName("isVideoDirect")]
     public bool? IsVideoDirect { get; init; }
-    [JsonPropertyName("isAudioDirect")]
     public bool? IsAudioDirect { get; init; }
-    [JsonPropertyName("isContainerRemux")]
     public bool IsContainerRemux { get; init; }
-    [JsonPropertyName("videoStatus")]
     public string VideoStatus { get; init; } = string.Empty;
-    [JsonPropertyName("audioStatus")]
     public string AudioStatus { get; init; } = string.Empty;
 
-    [JsonPropertyName("videoCodec")]
     public string? VideoCodec { get; init; }
-    [JsonPropertyName("audioCodec")]
     public string? AudioCodec { get; init; }
-    [JsonPropertyName("container")]
     public string? Container { get; init; }
-    [JsonPropertyName("resolution")]
     public string? Resolution { get; init; }
-    [JsonPropertyName("transcodeEngine")]
     public string? TranscodeEngine { get; init; }
-    [JsonPropertyName("transcodeReasons")]
     public IReadOnlyList<string> TranscodeReasons { get; init; } = Array.Empty<string>();
-    [JsonPropertyName("transcodeReasonsWhy")]
     public string TranscodeReasonsWhy { get; init; } = string.Empty;
-    [JsonPropertyName("primaryImageTag")]
     public string? PrimaryImageTag { get; init; }
 }

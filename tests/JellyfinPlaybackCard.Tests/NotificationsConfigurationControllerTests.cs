@@ -179,6 +179,30 @@ public class NotificationsConfigurationControllerTests
         Assert.True(root.TryGetProperty("category", out _), $"Expected lowercase-first \"category\" key in: {json}");
     }
 
+    /// <summary>
+    /// Deliberate opposite of the camelCase tests above. UserPlaybackSessionDto (a different
+    /// controller entirely) must NOT get JsonPropertyName camelCase overrides -- both
+    /// dashboard.js and playbackcard.html's session-rendering code is shared between this DTO's
+    /// endpoint and Jellyfin's own native /Sessions API, and reads session.MediaTitle,
+    /// session.PlayMethod, session.IsVideoDirect in PascalCase throughout. This guards against
+    /// "fixing" this DTO the same way as the notification DTOs and silently breaking the
+    /// personal/self session view instead.
+    /// </summary>
+    [Fact]
+    public void UserPlaybackSessionDto_SerializesWithPascalCaseKeys_MatchingSharedSessionRenderer()
+    {
+        var dto = new Jellyfin.Plugin.PlaybackCard.Controllers.UserPlaybackSessionDto { MediaTitle = "Test Movie", PlayMethod = "DirectPlay" };
+
+        var json = JsonSerializer.Serialize(dto);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        Assert.True(root.TryGetProperty("MediaTitle", out var mediaTitle), $"Expected PascalCase \"MediaTitle\" key (matching dashboard.js/playbackcard.html) in: {json}");
+        Assert.Equal("Test Movie", mediaTitle.GetString());
+        Assert.True(root.TryGetProperty("PlayMethod", out _), $"Expected PascalCase \"PlayMethod\" key in: {json}");
+        Assert.False(root.TryGetProperty("mediaTitle", out _), "Must not serialize as camelCase -- that would break dashboard.js/playbackcard.html's shared session renderer.");
+    }
+
     [Fact]
     public void UpdateConfiguration_WhenNotAdministrator_ReturnsForbidden()
     {
