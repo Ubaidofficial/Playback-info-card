@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.1",
+        "changelog": "Release v0.2.7.1 - Fixed a bug where the Master Switch (and the Discord/Telegram enable switches) could visually revert a few seconds after showing 'saved successfully' -- a slow settings request left over from page load could resolve after a save's own reload and silently overwrite it. Discord and Telegram enable switches now save immediately when flipped instead of requiring a separate Save click. The Test button for each destination stays disabled with an explanatory tooltip until that destination is actually configured, and a successful test now notes if the Master Switch is still off. Fixed a whitespace-only Telegram Chat ID being treated as configured. Added a redacted last-failure description to the diagnostics report for easier remote troubleshooting.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.1/jellyfin-plugin-playbackcard.zip",
+        "checksum": "7e7aec5c256cdda31f1919d6fa7afc96",
+        "timestamp": "2026-09-18T15:51:34Z"
+      },
+      {
         "version": "0.2.7.0",
         "changelog": "Release v0.2.7.0 - Unified the Now Playing dashboard widget with Connected Devices (shared glass/accent-ring styling, tinted by real playback method). Fixed the session grid leaving dead space with fewer active streams than columns. Poster art no longer stretches into a cropped sliver once Extended/Show Details makes a card taller. Compact mode now also shows bitrate, frame rate, and subtitle-active pills, a progress-completion ring on the poster, and real-world elapsed watch time next to ETA. The transcode reason is now a consistent highlighted callout in both Compact and Extended. The Info toggle can independently collapse one card while others stay open under Show Details, with a proper rotating chevron. Show Details is now grouped into titled Playback/Video/Audio/Stream/Subtitles sections. Fixed a bug where a malformed Discord webhook or Telegram bot token could block saving the notification enable switches entirely. Added delivery logging for successful Discord/Telegram sends to aid future diagnosis.",
         "targetAbi": "10.9.0.0",
