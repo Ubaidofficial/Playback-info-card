@@ -6,17 +6,19 @@
 
 A Now Playing monitor for Jellyfin: a live grid of active streams — play state, resolution, HDR, codecs, hardware transcode engine — read straight from what Jellyfin reports, never guessed. Optional native Discord/Telegram notifications for playback events. No analytics, no external calls, no telemetry.
 
-Last tagged release: **v0.2.5.4** — [changelog](https://github.com/Ubaidofficial/Playback-info-card/releases). This branch additionally includes the PlayInfo rebrand, a Tautulli-style card redesign, and admin session controls described below, not yet packaged as a numbered release — see [Building from source](#building-from-source) to try it now.
+Last tagged release: **v0.2.7.1** — [changelog](https://github.com/Ubaidofficial/Playback-info-card/releases).
 
 ## Where to find it
 
-**Dashboard → Now Playing** replaces the stock Devices widget automatically. **Dashboard → Server → PlayInfo** is the same page as a dedicated view — admins see every session, everyone else sees only their own, decided by role, one sidebar entry for both.
+**Dashboard → Now Playing** replaces the stock Devices widget automatically, with Connected Devices restyled to match. **Dashboard → Server → PlayInfo** is the same session grid as a dedicated view — admins see every session, everyone else sees only their own, decided by role, one sidebar entry for both.
 
 ## Features
 
 - Compact/extended/show-details modes, summary strip with a real Direct vs. Transcode split.
-- Full telemetry: resolution, HDR, codecs, bit depth, channels, subtitles, framerate, bitrate.
-- Transcode diagnostics (hardware engine, container, reason) sourced only from what the server actually reports — never fabricated.
+- Full telemetry: resolution, HDR, codecs, bit depth, channels, subtitles, framerate, bitrate — visible in Compact mode too, not locked behind Extended.
+- A completion ring on the poster and real elapsed watch time next to ETA, so progress reads at a glance.
+- Transcode diagnostics (hardware engine, container, reason) sourced only from what the server actually reports — never fabricated — shown as a highlighted callout instead of buried in a field list.
+- Show Details groups everything into Playback/Video/Audio/Stream/Subtitles sections, and each card's panel expands and collapses independently of the others.
 - ETA, Atmos/DTS:X detection, audio language, subtitle delivery method.
 - ~35 brand-accurate inline client/OS logos (browsers, native apps, TVs, consoles — no CDN).
 - **Tautulli-style card**: poster art bleeds flush to the card's edge and spans its full height, with a vivid blurred backdrop and a colored status ring (green/blue/purple/red) matching the session's real playback method — a grid of sessions reads at a glance.
@@ -34,7 +36,7 @@ Platform paths, Docker/reverse-proxy notes, and rollback steps: [docs/ADVANCED.m
 
 ### Building from Source
 
-To try changes that haven't been packaged into a numbered release yet (like this branch):
+To build and install directly from source instead of the catalog or a release zip:
 
 ```bash
 git clone https://github.com/Ubaidofficial/Playback-info-card.git
@@ -46,7 +48,7 @@ The Web assets (`Web/dashboard.js`, `Web/dashboard.css`, `Web/playbackcard.html`
 
 ## Notifications (Discord & Telegram)
 
-Configure from the PlayInfo page (**Playback Notifications**, admins only) — no external plugin needed. Usernames/device names are off by default; Discord mentions are disabled; Telegram output is HTML-escaped. Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md).
+Configure from the PlayInfo page (**Playback Notifications**, admins only) — no external plugin needed. Flipping a switch or hitting Save applies it immediately; Test stays disabled until there's actually something to test against. Usernames/device names are off by default; Discord mentions are disabled; Telegram output is HTML-escaped. Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md).
 
 ## Privacy & security
 

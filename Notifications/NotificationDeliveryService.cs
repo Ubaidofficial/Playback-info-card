@@ -33,6 +33,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
     private DateTimeOffset? _lastAttemptTimestamp;
     private DateTimeOffset? _lastSuccessTimestamp;
     private string? _lastFailureCategory;
+    private string? _lastFailureDescription;
     private int _lastHttpStatus;
     private int _dedupeCount;
     private int _retryCount;
@@ -290,6 +291,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
                 else
                 {
                     _lastFailureCategory = result.Category;
+                    _lastFailureDescription = result.Description;
                     _discordAvailability = result.IsPermanentFailure ? "Unavailable" : "Degraded";
 
                     if (result.StatusCode == 429)
@@ -351,6 +353,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
                 else
                 {
                     _lastFailureCategory = result.Category;
+                    _lastFailureDescription = result.Description;
                     _telegramAvailability = result.IsPermanentFailure ? "Unavailable" : "Degraded";
 
                     if (result.StatusCode == 429)
@@ -461,6 +464,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             LastAttemptTimestamp = _lastAttemptTimestamp,
             LastSuccessTimestamp = _lastSuccessTimestamp,
             LastSanitizedFailureCategory = _lastFailureCategory,
+            LastFailureDescription = _lastFailureDescription,
             LastHttpStatus = _lastHttpStatus,
             QueueCapacity = 100,
             DiscordQueueDepth = _discordQueue.QueueDepth,

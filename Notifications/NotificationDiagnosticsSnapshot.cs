@@ -15,6 +15,12 @@ public sealed class NotificationDiagnosticsSnapshot
     public DateTimeOffset? LastAttemptTimestamp { get; init; }
     public DateTimeOffset? LastSuccessTimestamp { get; init; }
     public string? LastSanitizedFailureCategory { get; init; }
+    // Already redacted at the source (SecretRedactor) before it ever reaches here -- see
+    // TelegramBotApiSender/DiscordWebhookSender's DescribeClientError/error-description
+    // paths -- so this stays within the zero-PII/zero-secret guarantee above while giving
+    // a non-technical user (via Copy Diagnostic Report) the actual reason, not just a
+    // category code they'd have to look up.
+    public string? LastFailureDescription { get; init; }
     public int LastHttpStatus { get; init; }
 
     public int QueueCapacity { get; init; } = 100;

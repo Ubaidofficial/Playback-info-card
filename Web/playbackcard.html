@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">PlayInfo</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.7.0</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.7.1</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -263,7 +263,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.7.0</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.7.1</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -1280,6 +1280,11 @@
     transition: background 0.15s ease;
 }
 
+.playbackMonitorPage .btnNotifAction:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .playbackMonitorPage .btnNotifAction.btnPrimary {
     background: #00a4dc;
     color: #ffffff;
@@ -1925,7 +1930,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.7.0';
+    var PLUGIN_VERSION = '0.2.7.1';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -1933,6 +1938,13 @@
     var activePage = null;
     var currentGeneration = 0;
     var isDisposed = false;
+    // Guards loadNotificationSettings against out-of-order GET responses: the
+    // initial load kicked off on page open can still be in flight when a save
+    // (e.g. flipping the Master Switch right after opening the page) triggers
+    // its own reload. Without this, the older, slower response can resolve
+    // last and silently overwrite the just-saved value a few seconds later,
+    // making the toggle appear to "revert" on its own.
+    var notifSettingsRequestId = 0;
     var displayMode = 'compact'; // 'compact' or 'extended'
     var currentUserIsAdmin = false;
 
@@ -1974,6 +1986,7 @@
             lastAttempt: 'None',
             lastSuccess: 'None',
             lastFailureCategory: 'OK',
+            lastFailureDescription: '',
             discordAvailability: 'Available',
             telegramAvailability: 'Available'
         }
@@ -3238,6 +3251,7 @@
         'notificationLastAttempt',
         'notificationLastSuccess',
         'notificationLastFailureCategory',
+        'notificationLastFailureDescription',
         'discordAvailability',
         'telegramAvailability',
         'notificationQueueCapacity',
@@ -3281,6 +3295,7 @@
         if (typeof report.notificationLastAttempt !== 'string') return false;
         if (typeof report.notificationLastSuccess !== 'string') return false;
         if (typeof report.notificationLastFailureCategory !== 'string') return false;
+        if (typeof report.notificationLastFailureDescription !== 'string' || report.notificationLastFailureDescription.length > 300) return false;
         if (typeof report.discordAvailability !== 'string') return false;
         if (typeof report.telegramAvailability !== 'string') return false;
         if (typeof report.notificationQueueCapacity !== 'number' || !isFinite(report.notificationQueueCapacity) || report.notificationQueueCapacity < 0) return false;
@@ -3341,6 +3356,7 @@
             notificationLastAttempt: String(notifs.lastAttempt || 'None'),
             notificationLastSuccess: String(notifs.lastSuccess || 'None'),
             notificationLastFailureCategory: String(notifs.lastFailureCategory || 'OK'),
+            notificationLastFailureDescription: String(notifs.lastFailureDescription || '').substring(0, 300),
             discordAvailability: String(notifs.discordAvailability || 'Available'),
             telegramAvailability: String(notifs.telegramAvailability || 'Available'),
             notificationQueueCapacity: Number(notifs.queueCapacity) || 100,
@@ -3657,9 +3673,15 @@
 
     function loadNotificationSettings(page) {
         if (!page) return Promise.resolve();
+        notifSettingsRequestId++;
+        var requestId = notifSettingsRequestId;
         return callNotificationApi('PlaybackCard/Notifications/Configuration', { method: 'GET' })
             .then(function (data) {
                 if (!data) return;
+                // A newer load (e.g. triggered by a save that happened while this
+                // request was still in flight) has already applied its result --
+                // discard this now-stale response instead of overwriting it.
+                if (requestId !== notifSettingsRequestId) return;
 
                 var chkMaster = page.querySelector('#chkNotificationsEnabled');
                 var chkDiscord = page.querySelector('#chkDiscordEnabled');
@@ -3691,9 +3713,10 @@
                         txtDiscord.placeholder = maskedDiscord;
                     }
                 }
+                var discordReady = Boolean(data.discordEnabled && data.hasDiscordWebhook);
                 if (badgeDiscord) {
                     badgeDiscord.textContent = data.discordEnabled ? (data.hasDiscordWebhook ? 'Configured' : 'Missing URL') : 'Disabled';
-                    badgeDiscord.className = 'notifBadge ' + (data.discordEnabled && data.hasDiscordWebhook ? 'status-ok' : 'status-disabled');
+                    badgeDiscord.className = 'notifBadge ' + (discordReady ? 'status-ok' : 'status-disabled');
                 }
 
                 if (chkTelegram) chkTelegram.checked = Boolean(data.telegramEnabled);
@@ -3704,10 +3727,34 @@
                     }
                 }
                 if (txtTelegramChat) txtTelegramChat.value = data.telegramChatId || '';
+                // Trim before checking -- a whitespace-only chat ID (e.g. an accidental
+                // pasted space) is not actually configured, even though it's a non-empty
+                // string that would otherwise read as truthy.
+                var telegramChatIdSet = Boolean(data.telegramChatId && String(data.telegramChatId).trim().length > 0);
+                var telegramReady = Boolean(data.telegramEnabled && data.hasTelegramBotToken && telegramChatIdSet);
                 if (badgeTelegram) {
-                    var tgOk = data.hasTelegramBotToken && data.telegramChatId;
+                    var tgOk = data.hasTelegramBotToken && telegramChatIdSet;
                     badgeTelegram.textContent = data.telegramEnabled ? (tgOk ? 'Configured' : 'Missing Info') : 'Disabled';
-                    badgeTelegram.className = 'notifBadge ' + (data.telegramEnabled && tgOk ? 'status-ok' : 'status-disabled');
+                    badgeTelegram.className = 'notifBadge ' + (telegramReady ? 'status-ok' : 'status-disabled');
+                }
+
+                // Test can't do anything useful until the destination is enabled and has a
+                // saved webhook/token+chat ID -- disable it with an explanatory tooltip
+                // instead of letting a non-technical user hit a confusing "Delivery
+                // failed" for a config problem, not a delivery problem.
+                var btnTestDiscordEl = page.querySelector('#btnTestDiscord');
+                if (btnTestDiscordEl) {
+                    btnTestDiscordEl.disabled = !discordReady;
+                    btnTestDiscordEl.title = discordReady
+                        ? 'Send a test notification to Discord'
+                        : (data.discordEnabled ? 'Save a Discord Webhook URL before testing' : 'Enable Discord Delivery and save a Webhook URL before testing');
+                }
+                var btnTestTelegramEl = page.querySelector('#btnTestTelegram');
+                if (btnTestTelegramEl) {
+                    btnTestTelegramEl.disabled = !telegramReady;
+                    btnTestTelegramEl.title = telegramReady
+                        ? 'Send a test notification to Telegram'
+                        : (data.telegramEnabled ? 'Save a Bot Token and Chat ID before testing' : 'Enable Telegram Delivery and save a Bot Token and Chat ID before testing');
                 }
 
                 if (chkStart) chkStart.checked = Boolean(data.notifyOnStart != null ? data.notifyOnStart : data.notifyOnPlaybackStart);
@@ -3734,6 +3781,7 @@
                     notifs.lastAttempt = data.diagnostics.lastDeliveryAttemptUtc || data.diagnostics.lastAttemptTimestamp ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastDeliveryAttemptUtc || data.diagnostics.lastAttemptTimestamp).getTime()) : 'None';
                     notifs.lastSuccess = data.diagnostics.lastSuccessfulDeliveryUtc || data.diagnostics.lastSuccessTimestamp ? formatRelativeTime(Date.now() - new Date(data.diagnostics.lastSuccessfulDeliveryUtc || data.diagnostics.lastSuccessTimestamp).getTime()) : 'None';
                     notifs.lastFailureCategory = data.diagnostics.lastFailureCategory || data.diagnostics.lastSanitizedFailureCategory || 'OK';
+                    notifs.lastFailureDescription = data.diagnostics.lastFailureDescription || '';
                     notifs.discordAvailability = data.diagnostics.discordAvailability || data.diagnostics.discordAvailabilityState || 'Available';
                     notifs.telegramAvailability = data.diagnostics.telegramAvailability || data.diagnostics.telegramAvailabilityState || 'Available';
                 }
@@ -3753,6 +3801,15 @@
             var chkMaster = page.querySelector('#chkNotificationsEnabled');
             payload.notificationsEnabled = chkMaster ? chkMaster.checked : false;
             payload.enabled = payload.notificationsEnabled;
+        } else if (section === 'discord-toggle') {
+            // Just the switch, same as 'master' -- deliberately does NOT touch the
+            // webhook field, so flipping this can never blank out a saved webhook.
+            var chkDiscordToggle = page.querySelector('#chkDiscordEnabled');
+            payload.discordEnabled = chkDiscordToggle ? chkDiscordToggle.checked : false;
+        } else if (section === 'telegram-toggle') {
+            // Just the switch, same reasoning as discord-toggle above.
+            var chkTelegramToggle = page.querySelector('#chkTelegramEnabled');
+            payload.telegramEnabled = chkTelegramToggle ? chkTelegramToggle.checked : false;
         } else if (section === 'discord') {
             var chkDiscord = page.querySelector('#chkDiscordEnabled');
             var txtWebhook = page.querySelector('#txtDiscordWebhookUrl');
@@ -3804,11 +3861,13 @@
             body: payload
         }).then(function (data) {
             var isMasterEnabled = data && typeof data.notificationsEnabled === 'boolean' ? data.notificationsEnabled : false;
-            if (!isMasterEnabled && (section === 'discord' || section === 'telegram')) {
+            if (!isMasterEnabled && (section === 'discord' || section === 'telegram' || section === 'discord-toggle' || section === 'telegram-toggle')) {
                 showNotificationFeedback(page, 'Settings saved. Notifications remain disabled until the Master Switch is enabled.', false);
             } else {
                 var sectionNames = {
                     master: 'Master switch',
+                    'discord-toggle': 'Discord switch',
+                    'telegram-toggle': 'Telegram switch',
                     discord: 'Discord settings',
                     telegram: 'Telegram settings',
                     preferences: 'Preferences'
@@ -3855,7 +3914,18 @@
             body: { destination: destination }
         }).then(function (result) {
             if (result && result.success) {
-                showNotificationFeedback(page, 'Test ' + destination + ' notification delivered successfully!', false);
+                // Test intentionally bypasses the Master Switch (so a token can be
+                // verified before going live) -- but that means a successful test here
+                // tells you nothing about whether real playback notifications will
+                // actually send. Say so explicitly rather than let it look like a green
+                // light for everything.
+                var chkMasterNow = page.querySelector('#chkNotificationsEnabled');
+                var masterOff = chkMasterNow && !chkMasterNow.checked;
+                var successMsg = 'Test ' + destination + ' notification delivered successfully!';
+                if (masterOff) {
+                    successMsg += ' Note: the Master Switch is still off, so real playback notifications will not send yet.';
+                }
+                showNotificationFeedback(page, successMsg, false);
             } else {
                 var reason = 'Delivery failed';
                 if (result) {
@@ -3901,6 +3971,7 @@
                 var successTime = data.lastSuccessfulDeliveryUtc || data.lastSuccessTimestamp;
                 notifs.lastSuccess = successTime ? formatRelativeTime(Date.now() - new Date(successTime).getTime()) : 'None';
                 notifs.lastFailureCategory = data.lastFailureCategory || data.lastSanitizedFailureCategory || 'OK';
+                notifs.lastFailureDescription = data.lastFailureDescription || '';
                 notifs.discordAvailability = data.discordAvailability || data.discordAvailabilityState || 'Available';
                 notifs.telegramAvailability = data.telegramAvailability || data.telegramAvailabilityState || 'Available';
                 updateDiagnosticsDisplay();
@@ -3918,6 +3989,24 @@
         if (chkMaster) {
             chkMaster.addEventListener('change', function () {
                 saveNotificationSettings(page, 'master');
+            });
+        }
+
+        // Enable switches save immediately, same as the master switch above -- previously
+        // these only took effect once "Save Discord"/"Save Telegram" was clicked, so
+        // flipping the switch alone left it looking on in the browser while the server
+        // still had it off (and Test would then fail confusingly against the old state).
+        var chkDiscordToggle = page.querySelector('#chkDiscordEnabled');
+        if (chkDiscordToggle) {
+            chkDiscordToggle.addEventListener('change', function () {
+                saveNotificationSettings(page, 'discord-toggle');
+            });
+        }
+
+        var chkTelegramToggle = page.querySelector('#chkTelegramEnabled');
+        if (chkTelegramToggle) {
+            chkTelegramToggle.addEventListener('change', function () {
+                saveNotificationSettings(page, 'telegram-toggle');
             });
         }
 

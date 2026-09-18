@@ -35,7 +35,7 @@ public class PlaybackCardDashboardMiddlewareTests
         using var reader = new StreamReader(bodyStream, Encoding.UTF8);
         var content = await reader.ReadToEndAsync();
         Assert.NotEmpty(content);
-        Assert.Contains("0.2.7.0", content);
+        Assert.Contains("0.2.7.1", content);
         Assert.Contains("NOW PLAYING", content);
     }
 
@@ -91,8 +91,8 @@ public class PlaybackCardDashboardMiddlewareTests
         using var reader = new StreamReader(bodyStream, Encoding.UTF8);
         var modifiedHtml = await reader.ReadToEndAsync();
 
-        Assert.Contains("<script plugin=\"PlaybackCard\" version=\"0.2.7.0\" data-asset-revision=\"0.2.7.0\" src=\"/PlaybackCard/dashboard.js?v=0.2.7.0\" defer></script>", modifiedHtml);
-        Assert.Contains("<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css?v=0.2.7.0\" data-asset-revision=\"0.2.7.0\">", modifiedHtml);
+        Assert.Contains("<script plugin=\"PlaybackCard\" version=\"0.2.7.1\" data-asset-revision=\"0.2.7.1\" src=\"/PlaybackCard/dashboard.js?v=0.2.7.1\" defer></script>", modifiedHtml);
+        Assert.Contains("<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css?v=0.2.7.1\" data-asset-revision=\"0.2.7.1\">", modifiedHtml);
         Assert.EndsWith("</body></html>", modifiedHtml.Trim());
     }
 
@@ -131,7 +131,7 @@ public class PlaybackCardDashboardMiddlewareTests
 
         Assert.Contains("dashboard.js", decompressedHtml);
         Assert.Contains("dashboard.css", decompressedHtml);
-        Assert.Contains("version=\"0.2.7.0\"", decompressedHtml);
+        Assert.Contains("version=\"0.2.7.1\"", decompressedHtml);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public class PlaybackCardDashboardMiddlewareTests
 
         Assert.Contains("dashboard.js", decompressedHtml);
         Assert.Contains("dashboard.css", decompressedHtml);
-        Assert.Contains("version=\"0.2.7.0\"", decompressedHtml);
+        Assert.Contains("version=\"0.2.7.1\"", decompressedHtml);
     }
 
     [Fact]
