@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.0",
+        "changelog": "Release v0.2.7.0 - Unified the Now Playing dashboard widget with Connected Devices (shared glass/accent-ring styling, tinted by real playback method). Fixed the session grid leaving dead space with fewer active streams than columns. Poster art no longer stretches into a cropped sliver once Extended/Show Details makes a card taller. Compact mode now also shows bitrate, frame rate, and subtitle-active pills, a progress-completion ring on the poster, and real-world elapsed watch time next to ETA. The transcode reason is now a consistent highlighted callout in both Compact and Extended. The Info toggle can independently collapse one card while others stay open under Show Details, with a proper rotating chevron. Show Details is now grouped into titled Playback/Video/Audio/Stream/Subtitles sections. Fixed a bug where a malformed Discord webhook or Telegram bot token could block saving the notification enable switches entirely. Added delivery logging for successful Discord/Telegram sends to aid future diagnosis.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.0/jellyfin-plugin-playbackcard.zip",
+        "checksum": "cce3eb6374ac8a76aa3f61ef97f33829",
+        "timestamp": "2026-09-18T14:48:08Z"
+      },
+      {
         "version": "0.2.6.0",
         "changelog": "Release v0.2.6.0 - Rebrand from Playback Info Card to PlayInfo (new icon/banner, renamed everywhere in the live UI, not just the plugin name). Tautulli-style card redesign: poster art now bleeds flush to the card's edge and spans its full height instead of a small inset thumbnail, the blurred backdrop art is actually visible, and each card carries a colored status ring (green/blue/purple/red) matching its real playback method. New admin-only session controls: Send Message and Stop, calling Jellyfin's own native Session API, with a custom confirm dialog styled to match the card instead of a bare OS popup. Real Moonfin brand icon replacing the placeholder crescent. Relicensed from MIT to GPL-3.0, matching Tautulli.",
         "targetAbi": "10.9.0.0",
