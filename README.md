@@ -1,326 +1,60 @@
 # Playback Info Card for Jellyfin
 
-**Current Version: v0.2.5.0**
+A Now Playing monitor for Jellyfin. It replaces the stock Devices widget on the admin Dashboard with a live grid of active streams — play state, resolution, HDR, codecs, audio, subtitles, and (when the server is transcoding) the actual hardware engine and reason, taken straight from what Jellyfin reports rather than guessed. There's also an optional native Discord/Telegram notifier for playback events.
 
-Real-time, privacy-safe stream telemetry and playback monitoring for Jellyfin Media Server — a Now Playing grid that replaces the stock Devices widget on the admin Dashboard, plus a self-service "My Playback" page for regular users.
+Latest release: **v0.2.5.3** — see the [changelog](https://github.com/Ubaidofficial/Playback-info-card/releases) for what changed.
 
----
+## Where to find it
 
-## What's in v0.2.5.0
+Two places, one page:
 
-* **Truthful transcode diagnostics** — separate Video/Audio direct-vs-transcode status, hardware engine, and transcode reason, all read only from what the server actually reports (never guessed, never fabricated). Rejects impossible values outright (e.g. an `2191 fps` ffmpeg throughput counter, or a hardware engine badge on direct video).
-* **New real, non-guessed fields**: estimated finish time (ETA), Dolby Atmos/DTS:X detection, audio track language, and subtitle delivery method (surfaces burned-in subtitles as a genuine, factual reason a video is being transcoded).
-* **Singleton Info drawer** that survives polling — clicking Info opens one accessible modal dialog (desktop: right-side panel, mobile: bottom sheet) with a full 26-field grouped breakdown, and it no longer silently closes itself every 3 seconds.
-* **Real, brand-accurate client logos** — Chrome, Safari, Edge, Firefox, Brave, and ~25 official/third-party Jellyfin clients and streaming devices, replacing single-color placeholder icons.
-* **Security hardening**: no guessable fallback encryption key for notification secrets, no silently-swallowed permission-hardening failures, no silent secret wipe on a key mismatch, and a fixed race condition that could double-fire a Discord/Telegram notification.
-* Full history: see [GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases).
+- **Dashboard → the Now Playing grid** replaces the stock Devices widget automatically, no configuration needed.
+- **Dashboard → Server → Playback Monitor** is the same page as a dedicated view. Admins see every active session; everyone else sees only their own — the page decides which by role, so there's a single sidebar entry instead of two separate pages for admins and regular users.
 
----
+## Features
 
-## Where to Find the Monitor
-
-1. **Primary Default Dashboard (Automatic)**:
-   Navigate to Jellyfin's standard **Dashboard** (`#/dashboard` or `#/devices`). The **NOW PLAYING** grid completely replaces the stock Devices section in-place.
-2. **Dedicated Fallback / Admin Detail Page**:
-   In the left sidebar under **Server**, click **Playback Monitor** (direct URL route: `/web/#/configurationpage?name=playbackcard`).
-3. **Personal User View**:
-   Users can navigate to **My Playback** (`/web/#/configurationpage?name=myplayback`) to view their own active sessions via authenticated claims-based filtering.
-
----
-
-## Features & UI Overview
-
-* **Compact & Extended Modes**: Toggle between a clean, badge-capped compact grid and an expanded telemetry breakdown.
-* **Stream Telemetry**:
-  - Playback status: Playing &bull; Paused &bull; Direct Play &bull; Direct Stream &bull; Remux &bull; Transcode
-  - Resolution: 4K &bull; 1440p &bull; 1080p &bull; 720p &bull; SD
-  - Dynamic Range: HDR &bull; HDR10+ &bull; Dolby Vision &bull; SDR
-  - Video Codecs: HEVC &bull; AV1 &bull; VP9 &bull; H.264 &bull; MPEG2
-  - Bit Depth: 10-bit &bull; 8-bit
-  - Audio: Atmos &bull; 7.1 &bull; 5.1 &bull; Stereo &bull; Audio Codecs (TrueHD, E-AC3, AC3, DTS, FLAC, AAC)
-  - Active Subtitles &amp; Closed Captions: Language and subtitle stream type
-  - Framerate (FPS) &amp; Stream Bitrate
-* **Transcoding Engine Details**: In extended mode, view active hardware acceleration engine (`QSV`, `NVENC`, `VAAPI`, `AMF`, `VideoToolbox`, or `Software CPU`), container conversion, and transcode reasons reported by the server.
-* **Artwork & Visuals**: Poster artwork with a layered "cinema poster" shadow and hover lift, plus a subtle blurred backdrop with automatic error fallback.
-* **Real Client Logos**: Self-contained, brand-accurate inline SVGs — Chrome, Safari, Edge, Firefox, Brave, Jellyfin Web/Android/Android TV/iOS/tvOS/Media Player, Swiftfin, Finamp, Findroid, Streamyfin, Moonfin, Infuse, Kodi, Roku, Fire TV, Chromecast, Apple TV, Samsung Tizen, LG webOS, Xbox, PlayStation, and DLNA. No CDN, no emoji, no runtime fetches.
-* **User Avatar**: Shows the viewer's own Jellyfin profile picture next to their name when available.
-
----
-
-## Privacy & Diagnostics Policy
-
-### 100% Offline & Air-Gapped
-* **Zero External Calls**: The monitor executes entirely within browser memory and queries only the local Jellyfin server via authenticated `ApiClient.getSessions()`.
-* **Zero Telemetry**: No tracking, no Google Analytics, no Sentry, no remote beacons, and no automated uploads.
-
-### Safe Diagnostics & Redacted Reports
-The diagnostics card at the bottom of the monitor displays:
-* Plugin version (`0.2.5.0`)
-* Jellyfin server and web client versions (if available)
-* Current monitor route
-* Sessions API health category (`OK`, `Waiting for sessions`, `Sessions unavailable`)
-* Polling status (`active`, `stopped`, `stalled` when interval exceeds threshold)
-* Artwork loaded, fallback, and error counts
-* Malformed session and client render error counts
-
-### Redacted Copy Tool
-Clicking **Copy diagnostic report** produces a clean JSON structure:
-```json
-{
-  "pluginVersion": "0.2.5.0",
-  "jellyfinVersion": "10.9.11",
-  "webVersion": "Available",
-  "route": "/playbackcard",
-  "pageLoaded": true,
-  "sessionsApi": "ok",
-  "lastSuccessfulPoll": "3s ago",
-  "pollingState": "active",
-  "artwork": "loaded",
-  "ignoredSessionCount": 0,
-  "renderErrors": 0
-}
-```
-Before copying, an automated redaction check scans for sensitive keywords (`RemoteEndPoint`, `ipAddress`, `token`, `password`, `cookie`, `media title`, `username`, IP regex). If any sensitive pattern is detected, the copy action is immediately blocked with a warning.
-
----
+- Compact and extended display modes, with a summary strip showing total streams and a real Direct/Transcode split.
+- Full stream telemetry: playback state, resolution, dynamic range (HDR/HDR10+/Dolby Vision), video/audio codecs, bit depth, channel layout, subtitles, framerate, and bitrate.
+- Transcode diagnostics that only show what the server actually reports — hardware engine (QSV/NVENC/VAAPI/AMF/VideoToolbox), container conversion, and transcode reason. No fabricated values, and it rejects obviously impossible ones (e.g. a hardware badge on a direct-play stream).
+- Estimated time to finish, Atmos/DTS:X detection, audio language, and subtitle delivery method.
+- Poster art with a backdrop and hover effects, plus ~25 brand-accurate inline client logos (no CDN, no runtime fetches).
+- A single "Info" toggle per card that expands the full field breakdown in place and survives the next poll, instead of closing itself.
 
 ## Installation
 
-### Method 1: Jellyfin Plugin Repository (Catalog Delivery)
-1. In Jellyfin Web, navigate to **Dashboard** &rarr; **Plugins** &rarr; **Repositories**.
-2. Add the custom repository:
-   - **Repository Name**: `Playback Info Card`
-   - **Repository URL**: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
-3. Navigate to **Catalog**, find **Playback Info Card**, and select the latest version (currently **0.2.5.0**).
-4. Click **Install** and restart Jellyfin server.
+**Via the plugin catalog (recommended)**
+1. Dashboard → Plugins → Repositories → Add repository.
+2. Repository URL: `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json`
+3. Dashboard → Catalog → find **Playback Info Card** → Install → restart Jellyfin.
 
-> The catalog (`manifest.json`) lists the 5 most recent releases. Older releases remain permanently available on the [Releases page](https://github.com/Ubaidofficial/Playback-info-card/releases) for manual installation.
+**Manually**
+Download the zip from the [latest release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest), extract `Jellyfin.Plugin.PlaybackCard.dll` and `plugin.json` into your `plugins/PlaybackCard/` directory, and restart the server.
 
-### Method 2: Manual Installation (ZIP / Binary)
-1. Download `jellyfin-plugin-playbackcard.zip` from the [latest GitHub Release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest).
-2. Locate your Jellyfin `plugins` directory:
-   - **Linux (systemd)**: `/var/lib/jellyfin/plugins/PlaybackCard/`
-   - **Docker**: `<path-to-config>/plugins/PlaybackCard/`
-   - **Windows**: `%ProgramData%\Jellyfin\Server\plugins\PlaybackCard\` or `<install-dir>\plugins\PlaybackCard\`
-   - **macOS**: `~/.local/share/jellyfin/plugins/PlaybackCard/`
-3. Extract `Jellyfin.Plugin.PlaybackCard.dll` and `plugin.json` into the `PlaybackCard` subdirectory.
-4. Restart Jellyfin Media Server.
+The catalog only lists the 5 most recent versions; every release ever published stays available on the [Releases page](https://github.com/Ubaidofficial/Playback-info-card/releases). Platform-specific paths, Docker/reverse-proxy notes, and rollback steps are in [docs/ADVANCED.md](docs/ADVANCED.md).
 
----
+## Playback notifications (Discord & Telegram)
 
-## Deployment Notes by Platform
+The plugin can post playback start/stop/completion (and optional progress) events directly from the Jellyfin server — no external plugin required.
 
-### Linux (Debian / Ubuntu / Arch / Fedora)
-* Ensure file permissions for the extracted files match the `jellyfin` service account:
-  ```bash
-  sudo chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/PlaybackCard
-  sudo chmod 644 /var/lib/jellyfin/plugins/PlaybackCard/*
-  sudo systemctl restart jellyfin
-  ```
+- Configure it from the Playback Monitor page itself: scroll to **Playback Notifications** (admins only), turn on the master switch, add a Discord webhook and/or Telegram bot token, pick which events to send, and use the built-in test buttons to confirm delivery.
+- Usernames and device names are **off by default** — an admin has to explicitly opt in to including them in outgoing messages.
+- Discord messages disable `@everyone`/`@here`/role mentions. Telegram messages are HTML-escaped and capped at 4,096 characters.
+- Getting a Telegram bot token/chat ID and a Discord webhook URL, plus the full delivery/retry behavior, is covered in [docs/ADVANCED.md](docs/ADVANCED.md).
 
-### Docker
-* Mount the plugins directory from the host into the container:
-  ```yaml
-  volumes:
-    - /path/to/jellyfin/config:/config
-    - /path/to/jellyfin/plugins:/plugins
-  ```
-* Place the plugin files in `<host-plugins-dir>/PlaybackCard/` and restart the container:
-  ```bash
-  docker restart jellyfin
-  ```
+## Privacy & security
 
-### Windows
-* Ensure the service account has read permissions to `%ProgramData%\Jellyfin\Server\plugins\PlaybackCard`.
-* Restart the Jellyfin Server service using the Windows Services app or Jellyfin tray tool.
+Everything runs against your own Jellyfin server — no analytics, no third-party calls, no telemetry. The diagnostics panel redacts anything sensitive (IPs, tokens, usernames, media titles) before you can copy it. Discord/Telegram secrets are encrypted at rest, separately from the rest of the plugin's config, and masked in the admin UI; see [SECURITY.md](SECURITY.md) for the full policy and how to report a vulnerability.
 
-### Reverse Proxy and Custom Base Paths
-* **Base Path Support**: The monitor page resolves URLs using Jellyfin's runtime `ApiClient.getUrl()`, which respects custom base paths (such as `/jellyfin` or `/media`).
-* **Sub-path / Nginx / Caddy / Traefik / Cloudflare**:
-  - No special proxy header rewrites are required.
-  - Standard WebSocket and HTTP proxy pass directives for Jellyfin are sufficient.
-  - Do not cache dynamic responses for `/Sessions` or `/web/configurationpage`.
+## Known limitations
 
----
+- Native apps (Android TV, Apple TV, Roku, etc.) report sessions to the server and show up in the grid, but they don't render this plugin's own UI — it's web-dashboard only.
+- Device/client names come from whatever each client self-reports; unrecognized ones show up as a generic label.
+- Polling runs every 3 seconds while the page is open and stops when you navigate away.
 
-## Client Compatibility
+## How this is built
 
-* **Jellyfin Web (Desktop & Mobile)**: Fully supported modern browser interface.
-* **Native Client Apps (Android TV, Apple TV, Roku, iOS, Infuse, Moonfin, Jellyfin Enhanced)**: Native client playback sessions are reported by the server and will appear in the Web Playback Monitor. However, native client apps do not render internal Web plugin pages.
-
----
-
-## Migration from v0.2.3.0
-
-1. **Uninstall Legacy Injection**: If you previously installed `0.2.3.0`, replace the plugin DLL and `plugin.json` in your server's `plugins/PlaybackCard/` directory with `0.2.5.0`.
-2. **Remove Host Modifications**: If you previously inserted `<script>` tags into `index.html` or used custom CSS tweaks for earlier versions, remove them. Version `0.2.5.0` requires zero host file modifications.
-3. **Restart Jellyfin**: Restart the server to initialize the updated assembly.
-4. **Access the New Location**: Open Jellyfin Web &rarr; Dashboard &rarr; Server &rarr; **Playback Monitor**.
-
----
-
-## Rollback Instructions
-
-Every release, including versions no longer listed in the plugin catalog, stays permanently downloadable from [GitHub Releases](https://github.com/Ubaidofficial/Playback-info-card/releases) — the catalog (`manifest.json`) only shows the 5 most recent for update purposes; nothing is ever deleted from Releases itself.
-
-To roll back to any specific version (replace `vX.Y.Z.W` below):
-
-1. Stop Jellyfin Server:
-   ```bash
-   sudo systemctl stop jellyfin
-   ```
-2. Download that release's package directly:
-   ```bash
-   curl -L -O https://github.com/Ubaidofficial/Playback-info-card/releases/download/vX.Y.Z.W/jellyfin-plugin-playbackcard.zip
-   ```
-3. Extract into your plugins directory:
-   ```bash
-   unzip -o jellyfin-plugin-playbackcard.zip -d /var/lib/jellyfin/plugins/PlaybackCard/
-   ```
-4. Restart Jellyfin Server:
-   ```bash
-   sudo systemctl start jellyfin
-   ```
-
----
-
-## ABI & Version Compatibility
-
-* **Compiled Server SDK**: Jellyfin 10.9.11 (`Jellyfin.Controller` and `Jellyfin.Model`).
-* **Target Runtime**: `.NET 8.0` (`net8.0`).
-* **Target ABI**: Declared as `10.9.0.0` in `plugin.json`.
-* **Version Scope**: Compatibility is designed for Jellyfin 10.9.x releases. Compatibility is treated as unverified until validated on your specific server environment and deployment type. We do not claim universal support across every Jellyfin version.
-
----
-
-## Client Compatibility & Telemetry Limitations
-
-* **Dashboard Web Interface**: The Playback Monitor UI runs exclusively within the Jellyfin Web administrator interface (`Dashboard -> Server -> Playback Monitor`).
-* **Native Apps (Moonfin, Android TV, Apple TV, Roku, iOS, Infuse, Jellyfin Enhanced)**:
-  - Native apps provide playback session data and telemetry to the server API; they **do not** render this dashboard page.
-  - Do not assume universal client support: device names, client application titles, and operating system labels depend strictly on what each individual client reports upon session registration.
-  - Omitted fields: If a client does not report audio/video bitrates, framerates, or profile data, the monitor omits these tags rather than inventing placeholders.
-* **Network & Connection Type**: The monitor never attempts to distinguish Wi-Fi, Ethernet, or Cellular connections. Jellyfin cannot reliably distinguish these network modes, and network classification heuristics are strictly forbidden for privacy.
-
----
-
-## Known Unverified Scenarios
-
-* **Live Server Environments**: Manual verification matrix across all physical native clients (Moonfin, Android TV, Jellyfin Enhanced) and live Windows host deployments remains to be verified by administrators on their respective servers.
-* **Method 1 Catalog**: The repository catalog (`manifest.json`) on `main` provides version `0.2.5.0` with verified MD5 checksums, while retaining `0.2.3.0` for safe rollback.
-
----
-
-## Playback Notifications (Native Discord & Telegram)
-
-Playback Info Card provides high-performance, server-side native playback notifications for **Discord** and **Telegram**. Dispatches occur directly inside the Jellyfin server background pipeline, operating completely independently of client browsers or external plugins.
-
-### Privacy by Omission & Threat Model
-
-* **IP-Safe by Omission**: The notification pipeline never queries, collects, or transmits client IP addresses, server internal IPs, remote endpoints, private LAN/WAN classifications, local filesystem paths, or authentication tokens.
-* **Explicit Disclosures**: Username and client/device disclosures are **disabled by default**. Administrators must explicitly check the respective disclosure checkboxes in the UI to include user account names or device models in external messages.
-* **Server-Local Plaintext Storage Disclosure**: In accordance with Jellyfin plugin architecture, plugin settings and configured secrets (Discord webhook URLs, Telegram bot tokens) are stored in server-local XML configuration files on disk in plaintext. Secrets are never encrypted on disk. Ensure file-system access to your Jellyfin server is strictly restricted to authorized administrators.
-* **Write-Only Secrets & Masking in API**: The plugin's administration REST API masks all tokens and secrets in responses (e.g. `••••••••`). Raw secret values are never reflected back over the network to the browser.
-* **Mention Storm Suppression**: Outbound Discord payloads strictly enforce `"allowed_mentions": { "parse": [] }` and sanitize `@everyone`, `@here`, and role mention strings from media titles to prevent ping storms.
-* **HTML Tag Integrity**: Outbound Telegram messages strictly escape HTML special characters (`&`, `<`, `>`, `"`) and cap messages at 4,096 characters to prevent HTML tag corruption.
-
----
-
-### Configuration Guide
-
-#### 1. Native Configuration via Playback Monitor Page
-Administrators can configure notifications directly on the **Playback Monitor** page (`/playbackcard`):
-1. Navigate to **Dashboard** &rarr; **Playback Monitor** (or `/playbackcard`).
-2. Scroll to the **Playback Notifications** section (visible only to server administrators).
-3. Toggle the **Master Switch** to enable the notification engine.
-4. Configure your desired destination (Discord and/or Telegram).
-5. Select your desired event subscriptions (Playback Start, Stop, Media Completion, Pause/Resume, and Periodic Progress).
-6. Click **Test Discord** or **Test Telegram** to send a synthetic test dispatch and verify delivery health.
-
----
-
-#### 2. Telegram Bot Setup
-1. Open Telegram and start a chat with [@BotFather](https://t.me/botfather).
-2. Send `/newbot` and follow the prompts to create your bot and obtain your HTTP API bot token (formatted as `123456789:ABCdefGhIjKlMnOpQrStUvWxYz`).
-3. Create a Telegram channel or group for alerts, add your bot as an administrator, and send a test message.
-4. Obtain the target Chat ID using `@userinfobot`, `@get_id_bot`, or by querying `https://api.telegram.org/bot<TOKEN>/getUpdates`.
-5. In Playback Info Card settings, enter the Bot Token and Chat ID, toggle **Enable Telegram Delivery**, and click **Save Telegram**.
-
----
-
-#### 3. Discord Webhook Setup
-1. In Discord, open your server's **Server Settings** &rarr; **Integrations** &rarr; **Webhooks**.
-2. Click **New Webhook**, assign a name (e.g., `Jellyfin Playback`), and select the alert channel.
-3. Click **Copy Webhook URL** (must start with `https://discord.com/api/webhooks/` or `https://discordapp.com/api/webhooks/`).
-4. In Playback Info Card settings, paste the Webhook URL into **Webhook URL**, toggle **Enable Discord Delivery**, and click **Save Discord**.
-
----
-
-### Delivery Engine & Resilience
-
-* **Independent Bounded Queues**: Discord and Telegram queues are fully isolated with an in-memory capacity of 100 items each.
-* **Priority Delivery**: Playback Start, Stop, and Media Completion events are prioritized over progress updates. A dedicated reservation of 20 slots ensures critical notifications are never blocked by high volumes of progress updates.
-* **Progress Coalescing**: Consecutive periodic progress updates for the same playback session replace older pending progress in the queue, preventing delivery backlog.
-* **Rate Limiting & Backoff**: Handles HTTP 429 rate limits by parsing Discord `Retry-After` headers and Telegram `parameters.retry_after`. Transient network errors (5xx, timeouts) automatically retry up to 3 times with exponential backoff and jitter. Permanent client errors (400, 401, 403, 404) fail immediately without retry.
-* **Shutdown Drain Budget**: On Jellyfin server shutdown, background queues execute a graceful drain with a 3-second maximum budget to flush pending events without delaying server termination.
-
----
-
-### Optional Upstream Webhook Plugin Integration (Alternative Option A)
-
-If you prefer using the generic upstream [Jellyfin Webhook Plugin](https://github.com/jellyfin/jellyfin-plugin-webhook) instead of the native engine:
-
-> [!CAUTION]
-> **DO NOT USE THE OFFICIAL UPSTREAM SAMPLE TELEGRAM TEMPLATE AS-IS.**
-> The sample `PlaybackStart.handlebars` template in the official webhook repository includes `{{RemoteEndPoint}}`, which broadcasts internal server IP addresses, client IP addresses, and private network topologies into chat rooms.
-> Always use IP-safe templates that strictly omit all IP and network fields.
-
-#### IP-Safe Upstream Telegram Template:
-```json
-{
-  "chat_id": "YOUR_CHAT_ID",
-  "text": "🎬 <b>Playback Started</b>\n\n<b>Title:</b> {{#if_equals ItemType 'Episode'}}<b>{{SeriesName}}</b> — S{{SeasonNumber00}}E{{EpisodeNumber00}} {{Name}}{{else}}<b>{{Name}}</b> ({{Year}}){{/if_equals}}\n<b>User:</b> {{NotificationUsername}}\n<b>Client:</b> {{ClientName}} ({{DeviceName}})\n<b>Play Method:</b> {{PlayMethod}}\n<b>Video:</b> {{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}\n<b>Audio:</b> {{Audio_0_Codec}} ({{Audio_0_Channels}}ch)",
-  "parse_mode": "HTML",
-  "protect_content": true,
-  "disable_web_page_preview": true
-}
-```
-
-#### IP-Safe Upstream Discord Embed Template:
-```json
-{
-  "content": "",
-  "allowed_mentions": { "parse": [] },
-  "embeds": [
-    {
-      "title": "🎬 Playback Started",
-      "description": "{{#if_equals ItemType 'Episode'}}**{{SeriesName}}**\nS{{SeasonNumber00}}E{{EpisodeNumber00}} — {{Name}}{{else}}**{{Name}}** ({{Year}}){{/if_equals}}",
-      "color": 421980,
-      "fields": [
-        { "name": "User", "value": "{{NotificationUsername}}", "inline": true },
-        { "name": "Client", "value": "{{ClientName}} ({{DeviceName}})", "inline": true },
-        { "name": "Stream", "value": "{{PlayMethod}}", "inline": true },
-        { "name": "Video", "value": "{{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}", "inline": true },
-        { "name": "Audio", "value": "{{Audio_0_Codec}} {{Audio_0_Channels}}ch", "inline": true }
-      ],
-      "footer": { "text": "Playback Info Card • Privacy Safe" },
-      "timestamp": "{{UtcTimestamp}}"
-    }
-  ]
-}
-```
-
----
-
-## Known Limitations
-
-* **Client and Device Metadata**: Device names, client app titles, and operating system labels depend entirely on the strings reported by the client during session registration. Unidentified clients report as "Generic / Unknown Client".
-* **Transcode Telemetry Availability**: Transcode reasons and hardware acceleration engine indicators are populated by the server only when video transcoding is active. In direct stream or direct play modes, transcode telemetry fields are omitted.
-* **Polling Lifecycle**: Polling frequency is 3 seconds while the monitor page is actively viewed. Switching away or leaving the page stops polling after the current cycle.
-* **Native Apps**: Native TV and mobile apps report session telemetry to Jellyfin, but the monitor UI itself can only be viewed in web browsers.
-
----
+This is a one-person side project. I use Claude Code for a meaningful share of the implementation, refactoring, and code review — I write the requirements and test every change against a real Jellyfin server before it ships, but you should assume AI tooling touched most commits.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)
