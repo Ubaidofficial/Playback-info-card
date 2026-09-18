@@ -1,34 +1,52 @@
-# Playback Info Card for Jellyfin
+# PlayInfo for Jellyfin
 
-![Playback Monitor showing three active sessions with live transcode telemetry](screenshots/dashboard-preview.png)
+*(formerly "Playback Info Card")*
+
+![PlayInfo Now Playing grid showing active sessions with live transcode telemetry](screenshots/dashboard-desktop.png)
 
 A Now Playing monitor for Jellyfin: a live grid of active streams — play state, resolution, HDR, codecs, hardware transcode engine — read straight from what Jellyfin reports, never guessed. Optional native Discord/Telegram notifications for playback events. No analytics, no external calls, no telemetry.
 
-Latest release: **v0.2.5.4** — [changelog](https://github.com/Ubaidofficial/Playback-info-card/releases).
+Last tagged release: **v0.2.5.4** — [changelog](https://github.com/Ubaidofficial/Playback-info-card/releases). This branch additionally includes the PlayInfo rebrand, a Tautulli-style card redesign, and admin session controls described below, not yet packaged as a numbered release — see [Building from source](#building-from-source) to try it now.
 
 ## Where to find it
 
-**Dashboard → Now Playing** replaces the stock Devices widget automatically. **Dashboard → Server → Playback Monitor** is the same page as a dedicated view — admins see every session, everyone else sees only their own, decided by role, one sidebar entry for both.
+**Dashboard → Now Playing** replaces the stock Devices widget automatically. **Dashboard → Server → PlayInfo** is the same page as a dedicated view — admins see every session, everyone else sees only their own, decided by role, one sidebar entry for both.
 
 ## Features
 
-- Compact/extended modes, summary strip with a real Direct vs. Transcode split.
+- Compact/extended/show-details modes, summary strip with a real Direct vs. Transcode split.
 - Full telemetry: resolution, HDR, codecs, bit depth, channels, subtitles, framerate, bitrate.
 - Transcode diagnostics (hardware engine, container, reason) sourced only from what the server actually reports — never fabricated.
 - ETA, Atmos/DTS:X detection, audio language, subtitle delivery method.
-- ~30 brand-accurate inline client/OS logos (browsers, native apps, TVs, consoles — no CDN).
+- ~35 brand-accurate inline client/OS logos (browsers, native apps, TVs, consoles — no CDN).
+- **Tautulli-style card**: poster art bleeds flush to the card's edge and spans its full height, with a vivid blurred backdrop and a colored status ring (green/blue/purple/red) matching the session's real playback method — a grid of sessions reads at a glance.
+- **Admin session controls**: send an on-screen message or stop a session's playback directly from the card, via Jellyfin's own Session API. Admin-only, and Stop always confirms first.
+
+![PlayInfo Extended mode with the full technical stream breakdown](screenshots/dashboard-extended.png)
 
 ## Installation
 
-**Catalog (recommended):** Dashboard → Plugins → Repositories → add `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json` → Catalog → install **Playback Info Card** → restart Jellyfin.
+**Catalog (recommended):** Dashboard → Plugins → Repositories → add `https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/manifest.json` → Catalog → install **PlayInfo** → restart Jellyfin.
 
 **Manual:** download the zip from the [latest release](https://github.com/Ubaidofficial/Playback-info-card/releases/latest), extract into `plugins/PlaybackCard/`, restart.
 
 Platform paths, Docker/reverse-proxy notes, and rollback steps: [docs/ADVANCED.md](docs/ADVANCED.md).
 
+### Building from Source
+
+To try changes that haven't been packaged into a numbered release yet (like this branch):
+
+```bash
+git clone https://github.com/Ubaidofficial/Playback-info-card.git
+cd Playback-info-card
+dotnet build -c Release
+```
+
+The Web assets (`Web/dashboard.js`, `Web/dashboard.css`, `Web/playbackcard.html`) are compiled directly into the DLL as embedded resources — nothing else to copy. Take `bin/Release/net8.0/Jellyfin.Plugin.PlaybackCard.dll` and this repo's `plugin.json`, drop them into your `plugins/PlaybackCard/` directory as in Manual install above, and restart Jellyfin. The plugin GUID and assembly name never change between releases, so this safely replaces an existing install rather than creating a duplicate.
+
 ## Notifications (Discord & Telegram)
 
-Configure from the Playback Monitor page (**Playback Notifications**, admins only) — no external plugin needed. Usernames/device names are off by default; Discord mentions are disabled; Telegram output is HTML-escaped. Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md).
+Configure from the PlayInfo page (**Playback Notifications**, admins only) — no external plugin needed. Usernames/device names are off by default; Discord mentions are disabled; Telegram output is HTML-escaped. Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md).
 
 ## Privacy & security
 
@@ -44,4 +62,4 @@ One-person side project. I use Claude Code for a meaningful share of the impleme
 
 ## License
 
-[MIT](LICENSE)
+[GNU General Public License v3.0](LICENSE) (GPL-3.0) — the same license used by [Tautulli](https://github.com/Tautulli/Tautulli), this project's original inspiration. Modified versions must also be distributed under GPL-3.0 with source available.

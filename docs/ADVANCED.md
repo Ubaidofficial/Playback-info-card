@@ -93,7 +93,7 @@ If you'd rather use the generic [jellyfin-plugin-webhook](https://github.com/jel
         { "name": "Video", "value": "{{Video_0_Codec}} {{Video_0_Width}}x{{Video_0_Height}}", "inline": true },
         { "name": "Audio", "value": "{{Audio_0_Codec}} {{Audio_0_Channels}}ch", "inline": true }
       ],
-      "footer": { "text": "Playback Info Card • Privacy Safe" },
+      "footer": { "text": "PlayInfo • Privacy Safe" },
       "timestamp": "{{UtcTimestamp}}"
     }
   ]

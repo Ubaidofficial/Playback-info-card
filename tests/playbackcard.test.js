@@ -438,15 +438,80 @@ describe('Playback Info Card v0.2.5.4 Test Suite', () => {
         });
     });
 
-    describe('14. Zero Remote-Control Commands Assertion', () => {
-        it('confirms absence of remote control buttons or playback mutation calls', () => {
-            const forbiddenRemoteControls = [
-                'btnPause', 'btnPlay', 'btnStop', 'btnKill', 'terminateSession',
-                'stopSession', 'pauseSession', 'postProgress', 'remoteControl'
-            ];
-            forbiddenRemoteControls.forEach((cmd) => {
-                assert.ok(!htmlContent.includes(cmd), `Prohibited remote control command found: ${cmd}`);
-            });
+    describe('14. Admin-Only Session Controls (Stop / Message)', () => {
+        // Superseded the plugin's original "zero remote-control surface" invariant --
+        // a deliberate, later policy change, not an oversight. Stop/Message now exist,
+        // but only for admins, only via Jellyfin's own native Session API (never a custom
+        // mutation), and Stop always confirms first since it's disruptive to a real session.
+        const dashboardJsPath = path.resolve(__dirname, '../Web/dashboard.js');
+        const dashboardSource = fs.readFileSync(dashboardJsPath, 'utf8');
+
+        function createMockDashboard(confirmReturns = true) {
+            const mockModule = { exports: {} };
+            const calls = { sendPlayStateCommand: [], sendMessageCommand: [] };
+            const fakeApiClient = {
+                sendPlayStateCommand: (...args) => { calls.sendPlayStateCommand.push(args); return Promise.resolve(); },
+                sendMessageCommand: (...args) => { calls.sendMessageCommand.push(args); return Promise.resolve(); }
+            };
+            const mockWindow = {
+                location: { hash: '#/dashboard', pathname: '/dashboard' },
+                ApiClient: fakeApiClient,
+                confirm: () => confirmReturns,
+                prompt: () => 'Hello from admin'
+            };
+            const runner = new Function('module', 'exports', 'window', 'globalThis', dashboardSource);
+            runner(mockModule, mockModule.exports, mockWindow, mockWindow);
+            return { controller: mockModule.exports, calls };
+        }
+
+        it('renders Stop and Message buttons for an admin, scoped to that session id', () => {
+            const { controller: dash } = createMockDashboard();
+            const session = { Id: 'sess-1', NowPlayingItem: { Name: 'Movie' } };
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(html.includes('data-action="stop-session"'));
+            assert.ok(html.includes('data-action="send-message"'));
+            assert.ok(html.includes('data-session-id="sess-1"'));
+        });
+
+        it('hides Stop/Message entirely for a non-admin (My Playback self-view)', () => {
+            const { controller: dash } = createMockDashboard();
+            dash.state.isNonAdmin = true;
+            const session = { Id: 'sess-1', NowPlayingItem: { Name: 'Movie' } };
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(!html.includes('data-action="stop-session"'));
+            assert.ok(!html.includes('data-action="send-message"'));
+        });
+
+        it('only calls the Session API through the shared ApiClient -- never a custom mutation endpoint', () => {
+            assert.ok(dashboardSource.includes('sendPlayStateCommand'));
+            assert.ok(dashboardSource.includes('sendMessageCommand'));
+            assert.ok(!dashboardSource.includes('PlaybackCard/Self/Sessions/Stop'));
+            assert.ok(!dashboardSource.includes('terminateSession'));
+        });
+
+        it('playbackcard.html carries the same admin-gated Stop/Message wiring', () => {
+            assert.ok(htmlContent.includes('currentUserIsAdmin'), 'Gated by the standalone page\'s own admin flag');
+            assert.ok(htmlContent.includes('data-action="stop-session"'));
+            assert.ok(htmlContent.includes('data-action="send-message"'));
+            assert.ok(htmlContent.includes('sendPlayStateCommand') && htmlContent.includes('sendMessageCommand'));
+        });
+
+        it('Stop is gated behind the custom confirm modal (not a bare click-to-fire), flagged as a destructive action', () => {
+            const clickHandlerStart = dashboardSource.indexOf('attachContainerEvents');
+            const stopHandlerStart = dashboardSource.indexOf("data-action=\"stop-session\"", clickHandlerStart);
+            const modalCallIdx = dashboardSource.indexOf('showActionModal(', stopHandlerStart);
+            const dangerIdx = dashboardSource.indexOf("confirmVariant: 'danger'", stopHandlerStart);
+            const apiCallIdx = dashboardSource.indexOf('sendPlayStateCommand(', stopHandlerStart);
+            assert.ok(modalCallIdx > -1 && apiCallIdx > -1, 'Both the modal call and the API call must exist in the Stop handler');
+            assert.ok(modalCallIdx < apiCallIdx, 'The modal must be shown before sendPlayStateCommand is ever called (API call lives inside onConfirm)');
+            assert.ok(dangerIdx > -1 && dangerIdx < apiCallIdx, 'Stop must be flagged as the destructive ("danger") modal variant');
+        });
+
+        it('the custom modal replaces native confirm()/prompt() -- no bare OS dialogs for these actions', () => {
+            assert.ok(dashboardSource.includes('function showActionModal'));
+            assert.ok(dashboardSource.includes('pi-modal-scrim'));
+            assert.ok(!/[^.\w]window\.confirm\(|[^.\w]global\.confirm\(/.test(dashboardSource));
+            assert.ok(!/[^.\w]window\.prompt\(|[^.\w]global\.prompt\(/.test(dashboardSource));
         });
     });
 

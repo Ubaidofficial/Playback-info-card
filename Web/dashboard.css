@@ -281,20 +281,31 @@
    lit sheet of glass rather than a flat tinted rectangle. */
 .playback-card {
     position: relative;
+    display: flex;
+    align-items: stretch;
     border-radius: 14px;
     background: linear-gradient(155deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(13, 17, 23, 0.78) 100%), #0d1117;
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1.5px solid var(--status-ring, rgba(255, 255, 255, 0.14));
     box-shadow:
         0 8px 24px -4px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.2),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.3);
+        inset 0 1.5px 0 0 rgba(255, 255, 255, 0.24),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.3),
+        0 0 0 1px var(--status-glow, transparent);
     overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     box-sizing: border-box;
     isolation: isolate;
 }
+
+/* Status ring: the whole card's border/glow is tinted by its real playback method,
+   so scanning a grid of cards reads status at a glance -- same signal as the badges,
+   just also visible from across the room. */
+.playback-card[data-playback-method="DirectPlay"] { --status-ring: rgba(74, 222, 128, 0.45); --status-glow: rgba(74, 222, 128, 0.16); }
+.playback-card[data-playback-method="DirectStream"] { --status-ring: rgba(56, 189, 248, 0.45); --status-glow: rgba(56, 189, 248, 0.16); }
+.playback-card[data-playback-method="Remux"] { --status-ring: rgba(192, 132, 252, 0.5); --status-glow: rgba(192, 132, 252, 0.18); }
+.playback-card[data-playback-method="Transcode"] { --status-ring: rgba(248, 113, 113, 0.5); --status-glow: rgba(248, 113, 113, 0.18); }
 
 .playback-card::before {
     content: '';
@@ -324,30 +335,49 @@
     inset: 0;
     background-size: cover;
     background-position: center 30%;
-    opacity: 0.14;
-    filter: blur(16px);
+    opacity: 0.4;
+    filter: blur(22px) saturate(150%);
     pointer-events: none;
-    transform: scale(1.1);
+    transform: scale(1.15);
     transition: opacity 0.3s ease;
+}
+
+.playback-card-backdrop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, rgba(13, 17, 23, 0.7) 0%, rgba(13, 17, 23, 0.35) 45%, rgba(13, 17, 23, 0.75) 100%);
 }
 
 .playback-card-inner {
     position: relative;
     z-index: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 0.9rem;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    height: 100%;
     box-sizing: border-box;
 }
 
-/* Card Header */
+.playback-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+/* Card Header. Now confined to the content column beside a flush full-height poster
+   (not the full card width), so at typical grid widths there isn't always room for
+   both the user identity and the non-shrinking status badges on one line -- wrap
+   instead of forcing the identity column down to a near-zero, one-letter-per-line width. */
 .playback-card-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem 0.75rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     padding-bottom: 0.6rem;
 }
@@ -357,7 +387,7 @@
     align-items: center;
     gap: 0.55rem;
     min-width: 0;
-    flex: 1 1 auto;
+    flex: 1 1 150px;
 }
 
 .playback-platform-icon {
@@ -479,14 +509,17 @@
     fill: currentColor;
 }
 
-/* Accessible Info Button */
-.playback-btn-info {
+/* Accessible Info Button. Icon-only (aria-label carries the name) so it sits as one
+   consistent visual group with the Message/Stop action buttons next to it, instead of
+   being the only one of the three with a visible text label. */
+.playback-btn-info,
+.playback-btn-action {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.5rem;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(8px) saturate(160%);
@@ -495,6 +528,7 @@
     color: #cbd5e1;
     cursor: pointer;
     transition: all 0.15s ease;
+    flex-shrink: 0;
 }
 
 .playback-btn-info:hover {
@@ -508,42 +542,41 @@
     color: #38bdf8;
 }
 
-/* Card Main Area */
-.playback-card-main {
-    display: flex;
-    gap: 0.85rem;
-    align-items: flex-start;
-    min-width: 0;
+.playback-btn-action.btn-message:hover {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
 }
 
+/* Stop carries a faint red tint at rest, not just on hover -- an admin scanning a grid
+   of cards should see at a glance which icon is destructive before the pointer is even
+   near it, not discover it only on hover. */
+.playback-btn-action.btn-stop {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+}
+
+.playback-btn-action.btn-stop:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #f87171;
+}
+
+/* Poster: bleeds flush to the card's own edge and spans the card's full height,
+   Tautulli-style, instead of floating inset with its own shadow. Sits as a direct
+   flex child of .playback-card, to the left of .playback-card-inner. */
 .playback-poster-wrap {
-    width: 54px;
-    height: 81px;
-    border-radius: 6px;
+    position: relative;
+    z-index: 1;
+    flex: 0 0 108px;
+    align-self: stretch;
     overflow: hidden;
     background: linear-gradient(145deg, #1e293b, #0f172a);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Layered "cinema poster" depth: a tight contact shadow, a soft ambient falloff,
-       and an inner highlight along the top edge to suggest a lit, physical print. */
-    box-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.5),
-        0 8px 16px -4px rgba(0, 0, 0, 0.55),
-        0 16px 32px -8px rgba(0, 0, 0, 0.4),
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.playback-card:hover .playback-poster-wrap {
-    transform: translateY(-2px);
-    box-shadow:
-        0 2px 3px rgba(0, 0, 0, 0.55),
-        0 12px 22px -4px rgba(0, 0, 0, 0.6),
-        0 22px 40px -10px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
 }
 
 .playback-poster {
@@ -827,9 +860,18 @@
         padding: 0.75rem;
     }
 
+    /* Poster flips from flush-left/full-height to flush-top/full-width -- there's no
+       room for a side-by-side flush poster at phone width. */
+    .playback-card {
+        flex-direction: column;
+    }
+
     .playback-poster-wrap {
-        width: 48px;
-        height: 72px;
+        flex: 0 0 auto;
+        width: 100%;
+        height: 190px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 }
 
@@ -1012,4 +1054,126 @@
     background: rgba(148, 163, 184, 0.08);
     border: 1px solid rgba(148, 163, 184, 0.15);
     color: #94a3b8;
+}
+
+/* Small brand tag next to the "NOW PLAYING" heading -- the only place in the live UI
+   that names the plugin (the rename otherwise only shows in Jellyfin's plugin list and
+   catalog listing). */
+.playback-brand-badge {
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(255, 145, 66, 0.14);
+    border: 1px solid rgba(255, 145, 66, 0.35);
+    color: #ffb27a;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+/* Custom confirm/prompt modal, replacing native confirm()/prompt() dialogs for the
+   Stop/Message actions so they match the rest of the "liquid glass" aesthetic instead
+   of popping a bare OS dialog box. */
+.pi-modal-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 10, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.pi-modal {
+    width: 100%;
+    max-width: 340px;
+    border-radius: 16px;
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(13, 17, 23, 0.92) 100%), #11161d;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+        inset 0 1.5px 0 0 rgba(255, 255, 255, 0.2),
+        0 20px 50px -10px rgba(0, 0, 0, 0.6);
+    padding: 18px;
+    box-sizing: border-box;
+}
+
+.pi-modal-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 0.4rem;
+}
+
+.pi-modal-body {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin-bottom: 0.85rem;
+}
+
+.pi-modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.85rem;
+    color: #f1f5f9;
+    margin-bottom: 0.9rem;
+    font-family: inherit;
+}
+
+.pi-modal-input:focus {
+    outline: none;
+    border-color: rgba(255, 145, 66, 0.6);
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.pi-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.pi-modal-btn {
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pi-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.pi-modal-btn.pi-modal-confirm {
+    background: rgba(255, 145, 66, 0.18);
+    border-color: rgba(255, 145, 66, 0.5);
+    color: #ffb27a;
+}
+
+.pi-modal-btn.pi-modal-confirm:hover {
+    background: rgba(255, 145, 66, 0.28);
+}
+
+.pi-modal-btn.pi-modal-confirm.danger {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.55);
+    color: #fca5a5;
+}
+
+.pi-modal-btn.pi-modal-confirm.danger:hover {
+    background: rgba(239, 68, 68, 0.32);
 }

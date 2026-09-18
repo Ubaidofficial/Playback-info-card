@@ -507,7 +507,7 @@
         finamp: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1DB5A6"/><path d="M14 6v8.2a2.6 2.6 0 1 1-1.5-2.4V9l-3 .7v6.2A2.6 2.6 0 1 1 8 13.5V8.5l6-1.4z" fill="#fff"/></svg>',
         findroid: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#0F9D58"/><polygon points="9,7.5 17,12 9,16.5" fill="#fff"/></svg>',
         streamyfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#8B5CF6"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/><circle cx="12" cy="12" r="10" fill="none" stroke="#EC4899" stroke-width="1"/></svg>',
-        moonfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#312E81"/><path d="M14.5 6.5A6 6 0 1 0 14.5 17.5 7 7 0 1 1 14.5 6.5z" fill="#C7D2FE"/></svg>',
+        moonfin: '<svg viewBox="0 0 24 24" width="20" height="20"><defs><linearGradient id="moonfinBrandGrad" x1="15%" y1="10%" x2="85%" y2="90%"><stop offset="10%" stop-color="#AA5CC3"/><stop offset="40%" stop-color="#7672CB"/><stop offset="65%" stop-color="#3A8CD4"/><stop offset="90%" stop-color="#00A4DC"/></linearGradient></defs><path d="M15.1 3.6c-3.6 1-6 4.7-5 8.4.4 2.2 1.7 3.7 4.1 3 2.7-.8 3.1-3.1 4.6-5a10 10 0 0 1 2.2-2.1c.1.6-.2 1.1-.4 1.7-.5 2-.7 5 2.1 5.1l-.3 1.2a6 6 0 0 0-1.6-.5 8 8 0 0 0-3.1.2c-2.5.5-4.6 2.2-7.2 2.8-2 .4-5.3.2-6.1-2a8 8 0 0 1 1.1-8.4c1.8-2.4 5.7-4.9 9.6-4.4z" fill="url(#moonfinBrandGrad)"/></svg>',
         infuse: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1173D4"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/></svg>',
         kodi: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#17B2E7"/><path d="M8 7v10M8 12l5-5v5l-5 5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         fladder: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#F97316"/><path d="M9 7h6v2.2H11v2.3h3.4V13.5H11V17H9V7z" fill="#fff"/></svg>',
@@ -1186,8 +1186,25 @@
                 showDetailsGridHtml +
             '</div>';
 
-            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle full technical stream details">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" aria-label="Toggle full technical stream details" title="Toggle full technical stream details">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>';
+
+            // Admin-only session controls (Stop / Message). A deliberate, later addition to
+            // the project's original read-only-observation scope -- both call Jellyfin's own
+            // native Session API (Sessions/{id}/Playing/Stop, Sessions/{id}/Message) via the
+            // shared ApiClient, exactly as Jellyfin-web's own remote-control features do.
+            // Hidden entirely for non-admins (My Playback self-view).
+            var sessionActionsHtml = '';
+            if (!state.isNonAdmin && session.Id) {
+                var sidAttr = escapeHtml(session.Id);
+                sessionActionsHtml =
+                    '<button type="button" class="playback-btn-action btn-message" data-action="send-message" data-session-id="' + sidAttr + '" aria-label="Send a message to this session" title="Send a message to this session">' +
+                        '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' +
+                    '</button>' +
+                    '<button type="button" class="playback-btn-action btn-stop" data-action="stop-session" data-session-id="' + sidAttr + '" aria-label="Stop this session&#39;s playback" title="Stop this session&#39;s playback">' +
+                        '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>' +
+                    '</button>';
+            }
 
             // Artwork
             var apiClient = getApiClient();
@@ -1210,23 +1227,24 @@
 
             return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-card="true" data-playback-method="' + escapeHtml(classification.method) + '">' +
                 '<div class="playback-card-backdrop" data-artwork-role="backdrop"' + backdropStyle + '></div>' +
+                '<div class="playback-poster-wrap">' + posterHtml + '</div>' +
                 '<div class="playback-card-inner">' +
-                    '<div class="playback-card-header">' +
-                        '<div class="playback-card-user-group">' +
-                            '<span class="playback-platform-icon" data-client-brand="' + escapeHtml(clientBrand.key) + '" title="' + client + '">' + platformIconSvg + '</span>' +
-                            '<div class="playback-card-user-info">' +
-                                '<div class="playback-card-user">' + userAvatarHtml + user + '</div>' +
-                                '<div class="playback-card-client">' + clientDevice + '</div>' +
+                    '<div class="playback-card-main">' +
+                        '<div class="playback-card-header">' +
+                            '<div class="playback-card-user-group">' +
+                                '<span class="playback-platform-icon" data-client-brand="' + escapeHtml(clientBrand.key) + '" title="' + client + '">' + platformIconSvg + '</span>' +
+                                '<div class="playback-card-user-info">' +
+                                    '<div class="playback-card-user">' + userAvatarHtml + user + '</div>' +
+                                    '<div class="playback-card-client">' + clientDevice + '</div>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="playback-badge-group">' +
+                                '<span class="playback-badge state-badge ' + stateBadgeCls + '">' + stateIcon + ' ' + escapeHtml(stateLabel) + '</span>' +
+                                '<span class="playback-badge ' + methodBadgeCls + '">' + escapeHtml(methodLabel) + '</span>' +
+                                sessionActionsHtml +
+                                infoBtnHtml +
                             '</div>' +
                         '</div>' +
-                        '<div class="playback-badge-group">' +
-                            '<span class="playback-badge state-badge ' + stateBadgeCls + '">' + stateIcon + ' ' + escapeHtml(stateLabel) + '</span>' +
-                            '<span class="playback-badge ' + methodBadgeCls + '">' + escapeHtml(methodLabel) + '</span>' +
-                            infoBtnHtml +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="playback-card-main">' +
-                        '<div class="playback-poster-wrap">' + posterHtml + '</div>' +
                         '<div class="playback-card-body">' +
                             '<div class="playback-card-title">' + title + '</div>' +
                             (subtitle ? '<div class="playback-card-subtitle">' + subtitle + '</div>' : '') +
@@ -1605,6 +1623,7 @@
                 '<h2 class="playback-dashboard-title">' +
                     '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>' +
                     'NOW PLAYING' +
+                    '<span class="playback-brand-badge">PlayInfo</span>' +
                 '</h2>' +
                 '<div class="playback-live-indicator"><span class="playback-live-dot"></span> Live</div>' +
                 '<div class="playback-dashboard-counts">' +
@@ -1660,6 +1679,57 @@
         container.innerHTML = headerHtml + summaryStripHtml + contentHtml + connectedDevicesHtml;
     }
 
+    /**
+     * Lightweight confirm/prompt modal matching the card's own "liquid glass" styling,
+     * used by the Stop/Message session actions instead of native confirm()/prompt() --
+     * those work, but a bare OS dialog box next to an otherwise fully custom-styled
+     * widget reads as an unfinished seam. Not a general-purpose dialog system; just
+     * enough for these two actions (an optional text input, Cancel, and one action button
+     * that can be flagged as "danger" for the destructive Stop case).
+     */
+    function showActionModal(opts) {
+        if (typeof document === 'undefined') return;
+        var scrim = document.createElement('div');
+        scrim.className = 'pi-modal-scrim';
+        var modal = document.createElement('div');
+        modal.className = 'pi-modal';
+        modal.innerHTML =
+            '<div class="pi-modal-title">' + escapeHtml(opts.title || '') + '</div>' +
+            '<div class="pi-modal-body">' + escapeHtml(opts.message || '') + '</div>' +
+            (opts.showInput ? '<input type="text" class="pi-modal-input" placeholder="' + escapeHtml(opts.inputPlaceholder || '') + '" />' : '') +
+            '<div class="pi-modal-actions">' +
+                '<button type="button" class="pi-modal-btn pi-modal-cancel">Cancel</button>' +
+                '<button type="button" class="pi-modal-btn pi-modal-confirm' + (opts.confirmVariant === 'danger' ? ' danger' : '') + '">' + escapeHtml(opts.confirmLabel || 'Confirm') + '</button>' +
+            '</div>';
+        scrim.appendChild(modal);
+        document.body.appendChild(scrim);
+
+        var input = modal.querySelector('.pi-modal-input');
+        var confirmBtn = modal.querySelector('.pi-modal-confirm');
+        var cancelBtn = modal.querySelector('.pi-modal-cancel');
+
+        function close() {
+            document.removeEventListener('keydown', onKeydown);
+            if (scrim.parentNode) scrim.parentNode.removeChild(scrim);
+        }
+        function confirmAction() {
+            var value = input ? input.value : true;
+            close();
+            if (typeof opts.onConfirm === 'function') opts.onConfirm(value);
+        }
+        function onKeydown(e) {
+            if (e.key === 'Escape') { close(); return; }
+            if (e.key === 'Enter' && document.activeElement !== cancelBtn) confirmAction();
+        }
+
+        cancelBtn.addEventListener('click', close);
+        confirmBtn.addEventListener('click', confirmAction);
+        scrim.addEventListener('click', function (e) { if (e.target === scrim) close(); });
+        document.addEventListener('keydown', onKeydown);
+
+        if (input) input.focus(); else confirmBtn.focus();
+    }
+
     function attachContainerEvents(container) {
         if (!container) return;
         if (typeof container.getAttribute === 'function' && container.getAttribute('data-events-attached') === 'true') return;
@@ -1703,6 +1773,58 @@
                         state.openInfoSessionIds[sessionId] = true;
                     }
                     renderDashboardContainer(container, state.activeSessions, state.allSessions);
+                }
+                return;
+            }
+
+            // Stop this session's playback -- confirm first, since it's disruptive to a
+            // real person's stream. Uses Jellyfin's own Sessions/{id}/Playing/Stop endpoint
+            // via the shared ApiClient, exactly as Jellyfin-web's own session controls do.
+            var stopBtn = target.closest('[data-action="stop-session"]');
+            if (stopBtn) {
+                var stopSessionId = stopBtn.getAttribute('data-session-id');
+                if (stopSessionId) {
+                    showActionModal({
+                        title: 'Stop Playback',
+                        message: 'Stop playback for this session? Their stream will end immediately.',
+                        confirmLabel: 'Stop Playback',
+                        confirmVariant: 'danger',
+                        onConfirm: function () {
+                            var stopApiClient = getApiClient();
+                            if (stopApiClient && typeof stopApiClient.sendPlayStateCommand === 'function') {
+                                stopApiClient.sendPlayStateCommand(stopSessionId, 'Stop').catch(function (err) {
+                                    console.error('[PlaybackCard] Failed to stop session:', err);
+                                });
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Send an on-screen message to this session's client, via Jellyfin's own
+            // Sessions/{id}/Message endpoint.
+            var messageBtn = target.closest('[data-action="send-message"]');
+            if (messageBtn) {
+                var messageSessionId = messageBtn.getAttribute('data-session-id');
+                if (messageSessionId) {
+                    showActionModal({
+                        title: 'Send Message',
+                        message: 'Send an on-screen message to this session.',
+                        showInput: true,
+                        inputPlaceholder: 'Message text…',
+                        confirmLabel: 'Send',
+                        onConfirm: function (value) {
+                            var text = (value || '').trim();
+                            if (!text) return;
+                            var messageApiClient = getApiClient();
+                            if (messageApiClient && typeof messageApiClient.sendMessageCommand === 'function') {
+                                messageApiClient.sendMessageCommand(messageSessionId, { Header: 'Message from Server', Text: text }).catch(function (err) {
+                                    console.error('[PlaybackCard] Failed to send message:', err);
+                                });
+                            }
+                        }
+                    });
                 }
                 return;
             }
@@ -1897,6 +2019,7 @@
         resolveUserAvatarUrl: resolveUserAvatarUrl,
         buildTelemetryModel: buildTelemetryModel,
         buildInlineDetailGridHtml: buildInlineDetailGridHtml,
+        showActionModal: showActionModal,
         startPolling: startPolling,
         stopPolling: stopPolling,
         pollSessions: pollSessions,

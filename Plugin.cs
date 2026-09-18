@@ -38,7 +38,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// <summary>
     /// Gets the plugin name.
     /// </summary>
-    public override string Name => "Playback Info Card";
+    public override string Name => "PlayInfo";
 
     /// <summary>
     /// Gets the unique plugin identifier.
@@ -66,7 +66,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             new PluginPageInfo
             {
                 Name = "playbackcard",
-                DisplayName = "Playback Monitor",
+                DisplayName = "PlayInfo",
                 EmbeddedResourcePath = string.Format(
                     CultureInfo.InvariantCulture,
                     "{0}.Web.playbackcard.html",

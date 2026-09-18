@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Playback Monitor</title>
+    <title>PlayInfo</title>
 </head>
 <body>
     <div data-role="page" class="page type-interior pluginConfigurationPage playbackMonitorPage" data-require="emby-button">
@@ -12,7 +12,7 @@
                 <div class="playbackMonitorHeader">
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
-                            <h2 class="sectionTitle playbackMonitorTitle">Playback Monitor</h2>
+                            <h2 class="sectionTitle playbackMonitorTitle">PlayInfo</h2>
                             <span class="playbackMonitorVersionBadge">v0.2.5.4</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
@@ -522,19 +522,25 @@
     background: linear-gradient(155deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 45%, rgba(20, 26, 36, 0.82) 100%), #141a24;
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1.5px solid var(--status-ring, rgba(255, 255, 255, 0.12));
     border-radius: 14px;
     overflow: hidden;
     display: flex;
-    flex-direction: column;
+    align-items: stretch;
     box-shadow:
         0 8px 24px -4px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.28);
+        inset 0 1.5px 0 0 rgba(255, 255, 255, 0.2),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.28),
+        0 0 0 1px var(--status-glow, transparent);
     min-width: 0;
     transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
     isolation: isolate;
 }
+
+.playbackMonitorPage .playback-card[data-playback-method="DirectPlay"] { --status-ring: rgba(74, 222, 128, 0.45); --status-glow: rgba(74, 222, 128, 0.16); }
+.playbackMonitorPage .playback-card[data-playback-method="DirectStream"] { --status-ring: rgba(56, 189, 248, 0.45); --status-glow: rgba(56, 189, 248, 0.16); }
+.playbackMonitorPage .playback-card[data-playback-method="Remux"] { --status-ring: rgba(192, 132, 252, 0.5); --status-glow: rgba(192, 132, 252, 0.18); }
+.playbackMonitorPage .playback-card[data-playback-method="Transcode"] { --status-ring: rgba(248, 113, 113, 0.5); --status-glow: rgba(248, 113, 113, 0.18); }
 
 .playbackMonitorPage .playback-card::before {
     content: '';
@@ -564,28 +570,45 @@
     inset: 0;
     background-size: cover;
     background-position: center;
-    opacity: 0.12;
-    filter: blur(24px);
+    opacity: 0.4;
+    filter: blur(24px) saturate(150%);
     pointer-events: none;
+    transform: scale(1.15);
     z-index: 0;
+}
+
+.playbackMonitorPage .playback-card-backdrop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, rgba(20, 26, 36, 0.7) 0%, rgba(20, 26, 36, 0.35) 45%, rgba(20, 26, 36, 0.75) 100%);
 }
 
 .playbackMonitorPage .playback-card-inner {
     position: relative;
     z-index: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     padding: 1rem;
     gap: 0.85rem;
-    height: 100%;
+}
+
+.playbackMonitorPage .playback-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
 }
 
 /* Card Header: User, Client, Platform Icon, State Badge */
 .playbackMonitorPage .playback-card-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75rem;
+    gap: 0.5rem 0.75rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     padding-bottom: 0.65rem;
 }
@@ -595,7 +618,7 @@
     align-items: center;
     gap: 0.55rem;
     min-width: 0;
-    flex: 1 1 auto;
+    flex: 1 1 150px;
 }
 
 .playbackMonitorPage .playback-platform-icon {
@@ -711,22 +734,15 @@
     fill: currentColor;
 }
 
-/* Card Main Area: Poster + Metadata */
-.playbackMonitorPage .playback-card-main {
-    display: flex;
-    gap: 0.85rem;
-    align-items: flex-start;
-    min-width: 0;
-}
-
+/* Poster: bleeds flush to the card's own edge and spans its full height, Tautulli-style. */
 .playbackMonitorPage .playback-poster-wrap {
-    width: 60px;
-    height: 90px;
-    border-radius: 6px;
+    position: relative;
+    z-index: 1;
+    flex: 0 0 108px;
+    align-self: stretch;
     overflow: hidden;
     background: #0f141d;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    flex-shrink: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -894,14 +910,16 @@
     overflow-wrap: anywhere;
 }
 
-/* Accessible Info Toggle Button */
-.playbackMonitorPage .playback-btn-info {
+/* Accessible Info Toggle Button. Icon-only (aria-label carries the name) so it sits as
+   one consistent group with the Message/Stop action buttons next to it. */
+.playbackMonitorPage .playback-btn-info,
+.playbackMonitorPage .playback-btn-action {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.5rem;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.06);
     backdrop-filter: blur(8px) saturate(160%);
@@ -909,7 +927,8 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     color: #cbd5e1;
     cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
 }
 
 /* Summary Strip: prominent "at a glance" glass bar above the grid */
@@ -982,6 +1001,26 @@
     background: rgba(0, 164, 220, 0.2);
     border-color: rgba(0, 164, 220, 0.5);
     color: #38bdf8;
+}
+
+.playbackMonitorPage .playback-btn-action.btn-message:hover {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+}
+
+/* Stop carries a faint red tint at rest, not just on hover -- visible as destructive
+   before the pointer is even near it. */
+.playbackMonitorPage .playback-btn-action.btn-stop {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.22);
+    color: #fca5a5;
+}
+
+.playbackMonitorPage .playback-btn-action.btn-stop:hover {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #f87171;
 }
 
 /* Video & Audio Status Badges */
@@ -1588,6 +1627,19 @@
         grid-template-columns: 1fr;
     }
 
+    /* Poster flips from flush-left/full-height to flush-top/full-width at phone width. */
+    .playbackMonitorPage .playback-card {
+        flex-direction: column;
+    }
+
+    .playbackMonitorPage .playback-poster-wrap {
+        flex: 0 0 auto;
+        width: 100%;
+        height: 190px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
     .playbackMonitorPage .diagnosticsHeader {
         flex-direction: column;
         align-items: flex-start;
@@ -1759,6 +1811,110 @@
     color: #f8fafc;
     word-break: break-word;
 }
+
+/* Custom confirm/prompt modal, replacing native confirm()/prompt() for Stop/Message so
+   they match the rest of the page's own styling instead of a bare OS dialog box. */
+.pi-modal-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 10, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.pi-modal {
+    width: 100%;
+    max-width: 340px;
+    border-radius: 16px;
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 45%, rgba(20, 26, 36, 0.92) 100%), #141a24;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+        0 20px 50px -10px rgba(0, 0, 0, 0.6);
+    padding: 18px;
+    box-sizing: border-box;
+}
+
+.pi-modal-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 0.4rem;
+}
+
+.pi-modal-body {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    line-height: 1.4;
+    margin-bottom: 0.85rem;
+}
+
+.pi-modal-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.85rem;
+    color: #f1f5f9;
+    margin-bottom: 0.9rem;
+    font-family: inherit;
+}
+
+.pi-modal-input:focus {
+    outline: none;
+    border-color: rgba(255, 145, 66, 0.6);
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.pi-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.pi-modal-btn {
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.45rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pi-modal-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.pi-modal-btn.pi-modal-confirm {
+    background: rgba(255, 145, 66, 0.18);
+    border-color: rgba(255, 145, 66, 0.5);
+    color: #ffb27a;
+}
+
+.pi-modal-btn.pi-modal-confirm:hover {
+    background: rgba(255, 145, 66, 0.28);
+}
+
+.pi-modal-btn.pi-modal-confirm.danger {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.55);
+    color: #fca5a5;
+}
+
+.pi-modal-btn.pi-modal-confirm.danger:hover {
+    background: rgba(239, 68, 68, 0.32);
+}
         </style>
 
         <script type="text/javascript">
@@ -1778,6 +1934,7 @@
     var currentGeneration = 0;
     var isDisposed = false;
     var displayMode = 'compact'; // 'compact' or 'extended'
+    var currentUserIsAdmin = false;
 
     // Per-session (not per-card-position) Info panel open state: without this, the panel's
     // open/closed state was derived only from displayMode on every render, so a manually
@@ -1833,6 +1990,54 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
+    }
+
+    /**
+     * Lightweight confirm/prompt modal matching the page's own styling, used by the
+     * Stop/Message session actions instead of native confirm()/prompt(). Not a general
+     * dialog system -- just enough for these two actions.
+     */
+    function showActionModal(opts) {
+        if (typeof document === 'undefined') return;
+        var scrim = document.createElement('div');
+        scrim.className = 'pi-modal-scrim';
+        var modal = document.createElement('div');
+        modal.className = 'pi-modal';
+        modal.innerHTML =
+            '<div class="pi-modal-title">' + escapeHtml(opts.title || '') + '</div>' +
+            '<div class="pi-modal-body">' + escapeHtml(opts.message || '') + '</div>' +
+            (opts.showInput ? '<input type="text" class="pi-modal-input" placeholder="' + escapeHtml(opts.inputPlaceholder || '') + '" />' : '') +
+            '<div class="pi-modal-actions">' +
+                '<button type="button" class="pi-modal-btn pi-modal-cancel">Cancel</button>' +
+                '<button type="button" class="pi-modal-btn pi-modal-confirm' + (opts.confirmVariant === 'danger' ? ' danger' : '') + '">' + escapeHtml(opts.confirmLabel || 'Confirm') + '</button>' +
+            '</div>';
+        scrim.appendChild(modal);
+        document.body.appendChild(scrim);
+
+        var input = modal.querySelector('.pi-modal-input');
+        var confirmBtn = modal.querySelector('.pi-modal-confirm');
+        var cancelBtn = modal.querySelector('.pi-modal-cancel');
+
+        function close() {
+            document.removeEventListener('keydown', onKeydown);
+            if (scrim.parentNode) scrim.parentNode.removeChild(scrim);
+        }
+        function confirmAction() {
+            var value = input ? input.value : true;
+            close();
+            if (typeof opts.onConfirm === 'function') opts.onConfirm(value);
+        }
+        function onKeydown(e) {
+            if (e.key === 'Escape') { close(); return; }
+            if (e.key === 'Enter' && document.activeElement !== cancelBtn) confirmAction();
+        }
+
+        cancelBtn.addEventListener('click', close);
+        confirmBtn.addEventListener('click', confirmAction);
+        scrim.addEventListener('click', function (e) { if (e.target === scrim) close(); });
+        document.addEventListener('keydown', onKeydown);
+
+        if (input) input.focus(); else confirmBtn.focus();
     }
 
     function formatTicks(ticks) {
@@ -1891,7 +2096,7 @@
         finamp: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1DB5A6"/><path d="M14 6v8.2a2.6 2.6 0 1 1-1.5-2.4V9l-3 .7v6.2A2.6 2.6 0 1 1 8 13.5V8.5l6-1.4z" fill="#fff"/></svg>',
         findroid: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#0F9D58"/><polygon points="9,7.5 17,12 9,16.5" fill="#fff"/></svg>',
         streamyfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#8B5CF6"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/><circle cx="12" cy="12" r="10" fill="none" stroke="#EC4899" stroke-width="1"/></svg>',
-        moonfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#312E81"/><path d="M14.5 6.5A6 6 0 1 0 14.5 17.5 7 7 0 1 1 14.5 6.5z" fill="#C7D2FE"/></svg>',
+        moonfin: '<svg viewBox="0 0 24 24" width="20" height="20"><defs><linearGradient id="moonfinBrandGrad" x1="15%" y1="10%" x2="85%" y2="90%"><stop offset="10%" stop-color="#AA5CC3"/><stop offset="40%" stop-color="#7672CB"/><stop offset="65%" stop-color="#3A8CD4"/><stop offset="90%" stop-color="#00A4DC"/></linearGradient></defs><path d="M15.1 3.6c-3.6 1-6 4.7-5 8.4.4 2.2 1.7 3.7 4.1 3 2.7-.8 3.1-3.1 4.6-5a10 10 0 0 1 2.2-2.1c.1.6-.2 1.1-.4 1.7-.5 2-.7 5 2.1 5.1l-.3 1.2a6 6 0 0 0-1.6-.5 8 8 0 0 0-3.1.2c-2.5.5-4.6 2.2-7.2 2.8-2 .4-5.3.2-6.1-2a8 8 0 0 1 1.1-8.4c1.8-2.4 5.7-4.9 9.6-4.4z" fill="url(#moonfinBrandGrad)"/></svg>',
         infuse: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1173D4"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/></svg>',
         kodi: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#17B2E7"/><path d="M8 7v10M8 12l5-5v5l-5 5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
         fladder: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#F97316"/><path d="M9 7h6v2.2H11v2.3h3.4V13.5H11V17H9V7z" fill="#fff"/></svg>',
@@ -2784,8 +2989,22 @@
             // panel survives the next poll's full grid rebuild instead of silently closing.
             cardSessionMap[cardDomId] = session.Id || null;
             var isPanelOpen = (displayMode === 'extended') || Boolean(session.Id && openInfoSessionIds[session.Id]);
-            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isPanelOpen ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" title="Toggle stream details">' +
-                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Info</button>';
+            var infoBtnHtml = '<button type="button" class="playback-btn-info" data-action="toggle-info" aria-expanded="' + (isPanelOpen ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" aria-label="Toggle stream details" title="Toggle stream details">' +
+                '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></button>';
+
+            // Admin-only session controls (Stop / Message), hidden entirely for a non-admin's
+            // own self-view. Both call Jellyfin's native Session API via the shared ApiClient.
+            var sessionActionsHtml = '';
+            if (currentUserIsAdmin && session.Id) {
+                var sidAttr = escapeHtml(session.Id);
+                sessionActionsHtml =
+                    '<button type="button" class="playback-btn-action btn-message" data-action="send-message" data-session-id="' + sidAttr + '" aria-label="Send a message to this session" title="Send a message to this session">' +
+                        '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' +
+                    '</button>' +
+                    '<button type="button" class="playback-btn-action btn-stop" data-action="stop-session" data-session-id="' + sidAttr + '" aria-label="Stop this session&#39;s playback" title="Stop this session&#39;s playback">' +
+                        '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>' +
+                    '</button>';
+            }
 
             var detailsPanelHtml = '<div id="' + detailsDomId + '" class="playback-details-panel' + (isPanelOpen ? ' open' : '') + '" role="region" aria-label="Stream Details">' +
                 '<div class="playback-drawer-header">' +
@@ -2825,24 +3044,25 @@
                 posterHtml = '<div class="playback-poster-fallback" aria-label="No artwork"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20" stroke="currentColor"/></svg></div>';
             }
 
-            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '">' +
+            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-method="' + escapeHtml(classification.method) + '">' +
                 '<div class="playback-card-backdrop"' + backdropStyle + '></div>' +
+                '<div class="playback-poster-wrap">' + posterHtml + '</div>' +
                 '<div class="playback-card-inner">' +
-                    '<div class="playback-card-header">' +
-                        '<div class="playback-card-user-group">' +
-                            '<span class="playback-platform-icon" title="' + client + '">' + platformIconSvg + '</span>' +
-                            '<div class="playback-card-user-info">' +
-                                '<div class="playback-card-user">' + userAvatarHtml + user + '</div>' +
-                                '<div class="playback-card-client">' + clientDevice + '</div>' +
+                    '<div class="playback-card-main">' +
+                        '<div class="playback-card-header">' +
+                            '<div class="playback-card-user-group">' +
+                                '<span class="playback-platform-icon" title="' + client + '">' + platformIconSvg + '</span>' +
+                                '<div class="playback-card-user-info">' +
+                                    '<div class="playback-card-user">' + userAvatarHtml + user + '</div>' +
+                                    '<div class="playback-card-client">' + clientDevice + '</div>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="playback-badge-group">' +
+                                '<span class="playback-badge ' + badgeClass + '">' + stateIcon + ' ' + badgeText + '</span>' +
+                                sessionActionsHtml +
+                                infoBtnHtml +
                             '</div>' +
                         '</div>' +
-                        '<div class="playback-badge-group">' +
-                            '<span class="playback-badge ' + badgeClass + '">' + stateIcon + ' ' + badgeText + '</span>' +
-                            infoBtnHtml +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="playback-card-main">' +
-                        '<div class="playback-poster-wrap">' + posterHtml + '</div>' +
                         '<div class="playback-card-body">' +
                             '<div class="playback-card-title">' + title + '</div>' +
                             (subtitle ? '<div class="playback-card-subtitle">' + subtitle + '</div>' : '') +
@@ -3819,6 +4039,55 @@
                     }
                 }
             });
+
+            // Admin-only session controls: Stop / Message, via Jellyfin's own Session API.
+            gridEl.addEventListener('click', function (e) {
+                var stopBtn = e.target && e.target.closest ? e.target.closest('[data-action="stop-session"]') : null;
+                if (stopBtn) {
+                    var stopSessionId = stopBtn.getAttribute('data-session-id');
+                    if (stopSessionId) {
+                        showActionModal({
+                            title: 'Stop Playback',
+                            message: 'Stop playback for this session? Their stream will end immediately.',
+                            confirmLabel: 'Stop Playback',
+                            confirmVariant: 'danger',
+                            onConfirm: function () {
+                                var stopApiClient = getApiClient();
+                                if (stopApiClient && typeof stopApiClient.sendPlayStateCommand === 'function') {
+                                    stopApiClient.sendPlayStateCommand(stopSessionId, 'Stop').catch(function (err) {
+                                        console.error('[PlaybackCard] Failed to stop session:', err);
+                                    });
+                                }
+                            }
+                        });
+                    }
+                    return;
+                }
+
+                var messageBtn = e.target && e.target.closest ? e.target.closest('[data-action="send-message"]') : null;
+                if (messageBtn) {
+                    var messageSessionId = messageBtn.getAttribute('data-session-id');
+                    if (messageSessionId) {
+                        showActionModal({
+                            title: 'Send Message',
+                            message: 'Send an on-screen message to this session.',
+                            showInput: true,
+                            inputPlaceholder: 'Message text…',
+                            confirmLabel: 'Send',
+                            onConfirm: function (value) {
+                                var text = (value || '').trim();
+                                if (!text) return;
+                                var messageApiClient = getApiClient();
+                                if (messageApiClient && typeof messageApiClient.sendMessageCommand === 'function') {
+                                    messageApiClient.sendMessageCommand(messageSessionId, { Header: 'Message from Server', Text: text }).catch(function (err) {
+                                        console.error('[PlaybackCard] Failed to send message:', err);
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+            });
         }
     }
 
@@ -3848,6 +4117,7 @@
                 return;
             }
 
+            currentUserIsAdmin = Boolean(isAdmin);
             applyRoleView(page, isAdmin);
 
             if (isAdmin) {
@@ -3967,6 +4237,7 @@
         formatEta: formatEta,
         resolveUserAvatarUrl: resolveUserAvatarUrl,
         renderSessionCard: renderSessionCard,
+        showActionModal: showActionModal,
         buildSummaryStripHtml: buildSummaryStripHtml,
         prepareRenderPass: prepareRenderPass,
         openInfoSessionIds: openInfoSessionIds,

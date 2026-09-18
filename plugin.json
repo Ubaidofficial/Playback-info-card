@@ -1,6 +1,6 @@
 {
   "guid": "b7e6f831-2794-4d82-8419-7c48ef2e2a39",
-  "name": "Playback Info Card",
+  "name": "PlayInfo",
   "version": "0.2.5.4",
   "description": "Admin playback session monitor displaying active streams, play state, and real-time transcode telemetry.",
   "overview": "Admin playback session monitor displaying active streams, play state, and real-time transcode telemetry.",
