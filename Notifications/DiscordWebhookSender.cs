@@ -232,7 +232,14 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
         SenderTag = "DiscordSender",
         ApiDisplayName = "Discord Webhook",
         ReadSuccessBody = false,
-        ParseSuccess = (_, status, _) => DeliveryResult.Ok(status),
+        ParseSuccess = (logger, status, _) =>
+        {
+            // Previously silent on success, leaving no log trace to diagnose a report of
+            // "message delivered but UI still says failed" -- see the identical fix on the
+            // Telegram sender.
+            logger.LogInformation("[DiscordSender] Delivery succeeded (HTTP {Status})", status);
+            return DeliveryResult.Ok(status);
+        },
         ParseRetryAfter = (response, body) => ParseRetryAfter(response, body),
         ReadClientErrorBody = false,
         DescribeClientError = (status, _) => status switch

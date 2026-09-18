@@ -215,6 +215,10 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             using var doc = JsonDocument.Parse(responseBody ?? string.Empty);
             if (doc.RootElement.TryGetProperty("ok", out var okProp) && okProp.GetBoolean())
             {
+                // Success was previously silent, leaving zero log trace to diagnose a report
+                // of "message delivered but UI still says failed". Logging it here means the
+                // next such report has real evidence instead of nothing.
+                logger.LogInformation("[TelegramSender] Delivery succeeded (HTTP {Status})", status);
                 return DeliveryResult.Ok(status);
             }
 

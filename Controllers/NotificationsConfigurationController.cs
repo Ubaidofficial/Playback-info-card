@@ -5,6 +5,8 @@ using Jellyfin.Plugin.PlaybackCard.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.PlaybackCard.Controllers;
 
@@ -22,22 +24,33 @@ public class NotificationsConfigurationController : ControllerBase
     private readonly INotificationDeliveryService _deliveryService;
     private readonly INotificationSecretStore _secretStore;
     private readonly PluginConfiguration? _testConfig;
+    private readonly ILogger _logger;
 
     public NotificationsConfigurationController(
         INotificationDeliveryService deliveryService,
         INotificationSecretStore secretStore)
-        : this(deliveryService, secretStore, null)
+        : this(deliveryService, secretStore, null, null)
+    {
+    }
+
+    public NotificationsConfigurationController(
+        INotificationDeliveryService deliveryService,
+        INotificationSecretStore secretStore,
+        ILogger<NotificationsConfigurationController> logger)
+        : this(deliveryService, secretStore, null, logger)
     {
     }
 
     internal NotificationsConfigurationController(
         INotificationDeliveryService deliveryService,
         INotificationSecretStore secretStore,
-        PluginConfiguration? testConfig)
+        PluginConfiguration? testConfig,
+        ILogger? logger = null)
     {
         _deliveryService = deliveryService;
         _secretStore = secretStore;
         _testConfig = testConfig;
+        _logger = logger ?? NullLogger.Instance;
     }
 
     private bool IsAdministrator()
@@ -96,49 +109,10 @@ public class NotificationsConfigurationController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, new { error = "PluginNotLoaded" });
         }
 
-        // 1. Handle Discord Webhook Credential (Omitted, Masked, New, or Clear)
-        if (request.ClearDiscordWebhook == true || string.Equals(request.DiscordWebhookUrl, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
-        {
-            _secretStore.ClearDiscordWebhookUrl();
-        }
-        else if (!string.IsNullOrWhiteSpace(request.DiscordWebhookUrl))
-        {
-            var trimmed = request.DiscordWebhookUrl.Trim();
-            if (!SecretRedactor.IsMasked(trimmed))
-            {
-                if (!DiscordWebhookSender.ValidateWebhookUrl(trimmed, out _, out var errCategory))
-                {
-                    return BadRequest(new { error = errCategory, message = "Invalid Discord webhook URL format, scheme, host, or path." });
-                }
-                _secretStore.SetDiscordWebhookUrl(trimmed);
-            }
-        }
-
-        // 2. Handle Telegram Bot Token Credential (Omitted, Masked, New, or Clear)
-        if (request.ClearTelegramBotToken == true || string.Equals(request.TelegramBotToken, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
-        {
-            _secretStore.ClearTelegramBotToken();
-        }
-        else if (!string.IsNullOrWhiteSpace(request.TelegramBotToken))
-        {
-            var trimmedToken = TelegramBotApiSender.NormalizeToken(request.TelegramBotToken);
-            if (!SecretRedactor.IsMasked(trimmedToken))
-            {
-                var targetChatId = request.TelegramChatId ?? config.TelegramChatId;
-                if (!TelegramBotApiSender.ValidateEndpoint(trimmedToken, targetChatId, out _, out var errCategory))
-                {
-                    return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format or endpoint." });
-                }
-                _secretStore.SetTelegramBotToken(trimmedToken);
-            }
-        }
-
-        if (request.TelegramChatId != null)
-        {
-            config.TelegramChatId = request.TelegramChatId.Trim();
-        }
-
-        // 3. Update switches and event preferences (only overwrite when explicitly supplied)
+        // 1. Update switches and event preferences first (only overwrite when explicitly
+        // supplied). These must not be lost just because a credential further down turns
+        // out to be malformed -- a rejected bot token shouldn't silently revert the
+        // enable switch the user just flipped in the same request.
         var notifsEnabled = request.NotificationsEnabled ?? request.Enabled;
         if (notifsEnabled.HasValue)
         {
@@ -186,6 +160,52 @@ public class NotificationsConfigurationController : ControllerBase
             config.SelectedUserIds = new List<string>(request.SelectedUserIds);
         }
 
+        if (request.TelegramChatId != null)
+        {
+            config.TelegramChatId = request.TelegramChatId.Trim();
+        }
+
+        // 2. Handle Discord Webhook Credential (Omitted, Masked, New, or Clear). A
+        // validation failure here saves everything above before returning the error, so
+        // the switches/preferences the user just set are never lost by a bad credential.
+        if (request.ClearDiscordWebhook == true || string.Equals(request.DiscordWebhookUrl, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
+        {
+            _secretStore.ClearDiscordWebhookUrl();
+        }
+        else if (!string.IsNullOrWhiteSpace(request.DiscordWebhookUrl))
+        {
+            var trimmed = request.DiscordWebhookUrl.Trim();
+            if (!SecretRedactor.IsMasked(trimmed))
+            {
+                if (!DiscordWebhookSender.ValidateWebhookUrl(trimmed, out _, out var errCategory))
+                {
+                    Plugin.Instance?.SaveConfiguration();
+                    return BadRequest(new { error = errCategory, message = "Invalid Discord webhook URL format, scheme, host, or path." });
+                }
+                _secretStore.SetDiscordWebhookUrl(trimmed);
+            }
+        }
+
+        // 3. Handle Telegram Bot Token Credential (Omitted, Masked, New, or Clear)
+        if (request.ClearTelegramBotToken == true || string.Equals(request.TelegramBotToken, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
+        {
+            _secretStore.ClearTelegramBotToken();
+        }
+        else if (!string.IsNullOrWhiteSpace(request.TelegramBotToken))
+        {
+            var trimmedToken = TelegramBotApiSender.NormalizeToken(request.TelegramBotToken);
+            if (!SecretRedactor.IsMasked(trimmedToken))
+            {
+                var targetChatId = request.TelegramChatId ?? config.TelegramChatId;
+                if (!TelegramBotApiSender.ValidateEndpoint(trimmedToken, targetChatId, out _, out var errCategory))
+                {
+                    Plugin.Instance?.SaveConfiguration();
+                    return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format or endpoint." });
+                }
+                _secretStore.SetTelegramBotToken(trimmedToken);
+            }
+        }
+
         Plugin.Instance?.SaveConfiguration();
 
         return Ok(ToDto(config));
@@ -211,6 +231,13 @@ public class NotificationsConfigurationController : ControllerBase
         }
 
         var result = await _deliveryService.SendTestNotificationAsync(request.Destination, HttpContext.RequestAborted).ConfigureAwait(false);
+        _logger.LogInformation(
+            "[NotificationsController] Test {Destination} result: Success={Success}, Category={Category}, StatusCode={StatusCode}, Description={Description}",
+            request.Destination,
+            result.Success,
+            result.Category,
+            result.StatusCode,
+            result.Description ?? "(none)");
         return Ok(result);
     }
 
