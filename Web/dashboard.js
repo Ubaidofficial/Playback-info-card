@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.5.3)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.5.4)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,8 +7,8 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.5.3';
-    var ASSET_REVISION = '0.2.5.3';
+    var VERSION = '0.2.5.4';
+    var ASSET_REVISION = '0.2.5.4';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -510,6 +510,10 @@
         moonfin: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#312E81"/><path d="M14.5 6.5A6 6 0 1 0 14.5 17.5 7 7 0 1 1 14.5 6.5z" fill="#C7D2FE"/></svg>',
         infuse: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#1173D4"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/></svg>',
         kodi: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#17B2E7"/><path d="M8 7v10M8 12l5-5v5l-5 5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+        fladder: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#F97316"/><path d="M9 7h6v2.2H11v2.3h3.4V13.5H11V17H9V7z" fill="#fff"/></svg>',
+        mpvshim: '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="10" fill="#5C6BC0"/><polygon points="9.5,7.5 17,12 9.5,16.5" fill="#fff"/></svg>',
+        linux: '<svg viewBox="0 0 24 24" width="20" height="20"><ellipse cx="12" cy="14" rx="6" ry="7" fill="#1a1a1a"/><ellipse cx="12" cy="15.2" rx="3.6" ry="4.6" fill="#fff"/><circle cx="10" cy="8.5" r="1" fill="#1a1a1a"/><circle cx="14" cy="8.5" r="1" fill="#1a1a1a"/><ellipse cx="12" cy="7.2" rx="4" ry="4.4" fill="#1a1a1a"/><path d="M9 20l-1.5 2M15 20l1.5 2" stroke="#F7C948" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
+        smarttv: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#9aa0a6" stroke-width="1.8"><rect x="2.5" y="5" width="19" height="12" rx="1.5"/><path d="M8 21h8M12 17v4M7 2l3 3M17 2l-3 3"/></svg>',
         generic: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 2v1h12v-1l-1-2h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/></svg>'
     };
 
@@ -553,6 +557,8 @@
         if (c.indexOf('moonfin') !== -1 || d.indexOf('moonfin') !== -1) return brand('moonfin', 'Moonfin', BRAND_SVG.moonfin);
         if (c.indexOf('infuse') !== -1) return brand('infuse', 'Infuse', BRAND_SVG.infuse);
         if (c.indexOf('kodi') !== -1) return brand('kodi', 'Kodi', BRAND_SVG.kodi);
+        if (c.indexOf('fladder') !== -1) return brand('fladder', 'Fladder', BRAND_SVG.fladder);
+        if (c.indexOf('mpv-shim') !== -1 || c.indexOf('mpv shim') !== -1 || c.indexOf('mpvshim') !== -1) return brand('mpvshim', 'MPV Shim', BRAND_SVG.mpvshim);
 
         // 1b. Official Jellyfin clients (exact application identity, then sub-variant, then browser override for Web)
         if (c.indexOf('jellyfin') !== -1) {
@@ -587,6 +593,7 @@
         if (combined.indexOf('xbox') !== -1) return brand('xbox', 'Xbox', BRAND_SVG.xbox);
         if (combined.indexOf('playstation') !== -1 || combined.indexOf('ps4') !== -1 || combined.indexOf('ps5') !== -1) return brand('playstation', 'PlayStation', BRAND_SVG.playstation);
         if (combined.indexOf('dlna') !== -1) return brand('dlna', 'DLNA', BRAND_SVG.dlna);
+        if (combined.indexOf('vizio') !== -1 || combined.indexOf('hisense') !== -1 || combined.indexOf('vidaa') !== -1 || combined.indexOf('bravia') !== -1) return brand('smarttv', 'Smart TV', BRAND_SVG.smarttv);
 
         // 2. Browser (generic/third-party web clients not identified as "Jellyfin Web")
         var browser = detectBrowserBrand(combined);
@@ -595,8 +602,13 @@
         // 4. Operating system fallback
         if (combined.indexOf('android tv') !== -1 || combined.indexOf('androidtv') !== -1) return brand('androidtv', 'Android TV', BRAND_SVG.androidTv);
         if (combined.indexOf('android') !== -1) return brand('android', 'Android', BRAND_SVG.android);
-        if (combined.indexOf('ios') !== -1 || combined.indexOf('iphone') !== -1 || combined.indexOf('ipad') !== -1 || combined.indexOf('apple') !== -1) return brand('apple', 'Apple', BRAND_SVG.apple);
+        if (combined.indexOf('ios') !== -1 || combined.indexOf('iphone') !== -1 || combined.indexOf('ipad') !== -1 || combined.indexOf('apple') !== -1 ||
+            combined.indexOf('macos') !== -1 || combined.indexOf('mac os') !== -1 || combined.indexOf('macbook') !== -1 ||
+            combined.indexOf('imac') !== -1 || combined.indexOf('macintosh') !== -1) {
+            return brand('apple', 'Apple', BRAND_SVG.apple);
+        }
         if (combined.indexOf('windows') !== -1) return brand('windows', 'Windows', BRAND_SVG.windows);
+        if (combined.indexOf('linux') !== -1) return brand('linux', 'Linux', BRAND_SVG.linux);
 
         // 5. Neutral fallback
         return brand('generic', 'Media Client', BRAND_SVG.generic);
