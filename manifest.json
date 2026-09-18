@@ -13,7 +13,7 @@
         "changelog": "Release v0.2.6.0 - Rebrand from Playback Info Card to PlayInfo (new icon/banner, renamed everywhere in the live UI, not just the plugin name). Tautulli-style card redesign: poster art now bleeds flush to the card's edge and spans its full height instead of a small inset thumbnail, the blurred backdrop art is actually visible, and each card carries a colored status ring (green/blue/purple/red) matching its real playback method. New admin-only session controls: Send Message and Stop, calling Jellyfin's own native Session API, with a custom confirm dialog styled to match the card instead of a bare OS popup. Real Moonfin brand icon replacing the placeholder crescent. Relicensed from MIT to GPL-3.0, matching Tautulli.",
         "targetAbi": "10.9.0.0",
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.6.0/jellyfin-plugin-playbackcard.zip",
-        "checksum": "f889ef816e0891c631651976f2f3cf89",
+        "checksum": "d4b8ba59f9f63b564c894ed973697d1c",
         "timestamp": "2026-09-18T03:26:00Z"
       },
       {
