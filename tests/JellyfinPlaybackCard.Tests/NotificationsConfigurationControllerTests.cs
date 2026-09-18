@@ -76,6 +76,37 @@ public class NotificationsConfigurationControllerTests
         }
     }
 
+    /// <summary>
+    /// Literal reproduction of the live bug report: "even after clicking the master switch and
+    /// enable telegram delivery, the settings aren't saved." Each click is its own sequential
+    /// HTTP request (its own controller instance, exactly like production), no artificial race --
+    /// just the two plain actions in the order the report describes, then a GET (what the page's
+    /// own auto-reload after each save does) to check what actually persisted.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_ClickMasterSwitchThenEnableTelegram_BothPersistOnNextLoad()
+    {
+        var config = new PluginConfiguration { NotificationsEnabled = false, TelegramEnabled = false };
+
+        // Click 1: flip the Master Switch.
+        var masterResult = CreateController(config)
+            .UpdateConfiguration(new UpdateNotificationConfigurationRequest { NotificationsEnabled = true });
+        var masterDto = Assert.IsType<NotificationConfigurationDto>(Assert.IsType<OkObjectResult>(masterResult.Result).Value);
+        Assert.True(masterDto.NotificationsEnabled, "Master Switch save's own response should already reflect it as enabled.");
+
+        // Click 2: flip "Enable Telegram Delivery".
+        var telegramResult = CreateController(config)
+            .UpdateConfiguration(new UpdateNotificationConfigurationRequest { TelegramEnabled = true });
+        var telegramDto = Assert.IsType<NotificationConfigurationDto>(Assert.IsType<OkObjectResult>(telegramResult.Result).Value);
+        Assert.True(telegramDto.NotificationsEnabled, "Telegram save's response must still show Master as enabled -- this is the exact check the frontend uses to decide whether to show \"Notifications remain disabled until the Master Switch is enabled.\"");
+        Assert.True(telegramDto.TelegramEnabled);
+
+        // What the page's own reload (GET) sees afterwards -- this is what the user actually looks at.
+        var loaded = Assert.IsType<NotificationConfigurationDto>(Assert.IsType<OkObjectResult>(CreateController(config).GetConfiguration().Result).Value);
+        Assert.True(loaded.NotificationsEnabled, "Master Switch should still read as enabled on reload.");
+        Assert.True(loaded.TelegramEnabled, "Telegram should still read as enabled on reload.");
+    }
+
     [Fact]
     public void UpdateConfiguration_AsAdmin_PersistsMasterSwitch()
     {
