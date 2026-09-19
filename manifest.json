@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.6",
+        "changelog": "Release v0.2.7.6 - Discord/Telegram notifications now attach the item's poster image directly, uploaded as part of the same request rather than a link back to the server, so it works even on servers that aren't internet-reachable; falls back to text-only when no image is cached (on by default, can be turned off). The summary strip gains a live bandwidth gauge showing total outbound bitrate, split by Local Network vs. Remote when that badge is enabled, plus an optional percentage against an admin-configured upload limit. Sessions paused a while now show a warning pill (escalating from amber to red past an hour) so a forgotten paused stream holding server resources doesn't go unnoticed, and a badge appears when one account has more than one stream running. The Send Message admin action now offers quick-fill presets, and the Info panel gets a Copy Report button producing a sanitized per-session technical summary (no username, device, or IP) for sharing in a forum post or issue. Added a Recent Sessions shelf -- a short in-memory history of finished playback, cleared on restart, no database. Also fixes two Telegram bugs: saving a bot token no longer requires a Chat ID to already be set, and notification duration text no longer wraps past 24 hours.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.6/jellyfin-plugin-playbackcard.zip",
+        "checksum": "ce59a52e0e27d6e77b08d5d35cc52f4b",
+        "timestamp": "2026-09-19T23:09:05Z"
+      },
+      {
         "version": "0.2.7.5",
         "changelog": "Release v0.2.7.5 - Added a second Info view: click Info while 'Right' is selected (next to the existing 'Down' toggle) to open a centered dialog with the poster on the left and the full Tautulli-style Product/Player/Quality/Stream/Container/Video/Audio/Subtitle/Location/Bandwidth field list on the right, instead of expanding the card in place. The original Down behavior is unchanged. Transcode reasons are now itemized with red/amber severity, shown both as a details-panel banner and as warning rings on the affected pills, so it is clear at a glance why a stream is transcoding and how serious it is. Compact/Extended switches and opening Info now animate instead of snapping open. Also adds a strictly opt-in (off by default) Local Network/Remote badge, with an optional city/country lookup for remote sessions via a third-party geolocation service -- the raw IP address is never exposed or logged.",
         "targetAbi": "10.9.0.0",
