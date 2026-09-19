@@ -26,18 +26,39 @@
         artworkFallbackCount: 0,
         renderErrors: 0,
         cardSessionMap: {},
+        // One-shot flag: true only for the single render pass immediately after a
+        // Compact->Extended click, so the newly-revealed extended-only pill row can play
+        // its entrance transition once. Consumed and reset to false right after that
+        // render -- an ambient poll re-render (session data refreshing every few seconds)
+        // must never see this true, or the row would replay the animation on every poll
+        // tick instead of just the moment the user actually switched modes.
+        modeAnimatePending: false,
+        // Which of the two Info views the Info button opens -- 'down' (default, unchanged
+        // from the original behavior: expands that one card's own inline details grid) or
+        // 'right' (opens a centered Tautulli-style dialog with the poster on the left and
+        // the full field list on the right, instead). A user preference, not a data fact,
+        // so it lives in state rather than being derived from anything server-reported.
+        infoViewStyle: 'down',
         // Per-card override of the details panel's open/closed state, keyed by stable
         // session ID (not card position) so it survives the next poll's full re-render.
         // A card with no entry here just follows showAllDetails; an entry lets one card
         // be collapsed while others stay open under "Show Details" (or vice versa) --
         // useful once several streams are active and every card expanded at once is too
-        // much to scan.
+        // much to scan. Only meaningful while infoViewStyle is 'down'.
         infoOverrides: {},
         // Wall-clock time (client Date.now()) this session was first observed, keyed by
         // stable session ID -- lets the card show how long it's actually been open in
         // real time, distinct from media position (a session stuck at 0:34 for an hour
         // reads very differently from one that just started).
-        sessionStartTimes: {}
+        sessionStartTimes: {},
+        // Network location badge (Local/Remote + optional geolocation) -- strictly opt-in,
+        // off by default. networkLocationEnabled mirrors the saved setting (re-checked
+        // periodically in case an admin toggles it while this dashboard stays open);
+        // networkLocationLabels is populated by its own independent poll, keyed by session
+        // ID, never by IP.
+        networkLocationEnabled: false,
+        networkLocationConfigCheckedAt: 0,
+        networkLocationLabels: {}
     };
 
     function escapeHtml(str) {
@@ -176,12 +197,19 @@
         hdr: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M12 2l2.2 6.6L21 10l-5.2 4.1L17.4 21 12 17.3 6.6 21 8.2 14.1 3 10l6.8-1.4z"/></svg>',
         audio: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
         sub: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15h4M13 15h5"/></svg>',
-        bitrate: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 20V10M10 20V4M16 20v-7M22 20v-3"/></svg>'
+        bitrate: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 20V10M10 20V4M16 20v-7M22 20v-3"/></svg>',
+        geo: '<svg class="pill-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.2"/></svg>'
     };
 
     function pillIconSvg(cls) {
         return PILL_ICONS[cls] || '';
     }
+
+    // Small warning glyph prefixed onto a pill when a transcode reason specifically
+    // targets it (see REASON_PILL_TARGETS/summarizePillWarnings) -- deliberately a
+    // different shape from the plain pill icons above so a ringed pill reads as
+    // "something's wrong here" at a glance, not just another category badge.
+    var PILL_WARN_ICON = '<svg class="pill-warn-icon" viewBox="0 0 24 24" width="9" height="9" fill="currentColor"><path d="M12 2 1 21h22L12 2zm0 6.5a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0v-5a1 1 0 0 1 1-1zm0 9.75a1.15 1.15 0 1 1 0-2.3 1.15 1.15 0 0 1 0 2.3z"/></svg>';
 
     // Estimated finish time, computed from real remaining playback duration -- never
     // shown for a paused session (there is no true ETA while paused).
@@ -316,6 +344,113 @@
             return valid.map(formatTranscodeReason).join(', ');
         }
         return null;
+    }
+
+    // Severity per Jellyfin transcode-reason code: "red" for a hard incompatibility (the
+    // client genuinely cannot play the source at all) vs. "amber" for a soft/negotiated
+    // limit (bitrate/profile/level ceilings, external tracks) -- the same distinction
+    // Jellyfin itself draws between "can't decode this" and "won't allow this much".
+    // An unrecognized code defaults to "amber" (uncertain, not alarming) rather than red.
+    var REASON_SEVERITY = {
+        ContainerNotSupported: 'red',
+        VideoCodecNotSupported: 'red',
+        AudioCodecNotSupported: 'red',
+        SubtitleCodecNotSupported: 'amber',
+        AudioIsExternal: 'amber',
+        SecondaryAudioNotSupported: 'amber',
+        VideoProfileNotSupported: 'red',
+        VideoLevelNotSupported: 'red',
+        VideoResolutionNotSupported: 'amber',
+        VideoBitrateNotSupported: 'amber',
+        VideoFramerateNotSupported: 'amber',
+        RefFramesNotSupported: 'red',
+        AnamorphicVideoNotSupported: 'amber',
+        InterlacedVideoNotSupported: 'amber',
+        DirectPlayError: 'red',
+        ContainerBitrateExceedsLimit: 'amber',
+        AudioBitrateNotSupported: 'amber',
+        AudioChannelsNotSupported: 'amber'
+    };
+
+    // Which compact pill a given reason code is actually about, so that specific pill
+    // can carry a warning ring instead of the reason only ever showing up in the banner
+    // below. Several codes legitimately point at the same pill (e.g. every audio-shaped
+    // reason rings the audio pill); the caller takes the worst severity among matches.
+    var REASON_PILL_TARGETS = {
+        VideoCodecNotSupported: 'video',
+        VideoProfileNotSupported: 'video',
+        VideoLevelNotSupported: 'video',
+        RefFramesNotSupported: 'video',
+        AnamorphicVideoNotSupported: 'video',
+        InterlacedVideoNotSupported: 'video',
+        VideoResolutionNotSupported: 'res',
+        VideoBitrateNotSupported: 'bitrate',
+        ContainerBitrateExceedsLimit: 'bitrate',
+        VideoFramerateNotSupported: 'framerate',
+        AudioCodecNotSupported: 'audio',
+        AudioIsExternal: 'audio',
+        SecondaryAudioNotSupported: 'audio',
+        AudioChannelsNotSupported: 'audio',
+        AudioBitrateNotSupported: 'audio',
+        ContainerNotSupported: 'container',
+        SubtitleCodecNotSupported: 'sub'
+    };
+
+    /**
+     * Structured, per-reason breakdown for the itemized "why transcoding" banner and the
+     * pill warning rings -- same raw source data as getTruthfulTranscodeReasons() above,
+     * but kept as a list of {code, label, severity} instead of one joined string so each
+     * reason can be colored and targeted independently. Returns [] (never null) when
+     * there is nothing to itemize; callers supply their own single fallback line.
+     */
+    function getTranscodeReasonDetails(session) {
+        if (!session || typeof session !== 'object') return [];
+        var tInfo = session.TranscodingInfo;
+        var raw = [];
+        if (Array.isArray(session.TranscodeReasons) && session.TranscodeReasons.length > 0) {
+            raw = session.TranscodeReasons;
+        } else if (tInfo && Array.isArray(tInfo.TranscodeReasons) && tInfo.TranscodeReasons.length > 0) {
+            raw = tInfo.TranscodeReasons;
+        }
+
+        var valid = raw.filter(function (r) {
+            return r != null && String(r).trim().length > 0 && String(r) !== '0' && String(r).toLowerCase() !== 'none';
+        });
+
+        if (valid.length > 0) {
+            return valid.map(function (r) {
+                var code = String(r);
+                return { code: code, label: formatTranscodeReason(code), severity: REASON_SEVERITY[code] || 'amber' };
+            });
+        }
+
+        if (typeof session.TranscodeReasonsWhy === 'string' && session.TranscodeReasonsWhy.trim().length > 0) {
+            return [{ code: null, label: session.TranscodeReasonsWhy.trim(), severity: 'amber' }];
+        }
+
+        return [];
+    }
+
+    /**
+     * Reduces a reason-details list down to one severity per pill target ("res", "video",
+     * "audio", "bitrate", "framerate", "container", "sub"), taking the worst (red beats
+     * amber) when more than one reason points at the same pill, plus the human-readable
+     * labels responsible so the pill's tooltip can say exactly why it's ringed.
+     */
+    function summarizePillWarnings(reasonDetails) {
+        var byTarget = {};
+        (reasonDetails || []).forEach(function (r) {
+            var targetKey = r.code ? REASON_PILL_TARGETS[r.code] : null;
+            if (!targetKey) return;
+            var existing = byTarget[targetKey];
+            if (!existing) {
+                byTarget[targetKey] = { severity: r.severity, labels: [r.label] };
+            } else {
+                if (r.severity === 'red') existing.severity = 'red';
+                existing.labels.push(r.label);
+            }
+        });
+        return byTarget;
     }
 
     function classifyPlaybackSession(session) {
@@ -995,6 +1130,49 @@
         return null;
     }
 
+    /**
+     * Title/subtitle/episode-label resolution, shared by the card itself and the
+     * Info modal so both name the exact same thing the exact same way.
+     */
+    function resolveTitleParts(session, item) {
+        item = item || (session && session.NowPlayingItem) || {};
+        var title = '';
+        var subtitle = '';
+        var isEpisode = (item.Type === 'Episode' || Boolean(session.SeriesName || item.SeriesName));
+
+        if (isEpisode) {
+            title = escapeHtml(session.SeriesName || item.SeriesName || session.MediaTitle || item.Name || 'Unknown Series');
+            var epParts = [];
+            var sNum = session.SeasonNumber != null ? session.SeasonNumber : item.ParentIndexNumber;
+            var eNum = session.EpisodeNumber != null ? session.EpisodeNumber : item.IndexNumber;
+            if (sNum != null && eNum != null) {
+                epParts.push('S' + sNum + ':E' + eNum);
+            } else if (sNum != null) {
+                epParts.push('Season ' + sNum);
+            } else if (eNum != null) {
+                epParts.push('Ep ' + eNum);
+            }
+
+            var epTitle = item.Name || session.MediaTitle;
+            if (epTitle && epTitle !== title) {
+                epParts.push('"' + escapeHtml(epTitle) + '"');
+            }
+
+            var year = session.ProductionYear || item.ProductionYear;
+            if (year) {
+                epParts.push(String(year));
+            }
+            subtitle = epParts.join(' &bull; ');
+        } else {
+            title = escapeHtml(session.MediaTitle || item.Name || 'Unknown Media');
+            var yearVal = session.ProductionYear || item.ProductionYear;
+            if (yearVal) {
+                subtitle = escapeHtml(String(yearVal));
+            }
+        }
+        return { title: title, subtitle: subtitle };
+    }
+
     function renderSessionCard(session, index, displayMode, showAllDetails) {
         try {
             if (!session || typeof session !== 'object') {
@@ -1030,40 +1208,9 @@
             }
 
             // Title, Subtitle, Season/Episode metadata
-            var title = '';
-            var subtitle = '';
-            var isEpisode = (item.Type === 'Episode' || Boolean(session.SeriesName || item.SeriesName));
-
-            if (isEpisode) {
-                title = escapeHtml(session.SeriesName || item.SeriesName || session.MediaTitle || item.Name || 'Unknown Series');
-                var epParts = [];
-                var sNum = session.SeasonNumber != null ? session.SeasonNumber : item.ParentIndexNumber;
-                var eNum = session.EpisodeNumber != null ? session.EpisodeNumber : item.IndexNumber;
-                if (sNum != null && eNum != null) {
-                    epParts.push('S' + sNum + ':E' + eNum);
-                } else if (sNum != null) {
-                    epParts.push('Season ' + sNum);
-                } else if (eNum != null) {
-                    epParts.push('Ep ' + eNum);
-                }
-
-                var epTitle = item.Name || session.MediaTitle;
-                if (epTitle && epTitle !== title) {
-                    epParts.push('"' + escapeHtml(epTitle) + '"');
-                }
-
-                var year = session.ProductionYear || item.ProductionYear;
-                if (year) {
-                    epParts.push(String(year));
-                }
-                subtitle = epParts.join(' &bull; ');
-            } else {
-                title = escapeHtml(session.MediaTitle || item.Name || 'Unknown Media');
-                var yearVal = session.ProductionYear || item.ProductionYear;
-                if (yearVal) {
-                    subtitle = escapeHtml(String(yearVal));
-                }
-            }
+            var titleParts = resolveTitleParts(session, item);
+            var title = titleParts.title;
+            var subtitle = titleParts.subtitle;
 
             // Unified Classification. classification.method is the pure transcode method
             // (DirectPlay/DirectStream/Remux/Transcode), never overridden by pause -- the
@@ -1094,64 +1241,124 @@
             // feed the compact pill row, not just the extended rows.
             var model = buildTelemetryModel(session);
 
+            // Per-reason severity ("red" hard-incompatible vs. "amber" soft/negotiated) and
+            // which pill each one is actually about -- lets the specific offending pill
+            // carry a warning ring instead of the reason only ever surfacing in the banner.
+            var reasonDetails = classification.method === 'Transcode' ? getTranscodeReasonDetails(session) : [];
+            var pillWarnings = summarizePillWarnings(reasonDetails);
+
             // Compact badge priority (section 11): Resolution, HDR/Dynamic range, Method,
             // Video codec, Bit depth, Audio format/channels, Container -- always shown,
             // wrapping onto additional lines on narrow screens rather than being cut off.
             var pills = [];
+            function pushPill(targetKey, text, cls, title) {
+                var warn = targetKey ? pillWarnings[targetKey] : null;
+                pills.push({
+                    text: text,
+                    cls: cls,
+                    title: warn ? (title + ' — ⚠ ' + warn.labels.join('; ')) : title,
+                    warn: warn ? warn.severity : null
+                });
+            }
+
             var resPill = extractResolutionPill(item.Width || (videoStream && videoStream.Width), item.Height || (videoStream && videoStream.Height));
-            if (resPill) pills.push({ text: resPill, cls: 'res' });
+            if (resPill) pushPill('res', resPill, 'res', 'Resolution: ' + resPill);
 
             var dynRangePill = extractDynamicRangeCompactPill(videoStream);
-            if (dynRangePill) pills.push({ text: dynRangePill, cls: 'hdr' });
+            if (dynRangePill) pills.push({ text: dynRangePill, cls: 'hdr', title: 'Dynamic Range: ' + dynRangePill });
 
-            pills.push({ text: methodLabel, cls: methodBadgeCls });
+            pills.push({ text: methodLabel, cls: methodBadgeCls, title: 'Playback Method: ' + methodLabel });
 
-            var vCodec = session.VideoCodec || (tInfo && tInfo.VideoCodec) || (videoStream && videoStream.Codec ? videoStream.Codec.toUpperCase() : '');
-            if (vCodec) {
-                if (vCodec === 'H264' || vCodec === 'h264') vCodec = 'H.264';
-                else if (vCodec === 'HEVC' || vCodec === 'hevc') vCodec = 'HEVC';
-                pills.push({ text: vCodec, cls: '' });
+            function formatCodecLabel(codec) {
+                if (!codec) return '';
+                var upper = String(codec).toUpperCase();
+                if (upper === 'H264') return 'H.264';
+                if (upper === 'H265') return 'HEVC';
+                if (upper === 'EAC3' || upper === 'EC-3') return 'E-AC3';
+                if (upper === 'TRUEHD') return 'TrueHD';
+                return upper;
+            }
+
+            // Video codec: show the real source -> output conversion when transcoding
+            // actually changed the codec, not just the delivered format alone -- knowing
+            // only "playing as HEVC" hides exactly the fact ("...because H264 wasn't
+            // supported") a viewer most wants at a glance. Falls back to the single
+            // delivered value when direct (no conversion to show).
+            var srcVCodec = formatCodecLabel(model.sourceVideoCodec);
+            var outVCodec = formatCodecLabel(model.outputVideoCodec) || srcVCodec || formatCodecLabel(session.VideoCodec);
+            if (outVCodec) {
+                var vCodecConverted = Boolean(srcVCodec && srcVCodec !== outVCodec);
+                var vCodecText = vCodecConverted ? (srcVCodec + '→' + outVCodec) : outVCodec;
+                var vCodecTitle = vCodecConverted
+                    ? ('Video Codec: source ' + srcVCodec + ', transcoded to ' + outVCodec)
+                    : ('Video Codec: ' + outVCodec + ' (Direct, not re-encoded)');
+                pushPill('video', vCodecText, '', vCodecTitle);
             }
 
             var bitDepthPill = extractBitDepthPill(videoStream);
-            if (bitDepthPill) pills.push({ text: bitDepthPill, cls: '' });
+            if (bitDepthPill) pills.push({ text: bitDepthPill, cls: '', title: 'Color Bit Depth: ' + bitDepthPill });
 
             var audioBadges = extractAudioBadges(audioStream);
             if (audioBadges.length > 0) {
-                pills.push({ text: audioBadges[0], cls: 'audio' });
+                pushPill('audio', audioBadges[0], 'audio', 'Audio Channels: ' + audioBadges[0]);
             }
 
             var atmosPill = extractAtmosBadge(audioStream);
-            if (atmosPill) pills.push({ text: atmosPill, cls: 'audio' });
+            if (atmosPill) pills.push({ text: atmosPill, cls: 'audio', title: 'Spatial Audio Format: ' + atmosPill });
 
-            var containerVal = (session.Container || (tInfo && tInfo.Container) || item.Container || '').toUpperCase();
-            if (containerVal) {
-                pills.push({ text: containerVal, cls: '' });
+            // Audio codec: same source -> output reasoning as video, and now a core pill
+            // (previously Extended-only) -- Compact and Extended carry the same facts.
+            var srcACodec = formatCodecLabel(model.sourceAudioCodec);
+            var outACodec = formatCodecLabel(model.outputAudioCodec) || srcACodec;
+            if (outACodec) {
+                var aCodecConverted = Boolean(srcACodec && srcACodec !== outACodec);
+                var aCodecText = aCodecConverted ? (srcACodec + '→' + outACodec) : outACodec;
+                var aCodecTitle = aCodecConverted
+                    ? ('Audio Codec: source ' + srcACodec + ', transcoded to ' + outACodec)
+                    : ('Audio Codec: ' + outACodec + ' (Direct, not re-encoded)');
+                pushPill('audio', aCodecText, 'audio', aCodecTitle);
+            }
+
+            // Container: same reasoning again -- a remux from MKV to TS is a real, useful
+            // fact that a plain "TS" pill on its own doesn't convey.
+            var srcContainerPill = model.sourceContainer;
+            var outContainerPill = model.outputContainer || srcContainerPill || ((session.Container || (tInfo && tInfo.Container) || item.Container || '').toUpperCase() || null);
+            if (outContainerPill) {
+                var containerConverted = Boolean(srcContainerPill && srcContainerPill !== outContainerPill);
+                var containerText = containerConverted ? (srcContainerPill + '→' + outContainerPill) : outContainerPill;
+                var containerTitle = containerConverted
+                    ? ('Container: source ' + srcContainerPill + ', remuxed to ' + outContainerPill)
+                    : ('Container: ' + outContainerPill);
+                pushPill('container', containerText, '', containerTitle);
             }
 
             // Quality/bandwidth and frame rate -- both already computed for the extended rows
             // and the Info grid, just not previously surfaced as a glance-level pill.
             if (model.overallBitrateStr) {
-                pills.push({ text: model.overallBitrateStr, cls: 'bitrate' });
+                pushPill('bitrate', model.overallBitrateStr, 'bitrate', 'Overall Bitrate: ' + model.overallBitrateStr);
             }
             if (model.frameRateStr) {
-                pills.push({ text: model.frameRateStr, cls: '' });
+                pushPill('framerate', model.frameRateStr, '', 'Frame Rate: ' + model.frameRateStr);
             }
 
             // Whether subtitles are on at all is a one-glance fact worth having in Compact,
             // same reasoning as bitrate/frame rate above -- not gated to Extended.
             var subBadge = extractSubtitleBadge(session, item);
-            if (subBadge) pills.push({ text: subBadge, cls: 'sub' });
+            if (subBadge) pushPill('sub', subBadge, 'sub', (subBadge.indexOf(':') !== -1 ? subBadge : ('Subtitle: ' + subBadge)));
 
-            // Extended mode adds any further, less-essential badges (section 11).
-            if (displayMode === 'extended') {
-                if (audioBadges.length > 1) {
-                    pills.push({ text: audioBadges[1], cls: 'audio' });
-                }
+            // Network location: strictly opt-in (off by default) and populated by a separate,
+            // independently-polled admin-only endpoint -- never derived from anything in this
+            // session object itself, so this stays absent unless that poll has actually
+            // returned a label for this exact session ID.
+            var netLocLabel = session.Id ? state.networkLocationLabels[session.Id] : null;
+            if (netLocLabel) {
+                pills.push({ text: netLocLabel, cls: 'geo', title: 'Network Location: ' + netLocLabel });
             }
 
             var pillHtml = pills.map(function (p) {
-                return '<span class="playback-pill ' + p.cls + '">' + pillIconSvg(p.cls) + escapeHtml(p.text) + '</span>';
+                var warnCls = p.warn ? (' warn-' + p.warn) : '';
+                var warnIcon = p.warn ? PILL_WARN_ICON : '';
+                return '<span class="playback-pill ' + p.cls + warnCls + '"' + (p.title ? ' title="' + escapeHtml(p.title) + '"' : '') + '>' + warnIcon + pillIconSvg(p.cls) + escapeHtml(p.text) + '</span>';
             }).join('');
 
             // Progress calculations
@@ -1199,7 +1406,13 @@
                     : 'Not reported';
                 if (model.overallBitrateStr) containerDetail += '<span class="playback-ext-sep">&bull;</span>Overall bitrate: ' + escapeHtml(model.overallBitrateStr);
 
-                extendedRowsHtml = '<div class="playback-ext-rows">' +
+                // Entrance-only animation (section: compact/extended transition) -- animates
+                // in exactly once, the render pass right after a Compact->Extended click
+                // (state.modeAnimatePending), never on an ambient poll refresh that happens
+                // to land while already in Extended (which renders straight into the "open"
+                // state so nothing replays/flickers every few seconds).
+                var extAnimateIn = Boolean(state.modeAnimatePending);
+                extendedRowsHtml = '<div class="playback-ext-rows' + (extAnimateIn ? '' : ' open') + '"' + (extAnimateIn ? ' data-anim-in="true"' : '') + '>' +
                     '<div class="playback-ext-row"><span class="playback-ext-label">Video</span><span class="' + videoBadgeCls + '">' + escapeHtml(model.isVideoDirect === false ? 'Transcode' : 'Direct') + '</span><span class="playback-ext-detail">' + (videoDetail || 'Not reported') + '</span></div>' +
                     '<div class="playback-ext-row"><span class="playback-ext-label">Audio</span><span class="' + audioBadgeCls + '">' + escapeHtml(model.isAudioDirect === false ? 'Transcode' : 'Direct') + '</span><span class="playback-ext-detail">' + (audioDetail || 'Not reported') + '</span></div>' +
                     '<div class="playback-ext-row"><span class="playback-ext-label">Subtitles</span><span class="playback-ext-detail">' + escapeHtml(model.subtitleField || 'Not active') + '</span></div>' +
@@ -1215,23 +1428,34 @@
             // The "why is this transcoding" highlight -- the main thing an admin needs to
             // diagnose a transcode, so it's the same prominent callout in both Compact and
             // Extended (never demoted to a plain text row), and only when actually transcoding.
+            // Itemized (one line per real reason, colored by severity) rather than one flat
+            // amber sentence, so a hard "codec not supported" failure reads differently from
+            // a soft "bitrate throttled" limit.
             var transcodeReasonHtml = '';
             if (classification.method === 'Transcode') {
-                var reasonText = model.serverReasons || 'Reason not reported by server';
-                var engineText = model.hardwareEngineStr ? (' [' + model.hardwareEngineStr + ']') : '';
-                transcodeReasonHtml = '<div class="playback-transcode-reason">' +
-                    '<svg class="playback-transcode-reason-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>' +
-                    '<span>' + escapeHtml(reasonText + engineText) + '</span>' +
-                '</div>';
+                var reasonItems = reasonDetails.length > 0 ? reasonDetails : [{ code: null, label: 'Reason not reported by server', severity: 'amber' }];
+                var engineSuffix = model.hardwareEngineStr ? (' [' + model.hardwareEngineStr + ']') : '';
+                var reasonRowsHtml = reasonItems.map(function (ri, idx) {
+                    var sevCls = ri.severity === 'red' ? 'sev-red' : 'sev-amber';
+                    var lineText = ri.label + (idx === reasonItems.length - 1 ? engineSuffix : '');
+                    return '<div class="playback-transcode-reason ' + sevCls + '">' +
+                        '<svg class="playback-transcode-reason-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>' +
+                        '<span>' + escapeHtml(lineText) + '</span>' +
+                    '</div>';
+                }).join('');
+                transcodeReasonHtml = '<div class="playback-transcode-reasons">' + reasonRowsHtml + '</div>';
             }
 
             // Info button and "Show Details" (global toggle) both reveal the same full
             // field breakdown inline on the card, grouped into titled sections (Playback/
-            // Video/Audio/Stream/Subtitles) rather than one flat list. A card with an
-            // explicit override in infoOverrides follows that instead of the global
-            // value, so one card can be collapsed (or expanded) independently of the
-            // rest -- important once there are more than a couple of active streams and
-            // every card expanded at once is too much to scan.
+            // Video/Audio/Stream/Subtitles) rather than one flat list -- this is the
+            // original behavior, unchanged, and it's what the Info button still does
+            // whenever infoViewStyle is 'down' (the default). A card with an explicit
+            // override in infoOverrides follows that instead of the global value, so one
+            // card can be collapsed (or expanded) independently of the rest. When
+            // infoViewStyle is 'right' instead, Info opens the separate Tautulli-style
+            // side panel (showInfoSidePanel) rather than toggling this at all -- a second,
+            // additive option, not a replacement for this one.
             state.cardSessionMap = state.cardSessionMap || {};
             state.cardSessionMap[cardDomId] = session.Id || null;
             state.infoOverrides = state.infoOverrides || {};
@@ -1246,8 +1470,11 @@
                 showDetailsGridHtml +
             '</div>';
 
-            var infoBtnHtml = '<button type="button" class="playback-btn-info' + (infoIsOpenForThisCard ? ' expanded' : '') + '" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" aria-label="' + (infoIsOpenForThisCard ? 'Collapse' : 'Expand') + ' full technical stream details" title="' + (infoIsOpenForThisCard ? 'Collapse' : 'Expand') + ' full technical stream details">' +
-                '<svg class="playback-chevron-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>';
+            var infoBtnHtml = (state.infoViewStyle === 'right')
+                ? ('<button type="button" class="playback-btn-info" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" data-session-id="' + escapeHtml(session.Id || '') + '" aria-haspopup="dialog" aria-label="View full stream details" id="btn-info-' + cardDomId + '" title="View full stream details">' +
+                    '<svg class="playback-info-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-5M12 8h.01"/></svg></button>')
+                : ('<button type="button" class="playback-btn-info' + (infoIsOpenForThisCard ? ' expanded' : '') + '" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" aria-label="' + (infoIsOpenForThisCard ? 'Collapse' : 'Expand') + ' full technical stream details" title="' + (infoIsOpenForThisCard ? 'Collapse' : 'Expand') + ' full technical stream details">' +
+                    '<svg class="playback-chevron-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>');
 
             // Admin-only session controls (Stop / Message). A deliberate, later addition to
             // the project's original read-only-observation scope -- both call Jellyfin's own
@@ -1307,10 +1534,19 @@
                 '</div>';
             }
 
+            // Poster size responds to how much telemetry is showing next to it: large by
+            // default (Compact, nothing expanded), medium once Extended's own icon-led
+            // rows are showing, and small once either Show Details or this card's own
+            // Info panel piles on the full field breakdown -- so a poster twice the
+            // card's usual height never happens just because the text column grew.
+            var posterSizeCls = Boolean(showDetailsGridHtml)
+                ? 'poster-sm'
+                : (displayMode === 'extended' ? 'poster-md' : 'poster-lg');
+
             return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-card="true" data-playback-method="' + escapeHtml(classification.method) + '">' +
                 '<div class="playback-card-backdrop" data-artwork-role="backdrop"' + backdropStyle + '></div>' +
                 '<div class="playback-card-top">' +
-                    '<div class="playback-poster-wrap">' + posterHtml + brandBadgeHtml + posterProgressHtml + '</div>' +
+                    '<div class="playback-poster-wrap ' + posterSizeCls + '">' + posterHtml + brandBadgeHtml + posterProgressHtml + '</div>' +
                     '<div class="playback-card-inner">' +
                         '<div class="playback-card-main">' +
                             '<div class="playback-card-header">' +
@@ -1587,7 +1823,10 @@
     function buildDrawerGroupsHtml(model) {
         var groups = buildFieldGroups(model);
         return groups.map(function (group) {
-            var rowsHtml = group.rows.map(fieldRowHtml).join('');
+            // Same identity-field omission as buildInlineDetailGridHtml -- User/Client/
+            // Client Version/Device are already shown in the card header, so repeating
+            // them here would just duplicate what a viewer already read a moment ago.
+            var rowsHtml = group.rows.filter(function (r) { return !INLINE_GRID_SKIP_KEYS[r.key]; }).map(fieldRowHtml).join('');
             var icon = DRAWER_GROUP_ICONS[group.title] || '';
             return '<div class="playback-drawer-group">' +
                 '<div class="playback-drawer-group-title">' + icon + '<span>' + escapeHtml(group.title.toUpperCase()) + '</span></div>' +
@@ -1708,13 +1947,14 @@
         // Reset per-render card->session correlation map (rebuilt below as each card renders).
         state.cardSessionMap = {};
 
-        // Drop any per-card Info override for sessions that are no longer present,
-        // otherwise infoOverrides would grow forever as sessions start and stop.
-        state.infoOverrides = state.infoOverrides || {};
         var stillPresent = {};
         for (var si = 0; si < activeSessions.length; si++) {
             if (activeSessions[si] && activeSessions[si].Id) stillPresent[activeSessions[si].Id] = true;
         }
+
+        // Drop any per-card Info override for sessions that are no longer present,
+        // otherwise infoOverrides would grow forever as sessions start and stop.
+        state.infoOverrides = state.infoOverrides || {};
         for (var openId in state.infoOverrides) {
             if (Object.prototype.hasOwnProperty.call(state.infoOverrides, openId) && !stillPresent[openId]) {
                 delete state.infoOverrides[openId];
@@ -1744,7 +1984,7 @@
                 '<h2 class="playback-dashboard-title">' +
                     '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>' +
                     'NOW PLAYING' +
-                    '<span class="playback-brand-badge">PlayInfo</span>' +
+                    '<span class="playback-header-brand-badge">PlayInfo</span>' +
                 '</h2>' +
                 '<div class="playback-live-indicator"><span class="playback-live-dot"></span> Live</div>' +
                 '<div class="playback-dashboard-counts">' +
@@ -1759,6 +1999,10 @@
                 '<div class="playback-mode-toggle" role="group" aria-label="Display density">' +
                     '<button type="button" class="playback-mode-btn' + (isCompact ? ' active' : '') + '" data-mode="compact">Compact</button>' +
                     '<button type="button" class="playback-mode-btn' + (!isCompact ? ' active' : '') + '" data-mode="extended">Extended</button>' +
+                '</div>' +
+                '<div class="playback-mode-toggle" role="group" aria-label="Info view style">' +
+                    '<button type="button" class="playback-mode-btn' + (state.infoViewStyle !== 'right' ? ' active' : '') + '" data-infoview="down" title="Info expands inline under the card (original behavior)">Down</button>' +
+                    '<button type="button" class="playback-mode-btn' + (state.infoViewStyle === 'right' ? ' active' : '') + '" data-infoview="right" title="Info opens a Tautulli-style dialog with poster art and the full field list">Right</button>' +
                 '</div>' +
                 '<button type="button" class="playback-btn-toggle-details" data-action="toggle-all-details">' +
                     (state.showAllDetails ? 'Hide Details' : 'Show Details') +
@@ -1798,6 +2042,24 @@
         }
 
         container.innerHTML = headerHtml + summaryStripHtml + contentHtml + connectedDevicesHtml;
+
+        // Consume the one-shot entrance-animation flag for this render pass only, so an
+        // ambient poll re-render never replays it. requestAnimationFrame lets the browser
+        // paint the freshly-inserted (collapsed) rows once before the "open" class is
+        // added, which is what makes the max-height/opacity change on it a visible
+        // transition instead of an instant, invisible jump.
+        if (state.modeAnimatePending) {
+            state.modeAnimatePending = false;
+            if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function' && typeof container.querySelectorAll === 'function') {
+                window.requestAnimationFrame(function () {
+                    var pending = container.querySelectorAll('[data-anim-in="true"]');
+                    for (var pi = 0; pi < pending.length; pi++) {
+                        pending[pi].classList.add('open');
+                        pending[pi].removeAttribute('data-anim-in');
+                    }
+                });
+            }
+        }
     }
 
     /**
@@ -1851,6 +2113,222 @@
         if (input) input.focus(); else confirmBtn.focus();
     }
 
+    // Only one Info modal open at a time -- clicking a different card's Info button while
+    // one is already open closes it first instead of stacking overlays.
+    var closeActiveInfoModal = null;
+
+    /**
+     * Single source of truth for the Tautulli-style field set (Product/Player/Quality/
+     * Stream/Container/Video/Audio/Subtitle/Location/Bandwidth) shown in the right-side
+     * Info panel (see showInfoSidePanel below), kept separate from the render function
+     * itself so the panel's data/labels are computed in exactly one place.
+     */
+    function computeInfoViewData(session) {
+        var item = session.NowPlayingItem || {};
+        var titleParts = resolveTitleParts(session, item);
+        var classification = classifyPlaybackSession(session);
+        var model = buildTelemetryModel(session);
+
+        var playState = session.PlayState || {};
+        var positionTicks = (typeof session.PositionTicks === 'number' && isFinite(session.PositionTicks))
+            ? session.PositionTicks
+            : ((typeof playState.PositionTicks === 'number' && isFinite(playState.PositionTicks) && playState.PositionTicks > 0) ? playState.PositionTicks : 0);
+        var runtimeTicks = (typeof session.RunTimeTicks === 'number' && isFinite(session.RunTimeTicks))
+            ? session.RunTimeTicks
+            : ((typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks) && item.RunTimeTicks > 0) ? item.RunTimeTicks : 0);
+        var percent = 0;
+        if (typeof session.PlaybackPercentage === 'number' && isFinite(session.PlaybackPercentage)) {
+            percent = Math.min(100, Math.max(0, session.PlaybackPercentage));
+        } else if (runtimeTicks > 0) {
+            percent = Math.min(100, Math.max(0, (positionTicks / runtimeTicks) * 100));
+        }
+
+        var reasonDetails = classification.method === 'Transcode' ? getTranscodeReasonDetails(session) : [];
+        var warningsHtml = '';
+        if (reasonDetails.length > 0) {
+            warningsHtml = '<div class="pi-info-warnings">' + reasonDetails.map(function (ri) {
+                var sevCls = ri.severity === 'red' ? 'sev-red' : 'sev-amber';
+                return '<div class="pi-info-warning ' + sevCls + '">' +
+                    '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>' +
+                    '<span>' + escapeHtml(ri.label) + '</span>' +
+                '</div>';
+            }).join('') + '</div>';
+        }
+
+        var netLocLabel = session.Id ? state.networkLocationLabels[session.Id] : null;
+        var qualityVal = (classification.method === 'Transcode' ? 'Transcode' : 'Original') + (model.overallBitrateStr ? ' (' + model.overallBitrateStr + ')' : '');
+
+        // Pure method (never collapsed to "Paused") -- Stream and State are deliberately
+        // two separate fields below, same as the original Playback State/Playback Method
+        // rows, so pausing a Transcode never hides *which* method it was mid-pause.
+        var METHOD_LABELS_INFO = { DirectPlay: 'Direct Play', DirectStream: 'Direct Stream', Remux: 'Remux', Transcode: 'Transcode' };
+        var methodVal = METHOD_LABELS_INFO[classification.method] || 'Direct Play';
+
+        var resolutionVal = (model.sourceResolution && model.outputResolution && model.sourceResolution !== model.outputResolution)
+            ? (model.sourceResolution + ' → ' + model.outputResolution)
+            : (model.outputResolution || model.sourceResolution || 'Not reported');
+
+        var videoVal = model.isVideoDirect === false
+            ? ((model.sourceVideoCodec || '?') + ' → ' + (model.outputVideoCodec || model.sourceVideoCodec || '?'))
+            : (model.sourceVideoCodec || 'Not reported');
+
+        // Audio codec conversion plus channel layout in the same row (e.g. "TrueHD → AAC
+        // (English 7.1)") -- the original's separate "Audio Channels / Layout" row, folded
+        // in here instead of adding a whole extra field for it.
+        var audioChannelsSuffix = model.audioChannelsLayout ? (' (' + model.audioChannelsLayout + ')') : '';
+        var audioVal = (model.isAudioDirect === false
+            ? ((model.sourceAudioCodec || '?') + ' → ' + (model.outputAudioCodec || model.sourceAudioCodec || '?'))
+            : (model.sourceAudioCodec || 'Not reported')) + audioChannelsSuffix;
+
+        var containerVal = (model.sourceContainer && model.outputContainer && model.sourceContainer !== model.outputContainer)
+            ? (model.sourceContainer + ' → ' + model.outputContainer)
+            : (model.outputContainer || model.sourceContainer || 'Not reported');
+
+        // HDR status plus whether tone mapping is actually active -- the original's
+        // separate "Tone Mapping / HDR Conversion" row, folded into this one instead.
+        var hdrVal = (model.hdrStatus || 'Not reported') + (model.hdrToSdrVal && model.hdrToSdrVal.indexOf('Active') === 0 ? ' (Tone-mapped)' : '');
+
+        var reasonFieldVal = model.serverReasons || (classification.method === 'Transcode' ? 'Reason not reported by server' : 'Not applicable');
+
+        // "wide" spans both grid columns and left-aligns -- for values that can run long
+        // (a joined, comma-separated Transcode Reason list), so they wrap as normal
+        // paragraph text instead of cramming into one narrow right-aligned column.
+        function fieldRow(key, val, bad, wide) {
+            return '<div class="pi-info-field' + (wide ? ' wide' : '') + '"><span class="pi-info-field-key">' + escapeHtml(key) + '</span><span class="pi-info-field-val' + (bad ? ' bad' : '') + '">' + escapeHtml(val) + '</span></div>';
+        }
+
+        var fieldsHtml =
+            fieldRow('Product', session.Client || 'Not reported') +
+            fieldRow('Player', session.DeviceName || session.Client || 'Not reported') +
+            fieldRow('State', model.isPaused ? 'Paused' : 'Playing') +
+            fieldRow('Stream', methodVal, classification.method === 'Transcode') +
+            fieldRow('Quality', qualityVal, classification.method === 'Transcode') +
+            fieldRow('Resolution', resolutionVal, model.isVideoDirect === false) +
+            fieldRow('Frame Rate', model.frameRateStr || 'Not reported') +
+            fieldRow('Video Bitrate', model.videoBitrateStr || 'Not reported') +
+            fieldRow('Audio Bitrate', model.audioBitrateStr || 'Not reported') +
+            fieldRow('Bandwidth', model.overallBitrateStr || 'Not reported') +
+            fieldRow('Container', containerVal) +
+            fieldRow('Engine', model.hardwareEngineStr || (classification.method === 'Transcode' ? 'Not reported' : 'Not applicable')) +
+            fieldRow('Video', videoVal, model.isVideoDirect === false) +
+            fieldRow('Audio', audioVal, model.isAudioDirect === false) +
+            fieldRow('Subtitle', model.subtitleField || 'None') +
+            fieldRow('HDR', hdrVal) +
+            fieldRow('Location', netLocLabel || 'Not tracked') +
+            fieldRow('Transcode Reason', reasonFieldVal, classification.method === 'Transcode', true);
+
+        return {
+            titleParts: titleParts,
+            classification: classification,
+            model: model,
+            positionTicks: positionTicks,
+            runtimeTicks: runtimeTicks,
+            percent: percent,
+            warningsHtml: warningsHtml,
+            fieldsHtml: fieldsHtml
+        };
+    }
+
+    /**
+     * The Tautulli-style Info dialog: a centered overlay with the poster art on the left
+     * and, on the right, the same flat Product/Player/Quality/Stream/Container/Video/
+     * Audio/Subtitle/Location/Bandwidth field set Tautulli's own activity popup shows,
+     * plus the itemized "why transcoding" list. A standalone document.body node (same
+     * pattern as showActionModal above), never part of the poll-driven card grid's
+     * innerHTML, so it animates open/closed cleanly and is never touched by an ambient
+     * re-render while open. This is purely additive -- it opens only while infoViewStyle
+     * is 'right'; the original inline expand-down behavior (infoOverrides) is completely
+     * unaffected and unchanged.
+     */
+    function showInfoSidePanel(session) {
+        if (typeof document === 'undefined' || !session) return;
+        if (typeof closeActiveInfoModal === 'function') closeActiveInfoModal();
+
+        var item = session.NowPlayingItem || {};
+        var data = computeInfoViewData(session);
+        var titleParts = data.titleParts;
+        var model = data.model;
+        var positionTicks = data.positionTicks;
+        var runtimeTicks = data.runtimeTicks;
+        var percent = data.percent;
+        var warningsHtml = data.warningsHtml;
+        var fieldsHtml = data.fieldsHtml;
+
+        var apiClient = getApiClient();
+        var art = resolveArtworkUrls(session, item, apiClient);
+
+        var posterHtml = art.posterUrl
+            ? '<img src="' + escapeHtml(art.posterUrl) + '" alt="" onerror="this.style.display=\'none\'" />'
+            : '<div class="pi-info-poster-fallback"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20"/></svg></div>';
+
+        var scrim = document.createElement('div');
+        scrim.className = 'pi-info-panel-scrim';
+        var panel = document.createElement('div');
+        panel.className = 'pi-info-panel';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-label', (titleParts.title || 'Stream details') + ' — stream details');
+        panel.innerHTML =
+            '<div class="pi-info-panel-art">' +
+                posterHtml +
+                '<div class="pi-info-panel-art-shine"></div>' +
+            '</div>' +
+            '<div class="pi-info-panel-content">' +
+                '<button type="button" class="pi-info-panel-close" aria-label="Close">' +
+                    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+                '</button>' +
+                '<div class="pi-info-panel-heading">' +
+                    '<div class="pi-info-panel-title">' + titleParts.title + '</div>' +
+                    (titleParts.subtitle ? '<div class="pi-info-panel-subtitle">' + titleParts.subtitle + '</div>' : '') +
+                '</div>' +
+                warningsHtml +
+                '<div class="pi-info-modal-body">' + fieldsHtml + '</div>' +
+                (runtimeTicks > 0 ? (
+                '<div class="pi-info-modal-progress">' +
+                    '<div class="playback-progress-bar-track"><div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div></div>' +
+                    '<div class="playback-progress-times">' +
+                        '<span>' + formatTicks(positionTicks) + '</span>' +
+                        (model.etaText ? '<span>ETA ' + escapeHtml(model.etaText) + '</span>' : '<span></span>') +
+                        '<span>' + formatTicks(runtimeTicks) + '</span>' +
+                    '</div>' +
+                '</div>'
+                ) : '') +
+            '</div>';
+
+        scrim.appendChild(panel);
+        document.body.appendChild(scrim);
+
+        function close() {
+            document.removeEventListener('keydown', onKeydown);
+            closeActiveInfoModal = null;
+            if (typeof scrim.classList !== 'undefined' && typeof scrim.classList.remove === 'function') scrim.classList.remove('show');
+            var remove = function () { if (scrim.parentNode) scrim.parentNode.removeChild(scrim); };
+            if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+                window.setTimeout(remove, 240);
+            } else {
+                remove();
+            }
+        }
+        function onKeydown(e) {
+            if (e.key === 'Escape') close();
+        }
+
+        closeActiveInfoModal = close;
+        var closeBtn = panel.querySelector('.pi-info-panel-close');
+        if (closeBtn) closeBtn.addEventListener('click', close);
+        scrim.addEventListener('click', function (e) { if (e.target === scrim) close(); });
+        document.addEventListener('keydown', onKeydown);
+
+        // Entrance animation: mount in the closed state, then flip to "show" on the next
+        // frame so opacity/transform genuinely transition (a slide in from the right)
+        // instead of snapping open.
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(function () { scrim.classList.add('show'); });
+        } else {
+            scrim.classList.add('show');
+        }
+    }
+
     function attachContainerEvents(container) {
         if (!container) return;
         if (typeof container.getAttribute === 'function' && container.getAttribute('data-events-attached') === 'true') return;
@@ -1861,12 +2339,32 @@
             var target = e.target;
             if (!target) return;
 
-            // Toggle mode button (Compact / Extended)
-            var modeBtn = target.closest('.playback-mode-btn');
+            // Toggle mode button (Compact / Extended). Switching TO Extended plays a
+            // one-shot entrance animation on the newly-revealed pill row (modeAnimatePending,
+            // consumed inside renderDashboardContainer); switching back to Compact is
+            // instant -- collapsing content doesn't need a matching exit flourish, and
+            // avoids delaying the re-render just to choreograph one. Matched by [data-mode]
+            // specifically (not the shared .playback-mode-btn class), since the Info-view
+            // toggle right next to it reuses that same button styling for a different
+            // control (see [data-infoview] below).
+            var modeBtn = target.closest('[data-mode]');
             if (modeBtn) {
                 var newMode = modeBtn.getAttribute('data-mode');
                 if (newMode && newMode !== state.displayMode) {
                     state.displayMode = newMode;
+                    state.modeAnimatePending = (newMode === 'extended');
+                    renderDashboardContainer(container, state.activeSessions, state.allSessions);
+                }
+                return;
+            }
+
+            // Info view style toggle (Down / Right) -- a display preference, so it just
+            // re-renders; it never touches which sessions exist or any per-session state.
+            var infoViewBtn = target.closest('[data-infoview]');
+            if (infoViewBtn) {
+                var newInfoView = infoViewBtn.getAttribute('data-infoview');
+                if (newInfoView && newInfoView !== state.infoViewStyle) {
+                    state.infoViewStyle = newInfoView;
                     renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 }
                 return;
@@ -1883,11 +2381,27 @@
                 return;
             }
 
-            // Info collapses/expands one card's own inline details grid, independent of
-            // the global Show Details state (session-ID keyed, so it survives the next
-            // poll's re-render) -- never a separate side panel.
+            // Info either collapses/expands one card's own inline details grid (the
+            // original behavior, unchanged, while infoViewStyle is 'down') or opens the
+            // Tautulli-style side panel for that one session (a self-contained overlay,
+            // never touching the poll-driven grid re-render) while it's 'right'.
             var infoBtn = target.closest('[data-action="toggle-info"]');
             if (infoBtn) {
+                if (state.infoViewStyle === 'right') {
+                    var infoSessionId = infoBtn.getAttribute('data-session-id');
+                    var infoSession = null;
+                    if (infoSessionId && Array.isArray(state.activeSessions)) {
+                        for (var isi = 0; isi < state.activeSessions.length; isi++) {
+                            if (state.activeSessions[isi] && state.activeSessions[isi].Id === infoSessionId) {
+                                infoSession = state.activeSessions[isi];
+                                break;
+                            }
+                        }
+                    }
+                    if (infoSession) showInfoSidePanel(infoSession);
+                    return;
+                }
+
                 var cardId = infoBtn.getAttribute('data-card-id');
                 var sessionId = cardId && state.cardSessionMap ? state.cardSessionMap[cardId] : null;
                 if (sessionId) {
@@ -1955,6 +2469,50 @@
         });
     }
 
+    // Minimal admin-authenticated GET helper, matching the same apiClient.getJSON-or-fetch
+    // fallback pollSessions already uses for the personal-sessions endpoint below.
+    async function fetchAdminJson(apiClient, path) {
+        var url = (typeof apiClient.getUrl === 'function') ? apiClient.getUrl(path) : ('/' + path);
+        if (typeof apiClient.getJSON === 'function') {
+            return await apiClient.getJSON(url);
+        }
+        var headers = {};
+        if (typeof apiClient.accessToken === 'function' && apiClient.accessToken()) {
+            headers['Authorization'] = 'MediaBrowser Token="' + apiClient.accessToken() + '"';
+        }
+        var resp = await fetch(url, { headers: headers });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return await resp.json();
+    }
+
+    var NETWORK_LOCATION_CONFIG_RECHECK_MS = 60000;
+
+    async function ensureNetworkLocationConfigLoaded(apiClient) {
+        var now = Date.now();
+        if (now - state.networkLocationConfigCheckedAt < NETWORK_LOCATION_CONFIG_RECHECK_MS) return;
+        state.networkLocationConfigCheckedAt = now;
+        try {
+            var data = await fetchAdminJson(apiClient, 'PlaybackCard/Notifications/Configuration');
+            state.networkLocationEnabled = Boolean(data && data.networkLocationDisclosure);
+            if (!state.networkLocationEnabled) {
+                state.networkLocationLabels = {};
+            }
+        } catch (err) {
+            // Non-critical -- leave the last known value in place rather than flapping the
+            // badge on and off because of a single failed config check.
+        }
+    }
+
+    async function pollNetworkLocations(apiClient) {
+        if (!state.networkLocationEnabled) return;
+        try {
+            var data = await fetchAdminJson(apiClient, 'PlaybackCard/NetworkLocation');
+            state.networkLocationLabels = (data && typeof data === 'object') ? data : {};
+        } catch (err) {
+            // Non-critical: badges just stay absent/stale until the next successful poll.
+        }
+    }
+
     async function pollSessions() {
         if (!isDashboardPage()) {
             stopPolling();
@@ -1963,6 +2521,14 @@
 
         var apiClient = getApiClient();
         if (!apiClient) return;
+
+        if (!state.isNonAdmin) {
+            // Fire-and-forget: never let a network-location hiccup block the actual
+            // session poll below.
+            ensureNetworkLocationConfigLoaded(apiClient).then(function () {
+                return pollNetworkLocations(apiClient);
+            }).catch(function () {});
+        }
 
         try {
             var sessions = null;
@@ -2120,6 +2686,7 @@
         calculateSessionCounts: calculateSessionCounts,
         buildSummaryStripHtml: buildSummaryStripHtml,
         renderDashboardContainer: renderDashboardContainer,
+        attachContainerEvents: attachContainerEvents,
         formatTicks: formatTicks,
         formatRelativeTime: formatRelativeTime,
         renderConnectedDeviceItem: renderConnectedDeviceItem,
@@ -2143,7 +2710,13 @@
         resolveUserAvatarUrl: resolveUserAvatarUrl,
         buildTelemetryModel: buildTelemetryModel,
         buildInlineDetailGridHtml: buildInlineDetailGridHtml,
+        buildDrawerGroupsHtml: buildDrawerGroupsHtml,
+        getTranscodeReasonDetails: getTranscodeReasonDetails,
+        summarizePillWarnings: summarizePillWarnings,
+        resolveTitleParts: resolveTitleParts,
         showActionModal: showActionModal,
+        showInfoSidePanel: showInfoSidePanel,
+        computeInfoViewData: computeInfoViewData,
         startPolling: startPolling,
         stopPolling: stopPolling,
         pollSessions: pollSessions,

@@ -42,6 +42,7 @@ public class PluginConfiguration : BasePluginConfiguration
         // Privacy defaults: strictly opt-in
         UsernameDisclosure = false;
         ClientDeviceDisclosure = false;
+        NetworkLocationDisclosure = false;
 
         // User filtering defaults
         UserFilterMode = Notifications.UserFilterMode.AllUsers;
@@ -127,6 +128,15 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets whether client app name, version, and device name are disclosed in notifications.
     /// </summary>
     public bool ClientDeviceDisclosure { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a Local Network/Remote badge (and, for remote sessions, an
+    /// approximate city/country looked up via a third-party geolocation service) is shown
+    /// on playback cards. Strictly opt-in and off by default: this is the one feature in the
+    /// plugin that makes an outbound call to a service that isn't Discord/Telegram, and only
+    /// does so for a session's remote IP, only when this is explicitly enabled.
+    /// </summary>
+    public bool NetworkLocationDisclosure { get; set; }
 
     /// <summary>
     /// User filtering mode (AllUsers, Whitelist, Blacklist).

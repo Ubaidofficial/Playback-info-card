@@ -170,6 +170,8 @@ public class NotificationsConfigurationController : ControllerBase
         var devDisc = request.ClientDeviceDisclosure ?? request.IncludeClientAndDeviceName;
         if (devDisc.HasValue) config.ClientDeviceDisclosure = devDisc.Value;
 
+        if (request.NetworkLocationDisclosure.HasValue) config.NetworkLocationDisclosure = request.NetworkLocationDisclosure.Value;
+
         if (request.UserFilterMode.HasValue) config.UserFilterMode = request.UserFilterMode.Value;
 
         if (request.SelectedUserIds != null)
@@ -297,6 +299,7 @@ public class NotificationsConfigurationController : ControllerBase
             NotifyOnCompletion = config.NotifyOnCompletion,
             UsernameDisclosure = config.UsernameDisclosure,
             ClientDeviceDisclosure = config.ClientDeviceDisclosure,
+            NetworkLocationDisclosure = config.NetworkLocationDisclosure,
             UserFilterMode = config.UserFilterMode,
             SelectedUserIds = config.SelectedUserIds,
             Diagnostics = _deliveryService.GetDiagnostics()
@@ -375,6 +378,8 @@ public sealed class NotificationConfigurationDto
     public bool ClientDeviceDisclosure { get; init; }
     [JsonPropertyName("includeClientAndDeviceName")]
     public bool IncludeClientAndDeviceName => ClientDeviceDisclosure;
+    [JsonPropertyName("networkLocationDisclosure")]
+    public bool NetworkLocationDisclosure { get; init; }
     [JsonPropertyName("userFilterMode")]
     public UserFilterMode UserFilterMode { get; init; }
     [JsonPropertyName("selectedUserIds")]
@@ -419,6 +424,7 @@ public sealed class UpdateNotificationConfigurationRequest
     public bool? IncludeUserAccountName { get; set; }
     public bool? ClientDeviceDisclosure { get; set; }
     public bool? IncludeClientAndDeviceName { get; set; }
+    public bool? NetworkLocationDisclosure { get; set; }
     public UserFilterMode? UserFilterMode { get; set; }
     public List<string>? SelectedUserIds { get; set; }
 }

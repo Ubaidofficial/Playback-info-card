@@ -370,6 +370,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
         });
 
         it('renders Transcode badge and hardware engine', () => {
+            controller.setDisplayMode('extended');
             const session = {
                 PlayState: { PlayMethod: 'Transcode', IsPaused: false },
                 TranscodingInfo: {
@@ -385,8 +386,11 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             const html = controller.renderSessionCard(session);
             assert.ok(html.includes('playback-badge transcode'));
             assert.ok(html.includes('Transcode'));
-            assert.ok(html.includes('Engine: QSV'));
+            // Hardware engine shows in the Extended-mode "Engine" summary row.
+            assert.ok(/Engine<\/span><span class="playback-ext-detail">QSV/.test(html));
             assert.ok(html.includes('4.5 Mbps'));
+            // The transcode reason is always visible on the card body (Compact included),
+            // not just in Extended mode.
             assert.ok(html.includes('Container not supported'));
         });
 
@@ -401,45 +405,56 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
         });
     });
 
-    describe('12. Compact Badge Cap', () => {
-        it('caps rendered pills to 5 in compact mode', () => {
+    describe('12. Compact/Extended Pill Parity', () => {
+        // Compact is not a stripped-down view of Extended: every pill -- including HDR,
+        // bitrate, frame rate, the secondary audio codec, and subtitle language -- is a
+        // "necessary at a glance" fact and shows in both modes identically. The only
+        // difference between the two modes is Extended auto-opening Show Details.
+        const richSession = {
+            PlayState: { SubtitleStreamIndex: 1 },
+            NowPlayingItem: {
+                Width: 3840,
+                Height: 2160,
+                MediaStreams: [
+                    { Type: 'Video', Width: 3840, Height: 2160, Codec: 'hevc', VideoRange: 'DOVI', BitDepth: 10 },
+                    { Type: 'Subtitle', Language: 'eng' },
+                    { Type: 'Audio', Channels: 8, Profile: 'Atmos', Codec: 'truehd' }
+                ]
+            }
+        };
+
+        it('shows every pill -- including secondary audio codec and subtitle language -- in compact mode', () => {
             controller.setDisplayMode('compact');
-            const session = {
-                PlayState: { SubtitleStreamIndex: 1 },
-                NowPlayingItem: {
-                    Width: 3840,
-                    Height: 2160,
-                    MediaStreams: [
-                        { Type: 'Video', Width: 3840, Height: 2160, Codec: 'hevc', VideoRange: 'DOVI', BitDepth: 10 },
-                        { Type: 'Subtitle', Language: 'eng' },
-                        { Type: 'Audio', Channels: 8, Profile: 'Atmos', Codec: 'truehd' }
-                    ]
-                }
-            };
-            const html = controller.renderSessionCard(session);
-            const pillMatches = html.match(/<span class="playback-pill/g);
-            assert.ok(pillMatches != null);
-            assert.ok(pillMatches.length <= 5, `Expected <= 5 pills in compact mode, got ${pillMatches.length}`);
+            const html = controller.renderSessionCard(richSession);
+            assert.ok(/>4K</.test(html), 'expected 4K resolution pill');
+            assert.ok(/>HEVC</.test(html), 'expected HEVC video codec pill');
+            assert.ok(/>DV</.test(html), 'expected Dolby Vision pill');
+            assert.ok(/>7\.1</.test(html), 'expected 7.1 audio channel layout pill');
+            assert.ok(/>TrueHD</.test(html), 'expected TrueHD audio codec pill in compact mode too');
+            assert.ok(/>Sub: ENG</.test(html), 'expected subtitle language pill in compact mode too');
         });
 
-        it('renders all pills in extended mode', () => {
+        it('renders the identical pill set in extended mode', () => {
             controller.setDisplayMode('extended');
-            const session = {
-                PlayState: { SubtitleStreamIndex: 1 },
-                NowPlayingItem: {
-                    Width: 3840,
-                    Height: 2160,
-                    MediaStreams: [
-                        { Type: 'Video', Width: 3840, Height: 2160, Codec: 'hevc', VideoRange: 'DOVI', BitDepth: 10 },
-                        { Type: 'Subtitle', Language: 'eng' },
-                        { Type: 'Audio', Channels: 8, Profile: 'Atmos', Codec: 'truehd' }
-                    ]
-                }
+            const html = controller.renderSessionCard(richSession);
+            assert.ok(/>4K</.test(html));
+            assert.ok(/>HEVC</.test(html));
+            assert.ok(/>DV</.test(html));
+            assert.ok(/>7\.1</.test(html));
+            assert.ok(/>TrueHD</.test(html));
+            assert.ok(/>Sub: ENG</.test(html));
+        });
+
+        it('always shows the transcode "Why" reason on the card body, in compact mode too', () => {
+            controller.setDisplayMode('compact');
+            const transcodingSession = {
+                PlayState: { PlayMethod: 'Transcode' },
+                TranscodingInfo: { IsVideoDirect: false, TranscodeReasons: ['VideoCodecNotSupported'] },
+                NowPlayingItem: { Name: 'Some Movie' }
             };
-            const html = controller.renderSessionCard(session);
-            const pillMatches = html.match(/<span class="playback-pill/g);
-            assert.ok(pillMatches != null);
-            assert.ok(pillMatches.length >= 5, `Expected extended pills count, got ${pillMatches.length}`);
+            const html = controller.renderSessionCard(transcodingSession);
+            assert.ok(html.includes('playback-why-banner'), 'expected the always-visible Why banner');
+            assert.ok(html.includes('Video codec not supported'), 'expected the real transcode reason, not the generic fallback');
         });
     });
 
@@ -530,8 +545,9 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
     });
 
     describe('15. Zero Network Classification Assertion', () => {
-        it('confirms absence of IP, LAN/WAN heuristics, or network labels in rendered cards', () => {
+        it('confirms absence of IP, LAN/WAN heuristics, or network labels in rendered cards by default', () => {
             const session = {
+                Id: 's-safe',
                 PlayState: { PlayMethod: 'DirectPlay' },
                 NowPlayingItem: { Name: 'Safe Video' }
             };
@@ -542,6 +558,23 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(!html.includes('Wi-Fi'));
             assert.ok(!html.includes('RemoteEndPoint'));
             assert.ok(!html.includes('ipAddress'));
+            assert.ok(!html.includes('playback-pill geo'), 'No geo badge without an explicit, opt-in label for this exact session');
+        });
+
+        it('renders the network-location badge only when explicitly populated for that exact session ID, never by default', () => {
+            const sessionA = { Id: 'sess-a', PlayState: { PlayMethod: 'DirectPlay' }, NowPlayingItem: { Name: 'A' } };
+            const sessionB = { Id: 'sess-b', PlayState: { PlayMethod: 'DirectPlay' }, NowPlayingItem: { Name: 'B' } };
+
+            controller.setNetworkLocationLabelsForTesting({ 'sess-a': 'Remote — Lahore, Pakistan' });
+
+            const htmlA = controller.renderSessionCard(sessionA);
+            assert.ok(/<span class="playback-pill geo"[^>]*>/.test(htmlA), 'Session with a matching label gets the geo pill');
+            assert.ok(htmlA.includes('Remote — Lahore, Pakistan'));
+
+            const htmlB = controller.renderSessionCard(sessionB);
+            assert.ok(!htmlB.includes('playback-pill geo'), 'A different session ID must never inherit another session\'s label');
+
+            controller.setNetworkLocationLabelsForTesting({});
         });
     });
 
@@ -630,7 +663,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
     });
 
     describe('17. Stream Details, Info Toggle, and My Playback View', () => {
-        it('renders accessible [Info] toggle button with aria-expanded and aria-controls using deterministic card ID', () => {
+        it('renders accessible [Info] toggle button with aria-expanded and aria-controls using deterministic card ID (original "down" behavior, unchanged)', () => {
             const session = {
                 PlayState: { PlayMethod: 'DirectPlay', IsPaused: false },
                 NowPlayingItem: { Name: 'Sample Item' }
@@ -670,6 +703,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
         });
 
         it('renders truthful Why and How transcode metadata', () => {
+            controller.setDisplayMode('extended');
             const session = {
                 Id: 's-whyhow',
                 PlayState: { PlayMethod: 'Transcode' },
@@ -684,9 +718,11 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
                 NowPlayingItem: { Name: 'Why How Test', Container: 'mkv' }
             };
             const html = controller.renderSessionCard(session);
-            assert.ok(html.includes('Engine: NVENC'));
-            assert.ok(html.includes('Video: H264'));
-            assert.ok(html.includes('Audio: AAC'));
+            // "How": the Extended-mode Engine/Video/Audio summary rows.
+            assert.ok(/Engine<\/span><span class="playback-ext-detail">NVENC/.test(html));
+            assert.ok(html.includes('H264'));
+            assert.ok(html.includes('AAC'));
+            // "Why": always visible on the card body, Compact included.
             assert.ok(html.includes('Container not supported'));
             assert.ok(html.includes('Video codec not supported'));
         });
@@ -710,29 +746,96 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(html.includes('Video: Direct'));
         });
 
-        it('keeps the Info panel open across a simulated poll re-render (tracked by session ID, not card position)', () => {
+        it('keeps the Info panel open across a simulated poll re-render (tracked by session ID, not card position) -- original "down" behavior, unchanged', () => {
             const session = { Id: 'monitor-persist-1', PlayState: { PlayMethod: 'DirectPlay' }, NowPlayingItem: { Name: 'Long Movie' } };
 
-            // Baseline: closed by default in compact mode.
             controller.prepareRenderPass([session]);
             const closedHtml = controller.renderSessionCard(session, 0);
             assert.ok(closedHtml.includes('aria-expanded="false"'), 'Info panel starts closed');
 
-            // Simulate the user clicking Info (this is what the real click handler does).
             controller.openInfoSessionIds['monitor-persist-1'] = true;
-
-            // Simulate a poll re-render (a fresh prepareRenderPass + renderSessionCard pass,
-            // exactly like fetchSessions() rebuilding the grid from scratch every 3s).
             controller.prepareRenderPass([session]);
             const reopenedHtml = controller.renderSessionCard(session, 0);
             assert.ok(reopenedHtml.includes('aria-expanded="true"'), 'Info panel survives a poll re-render instead of silently closing');
             assert.ok(reopenedHtml.includes('class="playback-details-panel open"'), 'Details panel carries the open class');
 
-            // Once the session disappears (stream ended), prepareRenderPass must prune the
-            // stale open-state entry so it can never leak onto an unrelated future session
-            // that happens to reuse the same card position.
+            for (let i = 0; i < 4; i++) {
+                controller.prepareRenderPass([session]);
+                const html = controller.renderSessionCard(session, 0);
+                assert.ok(html.includes('class="playback-details-panel open"'), `Panel must stay open through poll cycle ${i + 1}`);
+            }
+
             controller.prepareRenderPass([]);
             assert.ok(!controller.openInfoSessionIds['monitor-persist-1'], 'Open-info state is pruned once its session is gone');
+        });
+
+        it('clicking Info while infoViewStyle is "right" calls showInfoSidePanel with the session resolved via cardSessionMap', () => {
+            const handlerStart = htmlContent.indexOf("closest('.playback-btn-info')");
+            const panelCallIdx = htmlContent.indexOf('showInfoSidePanel(', handlerStart);
+            assert.ok(handlerStart > -1 && panelCallIdx > -1, 'Info click handler must call showInfoSidePanel for the "right" view');
+            assert.ok(htmlContent.includes('function showInfoSidePanel'), 'showInfoSidePanel must be defined');
+            assert.ok(htmlContent.includes('pi-info-panel-scrim'), 'Info side panel uses its own scrim, matching the existing showActionModal pattern');
+
+            // The original "down" toggle (openInfoSessionIds) must still be intact in the
+            // same handler -- this is additive, not a replacement.
+            const originalToggleIdx = htmlContent.indexOf('openInfoSessionIds[sessionId] = true', handlerStart);
+            assert.ok(originalToggleIdx > -1, 'Original per-card openInfoSessionIds toggle is still present in the same handler');
+        });
+
+        it('defaults to the "down" Info view (original behavior, unchanged), and "right" is a separate opt-in panel sharing the same field data', () => {
+            assert.equal(controller.getInfoViewStyleForTesting(), 'down', '"Down" (the original inline expand) is the default Info view');
+
+            const session = {
+                Id: 's-infoview-1', UserName: 'ViewUser', Client: 'Jellyfin Web', DeviceName: 'Chrome', PlayMethod: 'DirectPlay',
+                NowPlayingItem: { Name: 'Info View Test', Container: 'mkv', MediaStreams: [{ Type: 'Video', Codec: 'h264', Width: 1920, Height: 1080 }] }
+            };
+
+            const data = controller.computeInfoViewData(session);
+            // Full parity check: every one of these must survive in the Right panel's flat
+            // field list, even though the original 22-field grid presents them grouped.
+            for (const key of ['Product', 'Player', 'State', 'Stream', 'Quality', 'Resolution', 'Frame Rate', 'Video Bitrate', 'Audio Bitrate', 'Bandwidth', 'Container', 'Engine', 'Video', 'Audio', 'Subtitle', 'HDR', 'Location', 'Transcode Reason']) {
+                assert.ok(data.fieldsHtml.includes(`<span class="pi-info-field-key">${key}</span>`), `Right-panel field data includes ${key}`);
+            }
+
+            controller.prepareRenderPass([session]);
+            const downHtml = controller.renderSessionCard(session, 0);
+            assert.ok(downHtml.includes('aria-expanded="false"'), '"Down" style: Info button is the original toggle');
+            assert.ok(downHtml.includes('aria-controls='), '"Down" style: Info button still controls the inline panel');
+            assert.ok(!downHtml.includes('aria-haspopup'), '"Down" style: no dialog/panel affordance on the button');
+
+            controller.setInfoViewStyleForTesting('right');
+            controller.prepareRenderPass([session]);
+            const rightHtml = controller.renderSessionCard(session, 0);
+            assert.ok(rightHtml.includes('aria-haspopup="dialog"'), '"Right" style: Info button announces the side panel');
+            assert.ok(!rightHtml.includes('aria-expanded'), '"Right" style: button is stateless, not a toggle');
+
+            controller.setInfoViewStyleForTesting('down');
+        });
+
+        it('renders the Down/Right Info-view toggle buttons in the page template', () => {
+            assert.ok(htmlContent.includes('id="btnInfoViewDown"'), 'Template includes the Down option button');
+            assert.ok(htmlContent.includes('id="btnInfoViewRight"'), 'Template includes the Right option button');
+        });
+
+        it('sizes the poster large/small by whether the details panel is open (unrelated to the Down/Right Info-view choice)', () => {
+            const session = { Id: 's-poster-2', NowPlayingItem: { Name: 'Poster Sizing Test' } };
+
+            controller.prepareRenderPass([session]);
+            const compactHtml = controller.renderSessionCard(session, 0);
+            assert.ok(compactHtml.includes('playback-poster-wrap poster-lg'), 'Panel closed: large poster');
+
+            controller.setDisplayMode('extended');
+            controller.prepareRenderPass([session]);
+            const extendedHtml = controller.renderSessionCard(session, 0);
+            assert.ok(extendedHtml.includes('playback-poster-wrap poster-sm'), 'Panel open (Extended): small poster');
+            controller.setDisplayMode('compact');
+
+            controller.setInfoViewStyleForTesting('right');
+            controller.prepareRenderPass([session]);
+            const rightHtml = controller.renderSessionCard(session, 0);
+            assert.ok(rightHtml.includes('circle cx="12" cy="12" r="10"'), '"Right" style: info-circle icon shape present');
+            assert.ok(rightHtml.includes('playback-poster-wrap poster-lg'), '"Right" style: poster stays large (compact, drawer closed)');
+            controller.setInfoViewStyleForTesting('down');
         });
 
         it('mirrors the v0.2.5.3 additions on this page too (ETA, Atmos, audio language, subtitle delivery method, avatar)', () => {
@@ -1284,7 +1387,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(activeHtml.includes('7.1'), 'Shows 7.1 audio channels badge');
             assert.ok(activeHtml.includes('MKV'), 'Shows MKV container badge');
             assert.ok(activeHtml.includes('data-action="toggle-info"'), 'Shows Info toggle button');
-            assert.ok(activeHtml.includes('aria-expanded="false"'), 'Info toggle has aria-expanded false');
+            assert.ok(activeHtml.includes('aria-expanded="false"'), 'Info toggle has aria-expanded false (default "down" view, unchanged)');
             assert.ok(activeHtml.includes('aria-controls="details-dash-card-1"'), 'Info toggle points to this card\'s own inline details panel, not a shared side panel');
             assert.ok(activeHtml.includes('data-card-id="dash-card-1"'), 'Info toggle carries its card correlation id');
 
@@ -1409,25 +1512,28 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
                 }
             };
 
-            // Compact mode: section 11's full priority list renders every time (Resolution,
-            // HDR/Dynamic range, Method, Video codec, Bit depth, Audio, Container) -- excess
-            // badges wrap onto additional lines via CSS flex-wrap rather than being cut off.
+            // Compact mode: the full priority list renders every time (Resolution, HDR/Dynamic
+            // range, Method, Video codec, Bit depth, Audio channels, Audio codec, Container) --
+            // excess badges wrap onto additional lines via CSS flex-wrap rather than being cut
+            // off, and nothing is held back for Extended -- Compact is not a stripped-down view.
             const compactHtml = dash.renderSessionCard(richMediaSession, 1, 'compact', false);
             const compactPills = (compactHtml.match(/<span class="playback-pill/g) || []).length;
-            assert.equal(compactPills, 7, 'Compact mode renders the full priority badge list uncapped, got: ' + compactPills);
+            assert.equal(compactPills, 8, 'Compact mode renders the full priority badge list uncapped, got: ' + compactPills);
             assert.ok(compactHtml.includes('4K'), 'Must include Resolution');
             assert.ok(compactHtml.includes('HDR'), 'Must include HDR/Dynamic range');
             assert.ok(compactHtml.includes('Direct Play'), 'Must include Playback Method');
             assert.ok(compactHtml.includes('HEVC'), 'Must include Video Codec');
             assert.ok(compactHtml.includes('10-bit'), 'Must include Bit depth');
             assert.ok(compactHtml.includes('7.1'), 'Must include Audio Channels');
+            assert.ok(compactHtml.includes('TrueHD'), 'Must include Audio Codec, in compact mode too');
             assert.ok(compactHtml.includes('MKV'), 'Must include Container');
             assert.ok(compactHtml.includes('class="playback-pill-row"'), 'Pill row uses CSS flex-wrap for overflow, not JS-side capping');
 
-            // Extended mode adds secondary badges (2nd audio format, active subtitle) on top.
+            // Extended mode renders the identical pill set -- the distinction between the two
+            // modes is Extended auto-opening the full detail breakdown, not withheld pills.
             const extendedHtml = dash.renderSessionCard(richMediaSession, 1, 'extended', false);
             const extendedPills = (extendedHtml.match(/<span class="playback-pill/g) || []).length;
-            assert.ok(extendedPills > compactPills, 'Extended mode renders additional secondary badges beyond compact');
+            assert.equal(extendedPills, compactPills, 'Extended mode renders the same pill set as Compact, nothing withheld');
         });
 
         it('guarantees non-admin user isolation via PlaybackCard/Self/Sessions', async () => {
@@ -1494,7 +1600,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.equal(dash.state.activeSessions[0].MediaTitle, 'Isolated User Stream');
         });
 
-        it('renders accessible [Info] toggle button with aria-expanded and aria-controls', () => {
+        it('renders accessible [Info] toggle button with aria-expanded and aria-controls (original "down" behavior, unchanged)', () => {
             const dash = createMockDashboard();
             const session = {
                 Id: 's-aria',
@@ -1782,7 +1888,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(html.includes('<svg'), 'Must render SVG slate icon instead of a black box');
         });
 
-        it('renders the complete non-identity field grid inline, and Info shares it with Show Details', () => {
+        it('renders the complete non-identity field grid inline, and Show Details renders the same fields', () => {
             const dash = createMockDashboard();
             const session = {
                 Id: 's-grid-26',
@@ -1849,9 +1955,16 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             }
             assert.ok(gridHtml.includes('English (SRT)'), 'Active subtitle stream reports language and codec');
 
-            // Info and Show Details reveal the exact same grid content -- no separate side panel.
+            // Show Details (the global toggle) renders the same field rows -- grouped under
+            // titled sections rather than gridHtml's flat single grid, but every non-identity
+            // key/value pair is the same underlying data via the shared fieldRowHtml renderer.
             const showDetailsHtml = dash.renderSessionCard(session, 0, 'compact', true);
-            assert.ok(showDetailsHtml.includes(gridHtml), 'Show Details renders the identical grid markup inline on the card');
+            for (const key of requiredKeys) {
+                assert.ok(showDetailsHtml.includes(`<span class="playback-info-key">${key}</span>`), `Show Details grid must contain row: ${key}`);
+            }
+            for (const identityKey of ['User', 'Client', 'Client Version', 'Device']) {
+                assert.ok(!showDetailsHtml.includes(`<span class="playback-info-key">${identityKey}</span>`), `Show Details grid must also omit identity field "${identityKey}"`);
+            }
 
             // Missing fields show "Not reported" -- and a non-Transcode session never shows
             // the Transcode-only "Reason not reported by server" fallback (section 9/14).
@@ -1863,7 +1976,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(sparseHtml.includes('<span class="playback-info-key">Transcode Reason</span><span class="playback-info-val">Not applicable</span>'), 'DirectPlay Transcode Reason field must read Not applicable');
         });
 
-        it('Info toggles that one card\'s own inline details, and it survives a full re-render (simulated poll) by session ID', () => {
+        it('Info opens a modal for its own session (by ID), stays stable across poll re-renders, and never leaves stray state once the session ends', () => {
             const dash = createMockDashboard();
             const container = { innerHTML: '' };
 
@@ -1877,26 +1990,112 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             };
 
             dash.renderDashboardContainer(container, [session], [session]);
-            assert.ok(!container.innerHTML.includes('class="playback-details-panel open"'), 'Details panel starts closed');
+            assert.ok(container.innerHTML.includes('data-action="toggle-info"'), 'Info button renders');
+            assert.ok(container.innerHTML.includes('data-session-id="poll-persist-1"'), 'Info button is wired to this exact session ID');
+            assert.ok(!container.innerHTML.includes('class="playback-details-panel open"'), 'Compact, Show Details off: the inline summary panel stays closed -- Info no longer opens it');
 
-            // Toggling Info is exactly what the click handler does: flip the session-ID
-            // flag, then re-render -- no separate dialog/side panel node involved.
-            dash.state.openInfoSessionIds['poll-persist-1'] = true;
-            dash.renderDashboardContainer(container, [session], [session]);
-            assert.ok(container.innerHTML.includes('class="playback-details-panel open"'), 'Details panel opens inline on the card');
-            assert.ok(container.innerHTML.includes('aria-expanded="true"'), 'Info button reflects the open state');
-
-            // Simulate several more poll cycles while the session is still present: the
-            // inline panel must stay open without needing to be re-toggled.
+            // Simulate several more poll cycles while the session is still present: the Info
+            // button keeps targeting the same session ID every time, with no per-card open
+            // state to track (that mechanism no longer exists -- Info is a stateless trigger).
             for (let i = 0; i < 4; i++) {
                 dash.renderDashboardContainer(container, [session], [session]);
-                assert.ok(container.innerHTML.includes('class="playback-details-panel open"'), `Panel must stay open through poll cycle ${i + 1}`);
+                assert.ok(container.innerHTML.includes('data-session-id="poll-persist-1"'), `Info button must still target the right session through poll cycle ${i + 1}`);
             }
 
-            // Session disappears (stream ended) -- its Info state is cleaned up, not carried
-            // forward forever, so it doesn't silently reopen if the same session ID recurs.
+            // Session disappears (stream ended) -- its card, and the Info button on it, is
+            // simply gone; there is no leftover per-session state to clean up.
             dash.renderDashboardContainer(container, [], []);
-            assert.equal(dash.state.openInfoSessionIds['poll-persist-1'], undefined, 'Stale per-card Info state is dropped once the session is gone');
+            assert.ok(!container.innerHTML.includes('poll-persist-1'), 'Ended session leaves no trace once gone');
+        });
+
+        it('clicking Info while infoViewStyle is "right" calls showInfoSidePanel with the session resolved from data-session-id', () => {
+            const dashboardSource = fs.readFileSync(dashboardJsPath, 'utf8');
+            const handlerStart = dashboardSource.indexOf('function attachContainerEvents');
+            const infoHandlerStart = dashboardSource.indexOf('data-action="toggle-info"', handlerStart);
+            const panelCallIdx = dashboardSource.indexOf('showInfoSidePanel(', infoHandlerStart);
+            assert.ok(infoHandlerStart > -1 && panelCallIdx > -1, 'Info click handler must call showInfoSidePanel for the "right" view');
+            assert.ok(dashboardSource.includes('function showInfoSidePanel'), 'showInfoSidePanel must be defined');
+            assert.ok(dashboardSource.includes('pi-info-panel-scrim'), 'Info side panel uses its own scrim, matching the existing showActionModal pattern');
+
+            // The original "down" toggle (infoOverrides) must still be intact right there
+            // in the same handler -- this is additive, not a replacement.
+            const overrideIdx = dashboardSource.indexOf('state.infoOverrides[sessionId] = !currentlyOpen', infoHandlerStart);
+            assert.ok(overrideIdx > -1 && overrideIdx < panelCallIdx + 2000, 'Original per-card infoOverrides toggle is still present in the same handler');
+        });
+
+        it('defaults to the "down" Info view (original behavior, unchanged), and "right" is a separate opt-in panel sharing the same field data', () => {
+            const dash = createMockDashboard();
+            assert.equal(dash.state.infoViewStyle, 'down', '"Down" (the original inline expand) is the default Info view');
+
+            const session = {
+                Id: 's-infoview-1', UserName: 'ViewUser', Client: 'Jellyfin Web', DeviceName: 'Chrome', PlayMethod: 'DirectPlay',
+                NowPlayingItem: { Name: 'Info View Test', Container: 'mkv', MediaStreams: [{ Type: 'Video', Codec: 'h264', Width: 1920, Height: 1080 }] }
+            };
+
+            const data = dash.computeInfoViewData(session);
+            // Full parity check: every one of these must survive in the Right panel's flat
+            // field list, even though the original 22-field grid presents them grouped.
+            for (const key of ['Product', 'Player', 'State', 'Stream', 'Quality', 'Resolution', 'Frame Rate', 'Video Bitrate', 'Audio Bitrate', 'Bandwidth', 'Container', 'Engine', 'Video', 'Audio', 'Subtitle', 'HDR', 'Location', 'Transcode Reason']) {
+                assert.ok(data.fieldsHtml.includes(`<span class="pi-info-field-key">${key}</span>`), `Right-panel field data includes ${key}`);
+            }
+
+            // "Down" (default): Info toggles the original inline grouped drawer, exactly
+            // as before -- no right panel involved at all.
+            const downHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(downHtml.includes('aria-expanded="false"'), '"Down" style: Info button is the original toggle');
+            assert.ok(downHtml.includes('aria-controls='), '"Down" style: Info button still controls the inline panel');
+            assert.ok(!downHtml.includes('aria-haspopup'), '"Down" style: no dialog/panel affordance on the button');
+
+            // "Right": Info button instead announces the side panel; the inline grouped
+            // drawer's own open/closed state (Show Details) is untouched by this switch.
+            dash.state.infoViewStyle = 'right';
+            const rightHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(rightHtml.includes('aria-haspopup="dialog"'), '"Right" style: Info button announces the side panel');
+            assert.ok(!rightHtml.includes('aria-expanded'), '"Right" style: button is stateless, not a toggle');
+
+            dash.state.infoViewStyle = 'down';
+        });
+
+        it('the Down/Right Info-view toggle buttons are wired independently of the mode toggle, and the original per-card override still works', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+            const session = { Id: 's-infoview-2', NowPlayingItem: { Name: 'Toggle Test' } };
+
+            dash.renderDashboardContainer(container, [session], [session]);
+            assert.ok(container.innerHTML.includes('data-infoview="down"'), 'Header renders the Down option');
+            assert.ok(container.innerHTML.includes('data-infoview="right"'), 'Header renders the Right option');
+
+            // Original per-card override still works exactly as before, and is still
+            // pruned once its session ends.
+            dash.state.infoOverrides['s-infoview-2'] = true;
+            dash.renderDashboardContainer(container, [session], [session]);
+            assert.ok(container.innerHTML.includes('class="playback-details-panel open"'), 'Per-card override still opens the inline panel');
+
+            dash.renderDashboardContainer(container, [], []);
+            assert.ok(dash.state.infoOverrides['s-infoview-2'] === undefined, 'Stale per-card override is pruned once its session is gone');
+        });
+
+        it('sizes the poster large/medium/small by how much telemetry is showing (unrelated to the Down/Right Info-view choice)', () => {
+            const dash = createMockDashboard();
+            const session = { Id: 's-poster-1', NowPlayingItem: { Name: 'Poster Sizing Test' } };
+
+            const compactHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(compactHtml.includes('playback-poster-wrap poster-lg'), 'Compact, nothing expanded: large poster');
+
+            const extendedHtml = dash.renderSessionCard(session, 0, 'extended', false);
+            assert.ok(extendedHtml.includes('playback-poster-wrap poster-md'), 'Extended: medium poster');
+
+            const showDetailsHtml = dash.renderSessionCard(session, 0, 'compact', true);
+            assert.ok(showDetailsHtml.includes('playback-poster-wrap poster-sm'), 'Show Details open: small poster');
+
+            // "Right" style: Info button always shows the info-circle, never the chevron,
+            // and never affects poster size (the side panel is a separate overlay).
+            dash.state.infoViewStyle = 'right';
+            const rightHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(rightHtml.includes('playback-info-icon'), '"Right" style: info-circle icon');
+            assert.ok(!rightHtml.includes('playback-chevron-icon'), '"Right" style: never the chevron');
+            assert.ok(rightHtml.includes('playback-poster-wrap poster-lg'), '"Right" style: poster stays large (compact, drawer closed)');
+            dash.state.infoViewStyle = 'down';
         });
     });
 
@@ -2049,26 +2248,25 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(!reclosedHtml.includes('<span class="playback-info-key">Source Video Codec</span>'), 'Toggling Show Details back off hides the grid again');
         });
 
-        it('highlights the Info button by session identity, not card position, when session order shifts', () => {
+        it('targets the Info button by session identity, not card position, when session order shifts', () => {
             const dash = createMockDashboard();
             const container = { innerHTML: '' };
             const sessionA = { Id: 'session-a', UserName: 'A', NowPlayingItem: { Name: 'Movie A' } };
             const sessionB = { Id: 'session-b', UserName: 'B', NowPlayingItem: { Name: 'Movie B' } };
 
-            // Open Info for session B while it is in the second slot.
             dash.renderDashboardContainer(container, [sessionA, sessionB], [sessionA, sessionB]);
-            dash.state.openInfoSessionIds['session-b'] = true;
 
             // Session order flips (B now renders first, in what used to be A's slot) -- as
-            // a real poll re-render would do if one session started/stopped.
+            // a real poll re-render would do if one session started/stopped. Each card's Info
+            // button must still carry ITS OWN session's ID, not the ID of whichever session
+            // now happens to occupy that card position.
             dash.renderDashboardContainer(container, [sessionB, sessionA], [sessionB, sessionA]);
-            assert.equal(dash.state.openInfoSessionIds['session-b'], true, 'Open state remains targeted at session B by ID regardless of position');
 
             const cardChunks = container.innerHTML.split('<div class="playback-card"').slice(1);
             const movieBCard = cardChunks.find((c) => c.includes('Movie B'));
             const movieACard = cardChunks.find((c) => c.includes('Movie A'));
-            assert.ok(movieBCard.includes('aria-expanded="true"'), 'Session B\'s Info button is highlighted, since its details are actually open');
-            assert.ok(movieACard.includes('aria-expanded="false"'), 'Session A\'s Info button is NOT highlighted, even though it now occupies B\'s old slot');
+            assert.ok(movieBCard.includes('data-session-id="session-b"'), 'Session B\'s card carries session B\'s ID on its Info button');
+            assert.ok(movieACard.includes('data-session-id="session-a"'), 'Session A\'s card carries session A\'s ID on its Info button, even though it now occupies B\'s old slot');
         });
     });
 
@@ -2169,10 +2367,12 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
                 }
             };
             const html = dash.renderSessionCard(session, 0, 'extended', false);
-            assert.ok(/<span class="playback-pill res"><svg class="pill-icon"/.test(html), 'Resolution pill leads with an icon');
-            assert.ok(/<span class="playback-pill hdr"><svg class="pill-icon"/.test(html), 'HDR pill leads with an icon');
-            assert.ok(/<span class="playback-pill audio"><svg class="pill-icon"/.test(html), 'Audio pill leads with an icon');
-            assert.ok(!/<span class="playback-pill "><svg/.test(html), 'Plain codec/bit-depth/container pills stay icon-free');
+            // Pills may carry a title="..." tooltip attribute between the class and '>' now,
+            // so these tolerate any attributes rather than requiring exact adjacency.
+            assert.ok(/<span class="playback-pill res"[^>]*><svg class="pill-icon"/.test(html), 'Resolution pill leads with an icon');
+            assert.ok(/<span class="playback-pill hdr"[^>]*><svg class="pill-icon"/.test(html), 'HDR pill leads with an icon');
+            assert.ok(/<span class="playback-pill audio"[^>]*><svg class="pill-icon"/.test(html), 'Audio pill leads with an icon');
+            assert.ok(!/<span class="playback-pill "[^>]*><svg/.test(html), 'Plain codec/bit-depth/container pills stay icon-free');
         });
 
         it('places the progress bar directly under the title/subtitle, above the technical pill row', () => {
@@ -2205,8 +2405,8 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
                 }
             };
             const html = controller.renderSessionCard(session, 0);
-            assert.ok(/<span class="playback-pill res"><svg class="pill-icon"/.test(html), 'Resolution pill leads with an icon');
-            assert.ok(/<span class="playback-pill audio"><svg class="pill-icon"/.test(html), 'Audio pill leads with an icon');
+            assert.ok(/<span class="playback-pill res"[^>]*><svg class="pill-icon"/.test(html), 'Resolution pill leads with an icon');
+            assert.ok(/<span class="playback-pill audio"[^>]*><svg class="pill-icon"/.test(html), 'Audio pill leads with an icon');
         });
 
         it('places the progress bar directly under the title/subtitle, above the pill row, on the standalone page', () => {
@@ -2230,6 +2430,28 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.match(html, /playback-summary-value">2<\/span><span class="playback-summary-label">Active Streams/);
             assert.ok(html.includes('stat-transcode active'), 'Transcoding stat is active when at least one session is transcoding');
             assert.equal(controller.buildSummaryStripHtml([]), '', 'No markup at all when there are zero sessions');
+        });
+    });
+
+    describe('25. Network Location Badge (strictly opt-in, off by default)', () => {
+        it('Dashboard widget: renders no geo badge by default, and only for a session with an explicit matching label', () => {
+            const dash = createMockDashboard();
+            const sessionA = { Id: 'dash-sess-a', NowPlayingItem: { Name: 'A' }, PlayMethod: 'DirectPlay' };
+            const sessionB = { Id: 'dash-sess-b', NowPlayingItem: { Name: 'B' }, PlayMethod: 'DirectPlay' };
+
+            const beforeHtml = dash.renderSessionCard(sessionA, 0, 'compact', false);
+            assert.ok(!beforeHtml.includes('playback-pill geo'), 'No geo badge before the (opt-in) label poll has ever populated anything');
+
+            dash.state.networkLocationLabels = { 'dash-sess-a': 'Local Network' };
+
+            const htmlA = dash.renderSessionCard(sessionA, 0, 'compact', false);
+            assert.ok(/<span class="playback-pill geo"[^>]*>/.test(htmlA));
+            assert.ok(htmlA.includes('Local Network'));
+
+            const htmlB = dash.renderSessionCard(sessionB, 1, 'compact', false);
+            assert.ok(!htmlB.includes('playback-pill geo'), 'A different session ID must never inherit another session\'s label');
+
+            dash.state.networkLocationLabels = {};
         });
     });
 });

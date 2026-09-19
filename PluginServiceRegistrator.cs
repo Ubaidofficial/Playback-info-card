@@ -25,6 +25,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IDiscordWebhookSender, DiscordWebhookSender>();
         serviceCollection.AddSingleton<ITelegramBotApiSender, TelegramBotApiSender>();
 
+        // Strictly opt-in (off by default): resolves a session's remote IP into a safe
+        // Local Network/Remote(+city/country) label without ever exposing the raw address.
+        serviceCollection.AddSingleton<INetworkLocationService, NetworkLocationService>();
+
         // Register background delivery worker (shared singleton for delivery interface and hosted service)
         serviceCollection.AddSingleton<NotificationDeliveryService>();
         serviceCollection.AddSingleton<INotificationDeliveryService>(sp => sp.GetRequiredService<NotificationDeliveryService>());

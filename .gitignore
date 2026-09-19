@@ -34,3 +34,4 @@ scratch/
 Library/
 output/
 *.zip
+.preview/
