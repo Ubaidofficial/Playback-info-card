@@ -225,6 +225,25 @@ public class DiscordWebhookSenderTests
     }
 
     [Fact]
+    public void BuildDiscordJsonPayload_OmitsThumbnail_ByDefault()
+    {
+        var json = DiscordWebhookSender.BuildDiscordJsonPayload(CreateSamplePayload());
+        using var doc = JsonDocument.Parse(json);
+        var embed = doc.RootElement.GetProperty("embeds")[0];
+        Assert.False(embed.TryGetProperty("thumbnail", out _));
+    }
+
+    [Fact]
+    public void BuildDiscordJsonPayload_IncludesAttachmentThumbnail_WhenRequested()
+    {
+        var json = DiscordWebhookSender.BuildDiscordJsonPayload(CreateSamplePayload(), includeImageAttachment: true);
+        using var doc = JsonDocument.Parse(json);
+        var embed = doc.RootElement.GetProperty("embeds")[0];
+        Assert.True(embed.TryGetProperty("thumbnail", out var thumbnail));
+        Assert.Equal("attachment://poster.jpg", thumbnail.GetProperty("url").GetString());
+    }
+
+    [Fact]
     public void BuildDiscordJsonPayload_EnforcesCombined6000CharLimit_AndPrioritizesCoreFields()
     {
         var payload = new PlaybackNotificationPayload

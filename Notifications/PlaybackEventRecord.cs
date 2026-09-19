@@ -207,6 +207,15 @@ public sealed class PlaybackEventRecord
     public bool PlayedToCompletion { get; init; }
 
     /// <summary>
+    /// On-disk path to the item's cached Primary image, if one exists locally. Internal only,
+    /// like <see cref="InternalSessionKey"/> -- this is a local file path, which must never reach
+    /// <see cref="PlaybackNotificationPayload"/> (the strict outbound allow-listed DTO explicitly
+    /// documented to exclude file paths). Senders read the bytes from this path themselves, right
+    /// before dispatch, rather than this record or the payload ever carrying raw image bytes.
+    /// </summary>
+    internal string? PrimaryImagePath { get; init; }
+
+    /// <summary>
     /// Projects this internal event record to the strict outbound allow-listed DTO.
     /// Strictly excludes RemoteEndPoint, IP addresses, internal session identifiers,
     /// file paths, auth tokens, and raw session objects.

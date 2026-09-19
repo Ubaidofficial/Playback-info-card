@@ -44,6 +44,13 @@ public class PluginConfiguration : BasePluginConfiguration
         ClientDeviceDisclosure = false;
         NetworkLocationDisclosure = false;
 
+        // Poster art isn't sensitive data (unlike the disclosures above), so this defaults on.
+        IncludePosterImage = true;
+
+        // 0 = no configured limit (the summary strip's bandwidth gauge just shows the raw
+        // total, no percentage-of-capacity warning).
+        UploadBandwidthLimitMbps = 0;
+
         // User filtering defaults
         UserFilterMode = Notifications.UserFilterMode.AllUsers;
         SelectedUserIds = new List<string>();
@@ -137,6 +144,20 @@ public class PluginConfiguration : BasePluginConfiguration
     /// does so for a session's remote IP, only when this is explicitly enabled.
     /// </summary>
     public bool NetworkLocationDisclosure { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the item's poster/primary image is attached to Discord/Telegram
+    /// notifications when one is cached locally. Not a privacy disclosure like the settings
+    /// above -- a poster image isn't personal data -- so this defaults to enabled.
+    /// </summary>
+    public bool IncludePosterImage { get; set; }
+
+    /// <summary>
+    /// Gets or sets the admin's configured upstream bandwidth limit in Mbps, used only to show
+    /// a percentage-of-capacity figure on the summary strip's bandwidth gauge. 0 means unset --
+    /// no percentage is shown, just the raw total. Never enforced or acted on automatically.
+    /// </summary>
+    public int UploadBandwidthLimitMbps { get; set; }
 
     /// <summary>
     /// User filtering mode (AllUsers, Whitelist, Blacklist).

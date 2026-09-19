@@ -17,7 +17,7 @@ namespace Jellyfin.Plugin.PlaybackCard.Notifications;
 /// </summary>
 public interface ITelegramBotApiSender
 {
-    Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken);
+    Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken, string? posterImagePath = null);
     Task<DeliveryResult> SendTestAsync(string botToken, string chatId, CancellationToken cancellationToken);
 }
 
@@ -92,13 +92,15 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
     }
 
     /// <summary>
-    /// Validates Telegram Bot API parameters and builds strict endpoint URI.
-    /// Rejects arbitrary hosts, non-HTTPS schemes, non-443 ports, userinfo, invalid tokens, and malformed chat IDs.
+    /// Validates a Telegram bot token's format in isolation, independent of any chat ID.
+    /// Allows the token to be saved as soon as its own syntax is valid, without requiring
+    /// a Chat ID to already be configured (previously <see cref="ValidateEndpoint"/> required
+    /// both together, so saving the token alone -- e.g. before the Chat ID was ever set --
+    /// was rejected and the token silently never persisted).
     /// </summary>
-    public static bool ValidateEndpoint(string? botToken, string? chatId, out Uri? validatedUri, out string errorCategory)
+    public static bool ValidateTokenFormat(string? botToken, out string errorCategory)
     {
-        validatedUri = null;
-        if (string.IsNullOrWhiteSpace(botToken) || string.IsNullOrWhiteSpace(chatId))
+        if (string.IsNullOrWhiteSpace(botToken))
         {
             errorCategory = "InvalidConfiguration";
             return false;
@@ -106,28 +108,68 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
 
         var trimmedToken = NormalizeToken(botToken);
 
-        if (trimmedToken.Any(char.IsControl) || trimmedToken.Any(char.IsWhiteSpace) ||
-            chatId.Any(char.IsControl) || chatId.Any(char.IsWhiteSpace) ||
-            chatId.Contains('?') || chatId.Contains('#') || chatId.Contains('/') || chatId.Contains('\\'))
+        if (trimmedToken.Any(char.IsControl) || trimmedToken.Any(char.IsWhiteSpace) || !TokenFormatRegex.IsMatch(trimmedToken))
         {
             errorCategory = "InvalidConfiguration";
             return false;
         }
 
-        if (!TokenFormatRegex.IsMatch(trimmedToken))
+        errorCategory = "OK";
+        return true;
+    }
+
+    /// <summary>
+    /// Validates a Telegram Chat ID's format in isolation, independent of any bot token.
+    /// Trims before checking for whitespace/control characters (previously the raw,
+    /// untrimmed value was checked, so a Chat ID with an accidental leading/trailing space
+    /// was rejected even though trimming it would have made it valid).
+    /// </summary>
+    public static bool ValidateChatIdFormat(string? chatId, out string errorCategory)
+    {
+        if (string.IsNullOrWhiteSpace(chatId))
         {
             errorCategory = "InvalidConfiguration";
             return false;
         }
 
-        // Validate Chat ID: numeric or @channel username
         var trimmedChatId = chatId.Trim();
+
+        if (trimmedChatId.Any(char.IsControl) || trimmedChatId.Any(char.IsWhiteSpace) ||
+            trimmedChatId.Contains('?') || trimmedChatId.Contains('#') || trimmedChatId.Contains('/') || trimmedChatId.Contains('\\'))
+        {
+            errorCategory = "InvalidConfiguration";
+            return false;
+        }
+
         if (!NumericChatIdRegex.IsMatch(trimmedChatId) && !ChannelUsernameRegex.IsMatch(trimmedChatId))
         {
             errorCategory = "InvalidConfiguration";
             return false;
         }
 
+        errorCategory = "OK";
+        return true;
+    }
+
+    /// <summary>
+    /// Validates Telegram Bot API parameters and builds strict endpoint URI.
+    /// Rejects arbitrary hosts, non-HTTPS schemes, non-443 ports, userinfo, invalid tokens, and malformed chat IDs.
+    /// </summary>
+    public static bool ValidateEndpoint(string? botToken, string? chatId, out Uri? validatedUri, out string errorCategory)
+    {
+        validatedUri = null;
+
+        if (!ValidateTokenFormat(botToken, out errorCategory))
+        {
+            return false;
+        }
+
+        if (!ValidateChatIdFormat(chatId, out errorCategory))
+        {
+            return false;
+        }
+
+        var trimmedToken = NormalizeToken(botToken);
         var uriString = $"https://api.telegram.org/bot{trimmedToken}/sendMessage";
         if (!Uri.TryCreate(uriString, UriKind.Absolute, out var uri))
         {
@@ -215,7 +257,7 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken)
+    public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken, string? posterImagePath = null)
     {
         ArgumentNullException.ThrowIfNull(chatId);
 
@@ -225,10 +267,42 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             return DeliveryResult.Failed(errorCat, 0, permanent: true);
         }
 
+        var trimmedChatId = chatId.Trim();
+        var imageBytes = WebhookImageLoader.TryReadImageBytes(posterImagePath, _logger, "TelegramSender");
+
+        if (imageBytes != null)
+        {
+            // sendPhoto's caption is capped at 1024 chars, well under sendMessage's 4096 --
+            // reuse the same tag-safe truncation, just to the tighter limit.
+            var captionHtml = TruncateHtmlSafely(BuildTelegramMessageHtml(payload), 1024);
+            var photoUri = new Uri($"https://api.telegram.org/bot{NormalizeToken(botToken)}/sendPhoto");
+            var capturedBytes = imageBytes;
+
+            return await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
+                _httpClient,
+                _logger,
+                TelegramProfile,
+                photoUri,
+                () =>
+                {
+                    var multipart = new MultipartFormDataContent();
+                    multipart.Add(new StringContent(trimmedChatId), "chat_id");
+                    multipart.Add(new StringContent(captionHtml), "caption");
+                    multipart.Add(new StringContent("HTML"), "parse_mode");
+                    multipart.Add(new StringContent("true"), "protect_content");
+                    var photoContent = new ByteArrayContent(capturedBytes);
+                    photoContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+                    multipart.Add(photoContent, "photo", "poster.jpg");
+                    return multipart;
+                },
+                DelayAsync,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         var messageHtml = BuildTelegramMessageHtml(payload);
         var jsonPayload = JsonSerializer.Serialize(new Dictionary<string, object>
         {
-            ["chat_id"] = chatId.Trim(),
+            ["chat_id"] = trimmedChatId,
             ["text"] = messageHtml,
             ["parse_mode"] = "HTML",
             ["protect_content"] = true,
@@ -313,7 +387,7 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
         }
         else
         {
-            sb.Append("<b>Movie:</b> ").Append(EscapeHtml(payload.MediaTitle));
+            sb.Append("<b>").Append(NonEpisodeItemLabel(payload.ItemType)).Append(":</b> ").Append(EscapeHtml(payload.MediaTitle));
             if (payload.ProductionYear.HasValue && payload.ProductionYear > 0)
             {
                 sb.Append(CultureInfo.InvariantCulture, $" ({payload.ProductionYear})");
@@ -360,8 +434,8 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
 
         if (payload.TotalDuration.HasValue && payload.TotalDuration.Value > TimeSpan.Zero)
         {
-            var pos = payload.Position.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-            var dur = payload.TotalDuration.Value.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+            var pos = FormatDuration(payload.Position);
+            var dur = FormatDuration(payload.TotalDuration.Value);
             var pct = payload.PlaybackPercentage.HasValue ? $" ({payload.PlaybackPercentage}%)" : "";
             sb.Append("<b>Progress:</b> ").Append(CultureInfo.InvariantCulture, $"{pos} / {dur}{pct}\n");
         }
@@ -374,6 +448,35 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
         }
 
         return TruncateHtmlSafely(sb.ToString(), 4096);
+    }
+
+    /// <summary>
+    /// Formats a <see cref="TimeSpan"/> as H:MM:SS with unbounded hours. The "hh" custom format
+    /// specifier wraps at 24 (a 30-hour audiobook/livestream session would silently display as
+    /// "06:00:00"), so total hours are computed explicitly instead.
+    /// </summary>
+    private static string FormatDuration(TimeSpan ts)
+    {
+        return string.Format(CultureInfo.InvariantCulture, "{0:D2}:{1:D2}:{2:D2}", (int)ts.TotalHours, ts.Minutes, ts.Seconds);
+    }
+
+    /// <summary>
+    /// Picks the label preceding a non-episode item's title. Only episodes reach the "Series"
+    /// branch above; everything else (movies, music tracks, audiobooks, live TV, home videos)
+    /// previously always displayed "Movie:" regardless of its actual type.
+    /// </summary>
+    private static string NonEpisodeItemLabel(string? itemType)
+    {
+        return itemType switch
+        {
+            "Movie" => "Movie",
+            "Audio" => "Track",
+            "MusicVideo" => "Music Video",
+            "AudioBook" => "Audiobook",
+            "Book" => "Book",
+            "LiveTvChannel" or "LiveTvProgram" => "Live TV",
+            _ => "Title"
+        };
     }
 
     public static string EscapeHtml(string? input)

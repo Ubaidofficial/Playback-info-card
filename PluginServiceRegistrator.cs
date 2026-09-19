@@ -29,6 +29,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         // Local Network/Remote(+city/country) label without ever exposing the raw address.
         serviceCollection.AddSingleton<INetworkLocationService, NetworkLocationService>();
 
+        // Bounded in-memory "recently finished" history, independent of the notification
+        // pipeline/settings -- purely a UI convenience, cleared on restart.
+        serviceCollection.AddSingleton<IRecentSessionsHistoryService, RecentSessionsHistoryService>();
+
         // Register background delivery worker (shared singleton for delivery interface and hosted service)
         serviceCollection.AddSingleton<NotificationDeliveryService>();
         serviceCollection.AddSingleton<INotificationDeliveryService>(sp => sp.GetRequiredService<NotificationDeliveryService>());

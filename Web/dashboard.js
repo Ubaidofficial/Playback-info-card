@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.7.4)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.7.6)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,8 +7,8 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.7.4';
-    var ASSET_REVISION = '0.2.7.4';
+    var VERSION = '0.2.7.6';
+    var ASSET_REVISION = '0.2.7.6';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -58,8 +58,20 @@
         // ID, never by IP.
         networkLocationEnabled: false,
         networkLocationConfigCheckedAt: 0,
-        networkLocationLabels: {}
+        networkLocationLabels: {},
+
+        // First-observed pause timestamp per session ID, tracked client-side across poll
+        // cycles -- a session only reports its current paused flag, not how long it's been
+        // that way. Set the first time a session is seen paused, cleared the moment it isn't.
+        pausedSinceBySession: {},
+
+        // Admin-configured upstream cap for the bandwidth gauge's percentage display, mirrored
+        // from the saved setting by ensureNetworkLocationConfigLoaded's periodic config check.
+        // 0 = unset. Purely cosmetic, never enforced.
+        uploadBandwidthLimitMbps: 0
     };
+
+    var ZOMBIE_STREAM_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -223,6 +235,49 @@
         if (hours12 === 0) hours12 = 12;
         var paddedMinutes = minutes < 10 ? '0' + minutes : String(minutes);
         return hours12 + ':' + paddedMinutes + ' ' + ampm;
+    }
+
+    // Maps the 2/3-letter language codes media files are typically tagged with (ISO 639-1/639-2,
+    // e.g. "por", "spa", "eng") to a readable English name for pill tooltips. Most files carry only
+    // this generic code with no country/region info (Brazil vs. Portugal, Latin America vs. Spain,
+    // US vs. UK all collapse to the same 3-letter tag) -- that distinction isn't recoverable from
+    // it, so this only expands the language itself, never guesses a region.
+    var LANGUAGE_DISPLAY_NAMES = {
+        ENG: 'English', EN: 'English',
+        POR: 'Portuguese', PT: 'Portuguese',
+        SPA: 'Spanish', ES: 'Spanish',
+        FRE: 'French', FRA: 'French', FR: 'French',
+        GER: 'German', DEU: 'German', DE: 'German',
+        ITA: 'Italian', IT: 'Italian',
+        JPN: 'Japanese', JA: 'Japanese',
+        KOR: 'Korean', KO: 'Korean',
+        CHI: 'Chinese', ZHO: 'Chinese', ZH: 'Chinese',
+        RUS: 'Russian', RU: 'Russian',
+        ARA: 'Arabic', AR: 'Arabic',
+        HIN: 'Hindi', HI: 'Hindi',
+        DUT: 'Dutch', NLD: 'Dutch', NL: 'Dutch',
+        SWE: 'Swedish', SV: 'Swedish',
+        NOR: 'Norwegian', NOB: 'Norwegian', NB: 'Norwegian', NO: 'Norwegian',
+        DAN: 'Danish', DA: 'Danish',
+        FIN: 'Finnish', FI: 'Finnish',
+        POL: 'Polish', PL: 'Polish',
+        TUR: 'Turkish', TR: 'Turkish',
+        GRE: 'Greek', ELL: 'Greek', EL: 'Greek',
+        HEB: 'Hebrew', HE: 'Hebrew',
+        THA: 'Thai', TH: 'Thai',
+        VIE: 'Vietnamese', VI: 'Vietnamese',
+        IND: 'Indonesian', ID: 'Indonesian',
+        CZE: 'Czech', CES: 'Czech', CS: 'Czech',
+        HUN: 'Hungarian', HU: 'Hungarian',
+        RUM: 'Romanian', RON: 'Romanian', RO: 'Romanian',
+        UKR: 'Ukrainian', UK: 'Ukrainian'
+    };
+
+    function getLanguageDisplayName(code) {
+        if (!code) return '';
+        var upper = String(code).toUpperCase();
+        var base = upper.split(/[-_]/)[0];
+        return LANGUAGE_DISPLAY_NAMES[upper] || LANGUAGE_DISPLAY_NAMES[base] || upper;
     }
 
     function extractSubtitleBadge(session, item) {
@@ -1173,7 +1228,7 @@
         return { title: title, subtitle: subtitle };
     }
 
-    function renderSessionCard(session, index, displayMode, showAllDetails) {
+    function renderSessionCard(session, index, displayMode, showAllDetails, allSessions) {
         try {
             if (!session || typeof session !== 'object') {
                 return '';
@@ -1219,6 +1274,29 @@
             var isPaused = classification.isPaused;
             var isVideoDirect = classification.isVideoDirect;
             var isAudioDirect = classification.isAudioDirect;
+
+            // Zombie-stream tracking: record the first time this session is observed paused,
+            // clear it the moment it isn't.
+            var pausedDurationMs = 0;
+            if (session.Id) {
+                if (isPaused) {
+                    if (!state.pausedSinceBySession[session.Id]) {
+                        state.pausedSinceBySession[session.Id] = Date.now();
+                    }
+                    pausedDurationMs = Date.now() - state.pausedSinceBySession[session.Id];
+                } else {
+                    delete state.pausedSinceBySession[session.Id];
+                }
+            }
+
+            // Concurrent-streams-per-user: counts only sessions actually playing something,
+            // grouped by the real account identity (UserId), never guessed from a display name.
+            var concurrentUserStreamCount = 1;
+            if (Array.isArray(allSessions) && session.UserId) {
+                concurrentUserStreamCount = allSessions.filter(function (s) {
+                    return s && s.UserId === session.UserId && (s.NowPlayingItem || s.MediaTitle);
+                }).length;
+            }
 
             var METHOD_LABELS = { DirectPlay: 'Direct Play', DirectStream: 'Direct Stream', Remux: 'Remux', Transcode: 'Transcode' };
             var METHOD_BADGE_CLASSES = { DirectPlay: 'direct-play', DirectStream: 'direct-stream', Remux: 'remux', Transcode: 'transcode' };
@@ -1344,7 +1422,19 @@
             // Whether subtitles are on at all is a one-glance fact worth having in Compact,
             // same reasoning as bitrate/frame rate above -- not gated to Extended.
             var subBadge = extractSubtitleBadge(session, item);
-            if (subBadge) pushPill('sub', subBadge, 'sub', (subBadge.indexOf(':') !== -1 ? subBadge : ('Subtitle: ' + subBadge)));
+            if (subBadge) {
+                var subTitle = subBadge.indexOf(':') !== -1 ? subBadge : ('Subtitle: ' + subBadge);
+                // subBadge is "Sub: XXX" / "CC: XXX" -- expand just the trailing language code in
+                // the hover tooltip (e.g. "Sub: Portuguese") without touching the compact pill text.
+                var subLangMatch = /:\s*([A-Za-z]{2,3})$/.exec(subBadge);
+                if (subLangMatch) {
+                    var subFriendlyLang = getLanguageDisplayName(subLangMatch[1]);
+                    if (subFriendlyLang && subFriendlyLang.toUpperCase() !== subLangMatch[1].toUpperCase()) {
+                        subTitle = subTitle.slice(0, subTitle.length - subLangMatch[1].length) + subFriendlyLang;
+                    }
+                }
+                pushPill('sub', subBadge, 'sub', subTitle);
+            }
 
             // Network location: strictly opt-in (off by default) and populated by a separate,
             // independently-polled admin-only endpoint -- never derived from anything in this
@@ -1353,6 +1443,32 @@
             var netLocLabel = session.Id ? state.networkLocationLabels[session.Id] : null;
             if (netLocLabel) {
                 pills.push({ text: netLocLabel, cls: 'geo', title: 'Network Location: ' + netLocLabel });
+            }
+
+            // Only surface once paused for a while -- a normal "stepped away for a minute"
+            // pause isn't a zombie stream, and flagging every brief pause would just be noise.
+            if (pausedDurationMs >= 5 * 60 * 1000) {
+                var pausedMinutes = Math.floor(pausedDurationMs / 60000);
+                var pausedLabel = pausedMinutes >= 60
+                    ? ('Paused ' + Math.floor(pausedMinutes / 60) + 'h ' + (pausedMinutes % 60) + 'm')
+                    : ('Paused ' + pausedMinutes + 'm');
+                var isZombie = pausedDurationMs >= ZOMBIE_STREAM_THRESHOLD_MS;
+                pills.push({
+                    text: pausedLabel,
+                    cls: 'zombie',
+                    warn: isZombie ? 'red' : 'amber',
+                    title: isZombie
+                        ? 'Paused for over an hour -- still holding server resources (transcode temp files, hardware encoder lock if transcoding). Consider stopping it.'
+                        : 'Paused a while -- keeps holding server resources for as long as it stays open.'
+                });
+            }
+
+            if (concurrentUserStreamCount > 1) {
+                pills.push({
+                    text: concurrentUserStreamCount + ' concurrent streams',
+                    cls: 'concurrent',
+                    title: 'This account has ' + concurrentUserStreamCount + ' active playback sessions right now.'
+                });
             }
 
             var pillHtml = pills.map(function (p) {
@@ -1861,19 +1977,80 @@
     // real method regardless of pause state -- unlike the header's mutually-exclusive
     // Direct Play/Direct Stream/Remux/Transcode/Paused chips, a paused Transcode session
     // must still count as "Transcoding" here, or the two totals would silently omit it.
+    // Same tInfo.Bitrate -> videoStream.BitRate fallback the per-card "Overall Bitrate" pill
+    // already uses -- kept in sync with that logic rather than duplicating a third copy of it.
+    function getSessionBitrateBps(session) {
+        if (!session || typeof session !== 'object') return 0;
+        var tInfo = session.TranscodingInfo;
+        if (tInfo && typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
+            return tInfo.Bitrate;
+        }
+        var mediaStreams = (session.NowPlayingItem && session.NowPlayingItem.MediaStreams) || [];
+        for (var i = 0; i < mediaStreams.length; i++) {
+            if (mediaStreams[i].Type === 'Video' && typeof mediaStreams[i].BitRate === 'number' && isFinite(mediaStreams[i].BitRate) && mediaStreams[i].BitRate > 0) {
+                return mediaStreams[i].BitRate;
+            }
+        }
+        return 0;
+    }
+
     function buildSummaryStripHtml(activeSessions) {
         var sessions = Array.isArray(activeSessions) ? activeSessions : [];
         if (sessions.length <= 0) return '';
         var directTotal = 0;
         var transcodingTotal = 0;
+        var totalBps = 0;
+        var lanBps = 0;
+        var wanBps = 0;
+        var hasLocationData = false;
         for (var i = 0; i < sessions.length; i++) {
-            var m = classifyPlaybackSession(sessions[i]).method;
+            var session = sessions[i];
+            var m = classifyPlaybackSession(session).method;
             if (m === 'Remux' || m === 'Transcode') transcodingTotal++;
             else directTotal++;
+
+            var bps = getSessionBitrateBps(session);
+            totalBps += bps;
+            // Local Network vs Remote is itself strictly opt-in (NetworkLocationDisclosure) --
+            // state.networkLocationLabels stays empty when that's off, so this split degrades
+            // to "unknown" (no split shown) rather than ever guessing.
+            var locLabel = session && session.Id ? state.networkLocationLabels[session.Id] : null;
+            if (locLabel) {
+                hasLocationData = true;
+                if (locLabel === 'Local Network') lanBps += bps;
+                else wanBps += bps;
+            }
         }
         var streamIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>';
         var directIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>';
         var transcodeIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-3.5-7.11"/><path d="M21 3v6h-6"/></svg>';
+        var bandwidthIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 20V10M10 20V4M16 20v-7M22 20v-3"/></svg>';
+
+        var bandwidthHtml = '';
+        if (totalBps > 0) {
+            var totalMbps = (totalBps / 1000000).toFixed(1) + ' Mbps';
+            var bandwidthLabel = 'Bandwidth';
+            if (hasLocationData) {
+                bandwidthLabel = 'LAN ' + (lanBps / 1000000).toFixed(1) + ' · WAN ' + (wanBps / 1000000).toFixed(1);
+            }
+            var bandwidthTitle = 'Total outbound bitrate across active sessions';
+            var bandwidthWarnCls = '';
+            var uploadLimit = state.uploadBandwidthLimitMbps || 0;
+            if (uploadLimit > 0) {
+                var relevantBps = hasLocationData ? wanBps : totalBps;
+                var pctOfLimit = Math.round((relevantBps / 1000000 / uploadLimit) * 100);
+                bandwidthLabel += ' (' + pctOfLimit + '% of ' + uploadLimit + ' Mbps limit)';
+                bandwidthTitle += ' — ' + pctOfLimit + '% of your configured ' + uploadLimit + ' Mbps upload limit';
+                if (pctOfLimit >= 100) bandwidthWarnCls = ' warn-red';
+                else if (pctOfLimit >= 80) bandwidthWarnCls = ' warn-amber';
+            }
+            bandwidthHtml = '<div class="playback-summary-divider"></div>' +
+                '<div class="playback-summary-stat stat-bandwidth' + bandwidthWarnCls + '" title="' + escapeHtml(bandwidthTitle) + '">' + bandwidthIcon +
+                    '<span class="playback-summary-value">' + totalMbps + '</span>' +
+                    '<span class="playback-summary-label">' + bandwidthLabel + '</span>' +
+                '</div>';
+        }
+
         return '<div class="playback-summary-strip">' +
             '<div class="playback-summary-stat">' + streamIcon +
                 '<span class="playback-summary-value">' + sessions.length + '</span>' +
@@ -1888,7 +2065,7 @@
             '<div class="playback-summary-stat stat-transcode' + (transcodingTotal > 0 ? ' active' : '') + '">' + transcodeIcon +
                 '<span class="playback-summary-value">' + transcodingTotal + '</span>' +
                 '<span class="playback-summary-label">Transcoding</span>' +
-            '</div>' +
+            '</div>' + bandwidthHtml +
         '</div>';
     }
 
@@ -2019,7 +2196,7 @@
                 '</div>';
         } else {
             var cardsHtml = activeSessions.map(function (s, idx) {
-                return renderSessionCard(s, idx, state.displayMode, state.showAllDetails);
+                return renderSessionCard(s, idx, state.displayMode, state.showAllDetails, activeSessions);
             }).join('');
             contentHtml = '<div class="playback-dashboard-grid">' + cardsHtml + '</div>';
         }
@@ -2070,15 +2247,27 @@
      * enough for these two actions (an optional text input, Cancel, and one action button
      * that can be flagged as "danger" for the destructive Stop case).
      */
+    // Quick-fill presets for the "Send Message" admin action -- fills the input for review,
+    // never sends directly, so an admin can still edit before confirming.
+    var MESSAGE_PRESETS = [
+        'Server restarting for maintenance in 5 minutes.',
+        'Please switch playback quality to reduce transcoding load.',
+        'This session has been paused a long time and will be closed shortly.'
+    ];
+
     function showActionModal(opts) {
         if (typeof document === 'undefined') return;
         var scrim = document.createElement('div');
         scrim.className = 'pi-modal-scrim';
         var modal = document.createElement('div');
         modal.className = 'pi-modal';
+        var presets = Array.isArray(opts.presets) ? opts.presets : [];
         modal.innerHTML =
             '<div class="pi-modal-title">' + escapeHtml(opts.title || '') + '</div>' +
             '<div class="pi-modal-body">' + escapeHtml(opts.message || '') + '</div>' +
+            (presets.length ? '<div class="pi-modal-presets">' + presets.map(function (p, i) {
+                return '<button type="button" class="pi-modal-preset-btn" data-preset-index="' + i + '">' + escapeHtml(p) + '</button>';
+            }).join('') + '</div>' : '') +
             (opts.showInput ? '<input type="text" class="pi-modal-input" placeholder="' + escapeHtml(opts.inputPlaceholder || '') + '" />' : '') +
             '<div class="pi-modal-actions">' +
                 '<button type="button" class="pi-modal-btn pi-modal-cancel">Cancel</button>' +
@@ -2090,6 +2279,16 @@
         var input = modal.querySelector('.pi-modal-input');
         var confirmBtn = modal.querySelector('.pi-modal-confirm');
         var cancelBtn = modal.querySelector('.pi-modal-cancel');
+
+        modal.querySelectorAll('.pi-modal-preset-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = parseInt(btn.getAttribute('data-preset-index'), 10);
+                if (input && presets[idx] != null) {
+                    input.value = presets[idx];
+                    input.focus();
+                }
+            });
+        });
 
         function close() {
             document.removeEventListener('keydown', onKeydown);
@@ -2240,6 +2439,72 @@
      * is 'right'; the original inline expand-down behavior (infoOverrides) is completely
      * unaffected and unchanged.
      */
+    /**
+     * Plain-text, sanitized per-session technical report for pasting into a forum post or
+     * GitHub issue -- title, playback method, codecs, container, resolution, bitrate, hardware
+     * engine, and transcode reason only. Deliberately excludes username, device name, client
+     * app, and anything location-related.
+     */
+    function buildSessionDiagnosticText(session) {
+        if (!session || typeof session !== 'object') return '';
+        var item = session.NowPlayingItem || {};
+        var classification = classifyPlaybackSession(session);
+        var titleParts = resolveTitleParts(session, item);
+        var tInfo = session.TranscodingInfo;
+        var mediaStreams = item.MediaStreams || [];
+        var videoStream = null;
+        var audioStream = null;
+        for (var i = 0; i < mediaStreams.length; i++) {
+            if (!videoStream && mediaStreams[i].Type === 'Video') videoStream = mediaStreams[i];
+            if (!audioStream && mediaStreams[i].Type === 'Audio') audioStream = mediaStreams[i];
+        }
+
+        var sourceContainer = (item.Container || '').toUpperCase() || 'Unknown';
+        var outputContainer = (tInfo && tInfo.Container) ? tInfo.Container.toUpperCase() : sourceContainer;
+        var containerLine = (outputContainer !== sourceContainer) ? (sourceContainer + ' -> ' + outputContainer) : sourceContainer;
+
+        var sourceVideoCodec = (videoStream && videoStream.Codec ? videoStream.Codec : (session.VideoCodec || 'Unknown')).toString().toUpperCase();
+        var outputVideoCodec = (tInfo && tInfo.VideoCodec ? tInfo.VideoCodec : sourceVideoCodec).toString().toUpperCase();
+        var videoCodecLine = (classification.isVideoDirect === false && outputVideoCodec !== sourceVideoCodec) ? (sourceVideoCodec + ' -> ' + outputVideoCodec) : sourceVideoCodec;
+
+        var sourceAudioCodec = (audioStream && audioStream.Codec ? audioStream.Codec : (session.AudioCodec || 'Unknown')).toString().toUpperCase();
+        var outputAudioCodec = (tInfo && tInfo.AudioCodec ? tInfo.AudioCodec : sourceAudioCodec).toString().toUpperCase();
+        var audioCodecLine = (classification.isAudioDirect === false && outputAudioCodec !== sourceAudioCodec) ? (sourceAudioCodec + ' -> ' + outputAudioCodec) : sourceAudioCodec;
+
+        var resolution = (tInfo && tInfo.Width && tInfo.Height)
+            ? (tInfo.Width + 'x' + tInfo.Height)
+            : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : 'Unknown');
+
+        var bitrateVal = (tInfo && typeof tInfo.Bitrate === 'number' && tInfo.Bitrate > 0)
+            ? tInfo.Bitrate
+            : ((videoStream && typeof videoStream.BitRate === 'number' && videoStream.BitRate > 0) ? videoStream.BitRate : 0);
+        var bitrateLine = bitrateVal ? (bitrateVal / 1000000).toFixed(1) + ' Mbps' : 'Unknown';
+
+        var hwEngine = (tInfo && tInfo.HardwareAccelerationType && String(tInfo.HardwareAccelerationType).toLowerCase() !== 'none')
+            ? tInfo.HardwareAccelerationType
+            : 'Software / none';
+
+        var reasonDetails = getTranscodeReasonDetails(session);
+        var reasonLine = reasonDetails.length > 0 ? reasonDetails.map(function (r) { return r.label; }).join('; ') : 'Not transcoding';
+
+        return [
+            'PlayInfo session diagnostic report',
+            'Generated: ' + new Date().toISOString(),
+            '',
+            'Title: ' + (titleParts.title || 'Unknown'),
+            'Play Method: ' + (classification.method || 'Unknown'),
+            'Video: ' + (classification.isVideoDirect === false ? 'Transcoded' : 'Direct'),
+            'Audio: ' + (classification.isAudioDirect === false ? 'Transcoded' : 'Direct'),
+            'Container: ' + containerLine,
+            'Video Codec: ' + videoCodecLine,
+            'Audio Codec: ' + audioCodecLine,
+            'Resolution: ' + resolution,
+            'Bitrate: ' + bitrateLine,
+            'Hardware Engine: ' + hwEngine,
+            'Transcode Reason: ' + reasonLine
+        ].join('\n');
+    }
+
     function showInfoSidePanel(session) {
         if (typeof document === 'undefined' || !session) return;
         if (typeof closeActiveInfoModal === 'function') closeActiveInfoModal();
@@ -2274,6 +2539,7 @@
                 '<div class="pi-info-panel-art-shine"></div>' +
             '</div>' +
             '<div class="pi-info-panel-content">' +
+                '<button type="button" class="pi-info-panel-copy" title="Copy a sanitized technical report for this session (no username, device, or location)">Copy Report</button>' +
                 '<button type="button" class="pi-info-panel-close" aria-label="Close">' +
                     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
                 '</button>' +
@@ -2316,6 +2582,25 @@
         closeActiveInfoModal = close;
         var closeBtn = panel.querySelector('.pi-info-panel-close');
         if (closeBtn) closeBtn.addEventListener('click', close);
+
+        var copyBtn = panel.querySelector('.pi-info-panel-copy');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                var reportText = buildSessionDiagnosticText(session);
+                if (!reportText) {
+                    copyBtn.textContent = 'Blocked';
+                } else if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    navigator.clipboard.writeText(reportText).then(function () {
+                        copyBtn.textContent = 'Copied!';
+                    }).catch(function () {
+                        copyBtn.textContent = 'Failed';
+                    });
+                } else {
+                    copyBtn.textContent = 'Unsupported';
+                }
+                window.setTimeout(function () { copyBtn.textContent = 'Copy Report'; }, 1800);
+            });
+        }
         scrim.addEventListener('click', function (e) { if (e.target === scrim) close(); });
         document.addEventListener('keydown', onKeydown);
 
@@ -2449,6 +2734,7 @@
                     showActionModal({
                         title: 'Send Message',
                         message: 'Send an on-screen message to this session.',
+                        presets: MESSAGE_PRESETS,
                         showInput: true,
                         inputPlaceholder: 'Message text…',
                         confirmLabel: 'Send',
@@ -2497,6 +2783,7 @@
             if (!state.networkLocationEnabled) {
                 state.networkLocationLabels = {};
             }
+            state.uploadBandwidthLimitMbps = Number(data && data.uploadBandwidthLimitMbps) || 0;
         } catch (err) {
             // Non-critical -- leave the last known value in place rather than flapping the
             // badge on and off because of a single failed config check.

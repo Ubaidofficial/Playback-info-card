@@ -332,9 +332,17 @@ public sealed class NotificationSecretStore : INotificationSecretStore
             File.Move(tmpPath, _filePath, overwrite: true);
             SetRestrictedPermissions(_filePath);
         }
-        catch
+        catch (Exception ex)
         {
-            // Fail safely without logging secrets or corrupting state
+            // Fail safely without logging secret VALUES, but still surface that the write
+            // itself failed -- silently swallowing this (as before) meant a save could report
+            // success to the UI while the encrypted file on disk was never actually updated
+            // (e.g. a transient network-share/NFS/CIFS hiccup on the config volume), so the
+            // credential would vanish on the next restart with zero diagnostic trail.
+            RaiseWarning(
+                "Failed to persist secrets file '" + _filePath + "' (" + ex.GetType().Name + ": " +
+                ex.Message + "). Discord/Telegram credentials just set may NOT survive a restart " +
+                "until the underlying storage issue is resolved.");
         }
     }
 

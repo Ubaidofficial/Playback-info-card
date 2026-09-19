@@ -167,6 +167,16 @@
     color: #f87171;
 }
 
+.playback-summary-stat.stat-bandwidth.warn-amber svg,
+.playback-summary-stat.stat-bandwidth.warn-amber .playback-summary-value {
+    color: #fbbf24;
+}
+
+.playback-summary-stat.stat-bandwidth.warn-red svg,
+.playback-summary-stat.stat-bandwidth.warn-red .playback-summary-value {
+    color: #f87171;
+}
+
 .playback-count-chip .count-val {
     font-weight: 700;
     color: #f8fafc;
@@ -1397,6 +1407,30 @@
     margin-bottom: 0.85rem;
 }
 
+.pi-modal-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.pi-modal-preset-btn {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+
+.pi-modal-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+}
+
 .pi-modal-input {
     width: 100%;
     box-sizing: border-box;
@@ -1589,6 +1623,32 @@
 }
 
 .pi-info-panel-close:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #f8fafc;
+}
+
+.pi-info-panel-copy {
+    position: absolute;
+    top: 0.85rem;
+    right: 3.1rem;
+    z-index: 2;
+    flex-shrink: 0;
+    height: 28px;
+    padding: 0 0.6rem;
+    border: none;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    font-family: inherit;
+}
+
+.pi-info-panel-copy:hover {
     background: rgba(255, 255, 255, 0.16);
     color: #f8fafc;
 }

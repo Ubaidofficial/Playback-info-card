@@ -42,7 +42,7 @@ function createMockDashboard() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.7.4 Test Suite', () => {
+describe('Playback Info Card v0.2.7.6 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -50,9 +50,9 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.7.4', () => {
-            assert.equal(controller.version, '0.2.7.4');
-            assert.equal(controller.diagState.pluginVersion, '0.2.7.4');
+        it('initializes with default waiting state and version 0.2.7.6', () => {
+            assert.equal(controller.version, '0.2.7.6');
+            assert.equal(controller.diagState.pluginVersion, '0.2.7.6');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -191,7 +191,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.7.4');
+            assert.equal(report.pluginVersion, '0.2.7.6');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -239,7 +239,7 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.7.4',
+                pluginVersion: '0.2.7.6',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -897,10 +897,10 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.7.4', () => {
+        it('initializes with version 0.2.7.6', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.7.4');
-            assert.equal(dash.state.version, '0.2.7.4');
+            assert.equal(dash.version, '0.2.7.6');
+            assert.equal(dash.state.version, '0.2.7.6');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -1462,11 +1462,11 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
                 NowPlayingItem: { Name: 'Transcoded Movie', Container: 'mkv' }
             };
 
-            // Extended mode reveals the icon-led Reason/Engine rows (compact mode never does).
+            // The reason and hardware engine now surface together in the highlighted
+            // transcode-diagnostics callout (not a separate labeled field-grid row).
             const html = dash.renderSessionCard(transcodeSessionNoReasons, 1, 'extended', false);
             assert.ok(html.includes('Reason not reported by server'), 'Must render exact fallback text');
-            assert.ok(html.includes('<span class="playback-ext-label">Reason</span>'), 'Must include labeled Reason row');
-            assert.ok(html.includes('<span class="playback-ext-label">Engine</span><span class="playback-ext-detail">NVENC</span>'), 'Must include NVENC hardware acceleration value');
+            assert.ok(html.includes('Reason not reported by server [NVENC]'), 'Must surface the NVENC hardware engine alongside the reason in the callout');
         });
 
         it('reports truthful human-readable transcode reasons when reported by server', () => {
@@ -2355,6 +2355,25 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(html.includes('stat-transcode active') && /stat-transcode active">[\s\S]*?playback-summary-value">1</.test(html), 'Transcoding bucket is 1 even though the session is paused, since it is still genuinely transcoding');
         });
 
+        it('summary strip shows total bandwidth, split by LAN/WAN only when network location data is available', () => {
+            const dash = createMockDashboard();
+            const sessionLan = { Id: 's-bw-lan', NowPlayingItem: { Name: 'LAN Stream' }, PlayMethod: 'DirectPlay', TranscodingInfo: { Bitrate: 10000000 } };
+            const sessionWan = { Id: 's-bw-wan', NowPlayingItem: { Name: 'WAN Stream' }, PlayMethod: 'Transcode', TranscodingInfo: { Bitrate: 5000000, IsVideoDirect: false, IsAudioDirect: false } };
+
+            const noLocationHtml = dash.buildSummaryStripHtml([sessionLan, sessionWan]);
+            assert.ok(noLocationHtml.includes('15.0 Mbps'), 'Total bandwidth sums every active session, no location data needed');
+            assert.ok(noLocationHtml.includes('>Bandwidth<'), 'Falls back to a plain "Bandwidth" label with no location data');
+
+            dash.state.networkLocationLabels = { 's-bw-lan': 'Local Network', 's-bw-wan': 'Remote — Lahore, Pakistan' };
+            const splitHtml = dash.buildSummaryStripHtml([sessionLan, sessionWan]);
+            assert.ok(splitHtml.includes('LAN 10.0'), 'LAN total reflects only the locally-labeled session');
+            assert.ok(splitHtml.includes('WAN 5.0'), 'WAN total reflects only the remote-labeled session');
+            dash.state.networkLocationLabels = {};
+
+            const zeroSession = { Id: 's-bw-zero', NowPlayingItem: { Name: 'No Bitrate' }, PlayMethod: 'DirectPlay' };
+            assert.ok(!dash.buildSummaryStripHtml([zeroSession]).includes('stat-bandwidth'), 'No bandwidth stat renders when no active session reports a bitrate');
+        });
+
         it('high-signal pills (resolution, dynamic range, audio, subtitle) carry a leading icon; codec/bit-depth/container pills stay icon-free', () => {
             const dash = createMockDashboard();
             const session = {
@@ -2431,6 +2450,12 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(html.includes('stat-transcode active'), 'Transcoding stat is active when at least one session is transcoding');
             assert.equal(controller.buildSummaryStripHtml([]), '', 'No markup at all when there are zero sessions');
         });
+
+        it('summary strip shows total bandwidth from active sessions on the standalone page too', () => {
+            const session = { Id: 's-html-bw', NowPlayingItem: { Name: 'BW Test' }, PlayMethod: 'DirectPlay', TranscodingInfo: { Bitrate: 8000000 } };
+            const html = controller.buildSummaryStripHtml([session]);
+            assert.ok(html.includes('8.0 Mbps'), 'Bandwidth stat reflects the session bitrate');
+        });
     });
 
     describe('25. Network Location Badge (strictly opt-in, off by default)', () => {
@@ -2452,6 +2477,87 @@ describe('Playback Info Card v0.2.7.4 Test Suite', () => {
             assert.ok(!htmlB.includes('playback-pill geo'), 'A different session ID must never inherit another session\'s label');
 
             dash.state.networkLocationLabels = {};
+        });
+    });
+
+    describe('26. Zombie-stream timer, concurrent streams, and session diagnostics', () => {
+        it('flags a session paused a while as amber, and over an hour as a red zombie warning', () => {
+            const dash = createMockDashboard();
+            const session = { Id: 's-zombie', IsPaused: true, NowPlayingItem: { Name: 'Paused Movie' } };
+
+            dash.state.pausedSinceBySession['s-zombie'] = Date.now() - (10 * 60 * 1000);
+            const amberHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.match(amberHtml, /class="playback-pill zombie warn-amber"/, 'Paused 10 minutes is a warning, not yet a zombie');
+            assert.ok(amberHtml.includes('Paused 10m'));
+
+            dash.state.pausedSinceBySession['s-zombie'] = Date.now() - (65 * 60 * 1000);
+            const redHtml = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.match(redHtml, /class="playback-pill zombie warn-red"/, 'Paused over an hour escalates to red');
+            assert.ok(redHtml.includes('Paused 1h 5m'));
+
+            delete dash.state.pausedSinceBySession['s-zombie'];
+        });
+
+        it('never flags a session paused for under 5 minutes, and clears the timer once resumed', () => {
+            const dash = createMockDashboard();
+            const session = { Id: 's-brief-pause', IsPaused: true, NowPlayingItem: { Name: 'Briefly Paused' } };
+            dash.state.pausedSinceBySession['s-brief-pause'] = Date.now() - (30 * 1000);
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(!html.includes('playback-pill zombie'), 'A 30-second pause is not a zombie stream');
+
+            session.IsPaused = false;
+            dash.renderSessionCard(session, 0, 'compact', false);
+            assert.equal(dash.state.pausedSinceBySession['s-brief-pause'], undefined, 'Resuming clears the tracked pause-start timestamp');
+        });
+
+        it('shows a concurrent-streams badge only when the same account has more than one active session', () => {
+            const dash = createMockDashboard();
+            const sessionA = { Id: 's-conc-a', UserId: 'user-1', NowPlayingItem: { Name: 'A' } };
+            const sessionB = { Id: 's-conc-b', UserId: 'user-1', NowPlayingItem: { Name: 'B' } };
+            const sessionC = { Id: 's-conc-c', UserId: 'user-2', NowPlayingItem: { Name: 'C' } };
+            const all = [sessionA, sessionB, sessionC];
+
+            const htmlA = dash.renderSessionCard(sessionA, 0, 'compact', false, all);
+            assert.ok(htmlA.includes('2 concurrent streams'), 'Two sessions for user-1 both see the concurrent badge');
+
+            const htmlC = dash.renderSessionCard(sessionC, 2, 'compact', false, all);
+            assert.ok(!htmlC.includes('concurrent streams'), 'A lone session for user-2 gets no badge');
+
+            const soloHtml = dash.renderSessionCard(sessionA, 0, 'compact', false);
+            assert.ok(!soloHtml.includes('concurrent streams'), 'No session array provided means no count can be trusted, so no badge');
+        });
+
+        it('builds a recent-session row with title, status, and method, and excludes username by default styling', () => {
+            const html = controller.buildRecentSessionRowHtml({
+                mediaTitle: 'Dune: Part Two',
+                productionYear: 2024,
+                username: 'alice',
+                playMethod: 'Transcode',
+                resolution: '3840x2160',
+                playbackPercentage: 87,
+                playedToCompletion: true,
+                timestamp: new Date().toISOString()
+            });
+            assert.ok(html.includes('Dune: Part Two (2024)'));
+            assert.ok(html.includes('Completed (87%)'));
+            assert.ok(html.includes('Transcode'));
+            assert.ok(html.includes('alice'), 'Username is shown in this admin-only history view');
+        });
+
+        it('builds a sanitized per-session diagnostic report with no username or client/device info', () => {
+            const session = {
+                Id: 's-diag', UserName: 'bob', Client: 'Jellyfin Web', DeviceName: 'Chrome',
+                PlayMethod: 'Transcode', VideoCodec: 'hevc', AudioCodec: 'eac3',
+                TranscodingInfo: { VideoCodec: 'h264', AudioCodec: 'aac', Container: 'ts', Width: 1920, Height: 1080, Bitrate: 8000000, IsVideoDirect: false, IsAudioDirect: false, HardwareAccelerationType: 'nvenc' },
+                NowPlayingItem: { Name: 'Some Movie', Container: 'mkv', MediaStreams: [] }
+            };
+            const report = controller.buildSessionDiagnosticText(session);
+            assert.ok(report.includes('Title: Some Movie'));
+            assert.ok(report.includes('Video Codec: HEVC -> H264'));
+            assert.ok(report.includes('Resolution: 1920x1080'));
+            assert.ok(report.includes('Hardware Engine: nvenc'));
+            assert.ok(!report.toLowerCase().includes('bob'), 'Username never appears in the sanitized report');
+            assert.ok(!report.includes('Chrome'), 'Device name never appears in the sanitized report');
         });
     });
 });

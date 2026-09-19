@@ -17,7 +17,7 @@ public class DeliveryQueueTests
     /// </summary>
     private sealed class NoOpDiscordWebhookSender : IDiscordWebhookSender
     {
-        public Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken) =>
+        public Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken, string? posterImagePath = null) =>
             Task.FromResult(DeliveryResult.Ok());
 
         public Task<DeliveryResult> SendTestAsync(string webhookUrl, CancellationToken cancellationToken) =>
@@ -26,7 +26,7 @@ public class DeliveryQueueTests
 
     private sealed class NoOpTelegramBotApiSender : ITelegramBotApiSender
     {
-        public Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken) =>
+        public Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string botToken, string chatId, CancellationToken cancellationToken, string? posterImagePath = null) =>
             Task.FromResult(DeliveryResult.Ok());
 
         public Task<DeliveryResult> SendTestAsync(string botToken, string chatId, CancellationToken cancellationToken) =>

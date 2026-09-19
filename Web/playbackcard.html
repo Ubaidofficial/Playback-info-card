@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">PlayInfo</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.7.4</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.7.6</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -43,6 +43,16 @@
                     </div>
                     <div id="playbackSummaryStrip" class="playback-summary-strip" style="display: none;"></div>
                     <div id="playbackSessionsGrid" class="playbackMonitorGrid"></div>
+
+                    <!-- Recent Sessions: bounded in-memory history, admin-only, independent of
+                         notification settings. Cleared on server restart. -->
+                    <div id="recentSessionsShelf" class="recent-sessions-shelf" style="display: none;">
+                        <button type="button" id="recentSessionsToggle" class="recent-sessions-toggle">
+                            <svg class="recent-sessions-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 18l6-6-6-6"/></svg>
+                            <span>Recent Sessions</span>
+                        </button>
+                        <div id="recentSessionsList" class="recent-sessions-list" style="display: none;"></div>
+                    </div>
                 </div>
 
                 <!-- Notifications Section (Server-Side Native Dispatches) -->
@@ -190,6 +200,19 @@
                                 <span>Disclose Network Location (Local/Remote + Approximate Geolocation) on Playback Cards</span>
                             </label>
                             <span class="notifDisclosureNote">When enabled, each session's card shows whether it's on your Local Network or Remote, and for remote sessions, an approximate city/country looked up via a third-party geolocation service (ipapi.co) using that session's IP address &mdash; the IP itself is never shown or sent anywhere else. This is the only feature in the plugin that contacts a service other than your own configured Discord/Telegram. Admin view only. Disabled by default.</span>
+
+                            <label class="notifCheckItem" style="margin-top: 0.5rem;">
+                                <input type="checkbox" id="chkIncludePosterImage">
+                                <span>Include Poster Image in Discord/Telegram Notifications</span>
+                            </label>
+                            <span class="notifDisclosureNote">When enabled (default), notifications include the item's poster art if one is cached on this server. Not a privacy disclosure like the settings above &mdash; the image is uploaded directly to Discord/Telegram with the message, never via a public link to this server.</span>
+
+                            <div class="notifIntervalGroup" style="margin-top: 0.75rem;">
+                                <span>Upstream bandwidth limit</span>
+                                <input type="number" id="numUploadBandwidthLimit" min="0" max="100000" value="0" class="notifNumberInput">
+                                <span>Mbps (0 = off)</span>
+                            </div>
+                            <span class="notifDisclosureNote">Optional. When set, the summary strip's bandwidth gauge shows what percentage of this limit is currently in use. Never enforced or acted on &mdash; display only.</span>
                         </div>
 
                         <div class="notifBtnRow" style="margin-top: 1rem;">
@@ -282,7 +305,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.7.4</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.7.6</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -1072,6 +1095,101 @@
     flex-wrap: wrap;
 }
 
+.playbackMonitorPage .recent-sessions-shelf {
+    margin-top: 1.25rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.playbackMonitorPage .recent-sessions-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1rem;
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.playbackMonitorPage .recent-sessions-toggle:hover {
+    color: #f8fafc;
+}
+
+.playbackMonitorPage .recent-sessions-chevron {
+    transition: transform 0.15s ease;
+}
+
+.playbackMonitorPage .recent-sessions-toggle.open .recent-sessions-chevron {
+    transform: rotate(90deg);
+}
+
+.playbackMonitorPage .recent-sessions-list {
+    padding: 0 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.playbackMonitorPage .recent-session-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem 1rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 0.78rem;
+}
+
+.playbackMonitorPage .recent-session-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.playbackMonitorPage .recent-session-title {
+    color: #e2e8f0;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playbackMonitorPage .recent-session-user {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+.playbackMonitorPage .recent-session-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.playbackMonitorPage .recent-session-status.completed {
+    color: #4ade80;
+}
+
+.playbackMonitorPage .recent-session-status.stopped {
+    color: #fbbf24;
+}
+
+.playbackMonitorPage .recent-session-age {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
 .playbackMonitorPage .playback-summary-stat {
     display: flex;
     align-items: center;
@@ -1111,6 +1229,16 @@
 
 .playbackMonitorPage .playback-summary-stat.stat-transcode.active svg,
 .playbackMonitorPage .playback-summary-stat.stat-transcode.active .playback-summary-value {
+    color: #f87171;
+}
+
+.playbackMonitorPage .playback-summary-stat.stat-bandwidth.warn-amber svg,
+.playbackMonitorPage .playback-summary-stat.stat-bandwidth.warn-amber .playback-summary-value {
+    color: #fbbf24;
+}
+
+.playbackMonitorPage .playback-summary-stat.stat-bandwidth.warn-red svg,
+.playbackMonitorPage .playback-summary-stat.stat-bandwidth.warn-red .playback-summary-value {
     color: #f87171;
 }
 
@@ -2089,6 +2217,30 @@
     margin-bottom: 0.85rem;
 }
 
+.pi-modal-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.pi-modal-preset-btn {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+
+.pi-modal-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f1f5f9;
+}
+
 .pi-modal-input {
     width: 100%;
     box-sizing: border-box;
@@ -2285,6 +2437,32 @@
     color: #f8fafc;
 }
 
+.pi-info-panel-copy {
+    position: absolute;
+    top: 0.85rem;
+    right: 3.1rem;
+    z-index: 2;
+    flex-shrink: 0;
+    height: 28px;
+    padding: 0 0.6rem;
+    border: none;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    font-family: inherit;
+}
+
+.pi-info-panel-copy:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #f8fafc;
+}
+
 .pi-info-warnings {
     display: flex;
     flex-direction: column;
@@ -2407,7 +2585,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.7.4';
+    var PLUGIN_VERSION = '0.2.7.6';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -2431,6 +2609,17 @@
     var networkLocationEnabled = false;
     var networkLocationLabels = {};
     var currentUserIsAdmin = false;
+
+    // First-observed pause timestamp per session ID -- a session only carries its current
+    // IsPaused flag, not how long it's been that way, so this is tracked client-side across
+    // poll cycles: set the first time a session is seen paused, cleared the moment it isn't.
+    // Never persisted, never sent anywhere -- purely a local "how long has this sat paused" clock.
+    var pausedSinceBySession = {};
+    var ZOMBIE_STREAM_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+
+    // Admin-configured upstream cap for the bandwidth gauge's percentage-of-capacity display.
+    // 0 = unset (mirrors the saved setting); purely cosmetic, never enforced.
+    var uploadBandwidthLimitMbps = 0;
 
     // Per-session (not per-card-position) Info panel open state: without this, the panel's
     // open/closed state was derived only from displayMode on every render, so a manually
@@ -2509,15 +2698,27 @@
      * Stop/Message session actions instead of native confirm()/prompt(). Not a general
      * dialog system -- just enough for these two actions.
      */
+    // Quick-fill presets for the "Send Message" admin action -- fills the input for review,
+    // never sends directly, so an admin can still edit before confirming.
+    var MESSAGE_PRESETS = [
+        'Server restarting for maintenance in 5 minutes.',
+        'Please switch playback quality to reduce transcoding load.',
+        'This session has been paused a long time and will be closed shortly.'
+    ];
+
     function showActionModal(opts) {
         if (typeof document === 'undefined') return;
         var scrim = document.createElement('div');
         scrim.className = 'pi-modal-scrim';
         var modal = document.createElement('div');
         modal.className = 'pi-modal';
+        var presets = Array.isArray(opts.presets) ? opts.presets : [];
         modal.innerHTML =
             '<div class="pi-modal-title">' + escapeHtml(opts.title || '') + '</div>' +
             '<div class="pi-modal-body">' + escapeHtml(opts.message || '') + '</div>' +
+            (presets.length ? '<div class="pi-modal-presets">' + presets.map(function (p, i) {
+                return '<button type="button" class="pi-modal-preset-btn" data-preset-index="' + i + '">' + escapeHtml(p) + '</button>';
+            }).join('') + '</div>' : '') +
             (opts.showInput ? '<input type="text" class="pi-modal-input" placeholder="' + escapeHtml(opts.inputPlaceholder || '') + '" />' : '') +
             '<div class="pi-modal-actions">' +
                 '<button type="button" class="pi-modal-btn pi-modal-cancel">Cancel</button>' +
@@ -2529,6 +2730,18 @@
         var input = modal.querySelector('.pi-modal-input');
         var confirmBtn = modal.querySelector('.pi-modal-confirm');
         var cancelBtn = modal.querySelector('.pi-modal-cancel');
+
+        // Presets fill the input for review/editing, never auto-send -- an admin should
+        // always see exactly what's about to go out before confirming.
+        modal.querySelectorAll('.pi-modal-preset-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = parseInt(btn.getAttribute('data-preset-index'), 10);
+                if (input && presets[idx] != null) {
+                    input.value = presets[idx];
+                    input.focus();
+                }
+            });
+        });
 
         function close() {
             document.removeEventListener('keydown', onKeydown);
@@ -2743,6 +2956,73 @@
     }
 
     /**
+     * Plain-text, sanitized per-session technical report for pasting into a forum post or
+     * GitHub issue -- title, playback method, codecs, container, resolution, bitrate, hardware
+     * engine, and transcode reason only. Deliberately excludes username, device name, client
+     * app, and anything location-related, so it's safe to paste in public without the admin
+     * having to redact it by hand first.
+     */
+    function buildSessionDiagnosticText(session) {
+        if (!session || typeof session !== 'object') return '';
+        var item = session.NowPlayingItem || {};
+        var classification = classifyPlaybackSession(session);
+        var titleParts = resolveTitleParts(session, item);
+        var tInfo = session.TranscodingInfo;
+        var mediaStreams = item.MediaStreams || [];
+        var videoStream = null;
+        var audioStream = null;
+        for (var i = 0; i < mediaStreams.length; i++) {
+            if (!videoStream && mediaStreams[i].Type === 'Video') videoStream = mediaStreams[i];
+            if (!audioStream && mediaStreams[i].Type === 'Audio') audioStream = mediaStreams[i];
+        }
+
+        var sourceContainer = (item.Container || '').toUpperCase() || 'Unknown';
+        var outputContainer = (tInfo && tInfo.Container) ? tInfo.Container.toUpperCase() : sourceContainer;
+        var containerLine = (outputContainer !== sourceContainer) ? (sourceContainer + ' -> ' + outputContainer) : sourceContainer;
+
+        var sourceVideoCodec = (videoStream && videoStream.Codec ? videoStream.Codec : (session.VideoCodec || 'Unknown')).toString().toUpperCase();
+        var outputVideoCodec = (tInfo && tInfo.VideoCodec ? tInfo.VideoCodec : sourceVideoCodec).toString().toUpperCase();
+        var videoCodecLine = (classification.isVideoDirect === false && outputVideoCodec !== sourceVideoCodec) ? (sourceVideoCodec + ' -> ' + outputVideoCodec) : sourceVideoCodec;
+
+        var sourceAudioCodec = (audioStream && audioStream.Codec ? audioStream.Codec : (session.AudioCodec || 'Unknown')).toString().toUpperCase();
+        var outputAudioCodec = (tInfo && tInfo.AudioCodec ? tInfo.AudioCodec : sourceAudioCodec).toString().toUpperCase();
+        var audioCodecLine = (classification.isAudioDirect === false && outputAudioCodec !== sourceAudioCodec) ? (sourceAudioCodec + ' -> ' + outputAudioCodec) : sourceAudioCodec;
+
+        var resolution = (tInfo && tInfo.Width && tInfo.Height)
+            ? (tInfo.Width + 'x' + tInfo.Height)
+            : ((videoStream && videoStream.Width && videoStream.Height) ? (videoStream.Width + 'x' + videoStream.Height) : 'Unknown');
+
+        var bitrateVal = (tInfo && typeof tInfo.Bitrate === 'number' && tInfo.Bitrate > 0)
+            ? tInfo.Bitrate
+            : ((videoStream && typeof videoStream.BitRate === 'number' && videoStream.BitRate > 0) ? videoStream.BitRate : 0);
+        var bitrateLine = bitrateVal ? (bitrateVal / 1000000).toFixed(1) + ' Mbps' : 'Unknown';
+
+        var hwEngine = (tInfo && tInfo.HardwareAccelerationType && String(tInfo.HardwareAccelerationType).toLowerCase() !== 'none')
+            ? tInfo.HardwareAccelerationType
+            : 'Software / none';
+
+        var reasonDetails = getTranscodeReasonDetails(session);
+        var reasonLine = reasonDetails.length > 0 ? reasonDetails.map(function (r) { return r.label; }).join('; ') : 'Not transcoding';
+
+        return [
+            'PlayInfo session diagnostic report',
+            'Generated: ' + new Date().toISOString(),
+            '',
+            'Title: ' + (titleParts.title || 'Unknown'),
+            'Play Method: ' + (classification.method || 'Unknown'),
+            'Video: ' + (classification.isVideoDirect === false ? 'Transcoded' : 'Direct'),
+            'Audio: ' + (classification.isAudioDirect === false ? 'Transcoded' : 'Direct'),
+            'Container: ' + containerLine,
+            'Video Codec: ' + videoCodecLine,
+            'Audio Codec: ' + audioCodecLine,
+            'Resolution: ' + resolution,
+            'Bitrate: ' + bitrateLine,
+            'Hardware Engine: ' + hwEngine,
+            'Transcode Reason: ' + reasonLine
+        ].join('\n');
+    }
+
+    /**
      * The Tautulli-style Info dialog: a centered overlay with the poster art on the left
      * and, on the right, the same flat Product/Player/Quality/Stream/Container/Video/
      * Audio/Subtitle/Location/Bandwidth field set Tautulli's own activity popup shows,
@@ -2786,6 +3066,7 @@
                 '<div class="pi-info-panel-art-shine"></div>' +
             '</div>' +
             '<div class="pi-info-panel-content">' +
+                '<button type="button" class="pi-info-panel-copy" title="Copy a sanitized technical report for this session (no username, device, or location)">Copy Report</button>' +
                 '<button type="button" class="pi-info-panel-close" aria-label="Close">' +
                     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
                 '</button>' +
@@ -2828,6 +3109,27 @@
         closeActiveInfoModal = close;
         var closeBtn = panel.querySelector('.pi-info-panel-close');
         if (closeBtn) closeBtn.addEventListener('click', close);
+
+        var copyBtn = panel.querySelector('.pi-info-panel-copy');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                var reportText = buildSessionDiagnosticText(session);
+                if (!reportText || SENSITIVE_PATTERN.test(reportText)) {
+                    copyBtn.textContent = 'Blocked';
+                } else if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    navigator.clipboard.writeText(reportText).then(function () {
+                        copyBtn.textContent = 'Copied!';
+                    }).catch(function () {
+                        fallbackCopyText(reportText, null);
+                        copyBtn.textContent = 'Copied!';
+                    });
+                } else {
+                    fallbackCopyText(reportText, null);
+                    copyBtn.textContent = 'Copied!';
+                }
+                window.setTimeout(function () { copyBtn.textContent = 'Copy Report'; }, 1800);
+            });
+        }
         scrim.addEventListener('click', function (e) { if (e.target === scrim) close(); });
         document.addEventListener('keydown', onKeydown);
 
@@ -3114,6 +3416,49 @@
         return badges;
     }
 
+    // Maps the 2/3-letter language codes media files are typically tagged with (ISO 639-1/639-2,
+    // e.g. "por", "spa", "eng") to a readable English name for pill tooltips. Most files carry only
+    // this generic code with no country/region info (Brazil vs. Portugal, Latin America vs. Spain,
+    // US vs. UK all collapse to the same 3-letter tag) -- that distinction isn't recoverable from
+    // it, so this only expands the language itself, never guesses a region.
+    var LANGUAGE_DISPLAY_NAMES = {
+        ENG: 'English', EN: 'English',
+        POR: 'Portuguese', PT: 'Portuguese',
+        SPA: 'Spanish', ES: 'Spanish',
+        FRE: 'French', FRA: 'French', FR: 'French',
+        GER: 'German', DEU: 'German', DE: 'German',
+        ITA: 'Italian', IT: 'Italian',
+        JPN: 'Japanese', JA: 'Japanese',
+        KOR: 'Korean', KO: 'Korean',
+        CHI: 'Chinese', ZHO: 'Chinese', ZH: 'Chinese',
+        RUS: 'Russian', RU: 'Russian',
+        ARA: 'Arabic', AR: 'Arabic',
+        HIN: 'Hindi', HI: 'Hindi',
+        DUT: 'Dutch', NLD: 'Dutch', NL: 'Dutch',
+        SWE: 'Swedish', SV: 'Swedish',
+        NOR: 'Norwegian', NOB: 'Norwegian', NB: 'Norwegian', NO: 'Norwegian',
+        DAN: 'Danish', DA: 'Danish',
+        FIN: 'Finnish', FI: 'Finnish',
+        POL: 'Polish', PL: 'Polish',
+        TUR: 'Turkish', TR: 'Turkish',
+        GRE: 'Greek', ELL: 'Greek', EL: 'Greek',
+        HEB: 'Hebrew', HE: 'Hebrew',
+        THA: 'Thai', TH: 'Thai',
+        VIE: 'Vietnamese', VI: 'Vietnamese',
+        IND: 'Indonesian', ID: 'Indonesian',
+        CZE: 'Czech', CES: 'Czech', CS: 'Czech',
+        HUN: 'Hungarian', HU: 'Hungarian',
+        RUM: 'Romanian', RON: 'Romanian', RO: 'Romanian',
+        UKR: 'Ukrainian', UK: 'Ukrainian'
+    };
+
+    function getLanguageDisplayName(code) {
+        if (!code) return '';
+        var upper = String(code).toUpperCase();
+        var base = upper.split(/[-_]/)[0];
+        return LANGUAGE_DISPLAY_NAMES[upper] || LANGUAGE_DISPLAY_NAMES[base] || upper;
+    }
+
     function extractSubtitleBadge(session, item) {
         var playState = session.PlayState;
         if (!playState || playState.SubtitleStreamIndex == null || playState.SubtitleStreamIndex < 0) {
@@ -3223,31 +3568,101 @@
         var emptyEl = page.querySelector('#playbackEmptyState');
         var gridEl = page.querySelector('#playbackSessionsGrid');
         var summaryStripEl = page.querySelector('#playbackSummaryStrip');
+        var recentShelfEl = page.querySelector('#recentSessionsShelf');
+        var recentListEl = page.querySelector('#recentSessionsList');
+        var recentToggleEl = page.querySelector('#recentSessionsToggle');
         if (!statusEl || !emptyEl || !gridEl) return null;
         return {
             statusEl: statusEl,
             emptyEl: emptyEl,
             gridEl: gridEl,
-            summaryStripEl: summaryStripEl
+            summaryStripEl: summaryStripEl,
+            recentShelfEl: recentShelfEl,
+            recentListEl: recentListEl,
+            recentToggleEl: recentToggleEl
         };
     }
 
     // Prominent "at a glance" glass strip shown above the grid: total active streams
     // plus a genuine Direct/Transcoding split so a user can see whether anything is
     // actually being transcoded right now without reading every card.
+    // Same tInfo.Bitrate -> videoStream.BitRate fallback the per-card "Overall Bitrate" pill
+    // already uses (see the main session-card render loop) -- kept in sync with that logic
+    // rather than duplicating a third copy of it.
+    function getSessionBitrateBps(session) {
+        if (!session || typeof session !== 'object') return 0;
+        var tInfo = session.TranscodingInfo;
+        if (tInfo && typeof tInfo.Bitrate === 'number' && isFinite(tInfo.Bitrate) && tInfo.Bitrate > 0) {
+            return tInfo.Bitrate;
+        }
+        var mediaStreams = (session.NowPlayingItem && session.NowPlayingItem.MediaStreams) || [];
+        for (var i = 0; i < mediaStreams.length; i++) {
+            if (mediaStreams[i].Type === 'Video' && typeof mediaStreams[i].BitRate === 'number' && isFinite(mediaStreams[i].BitRate) && mediaStreams[i].BitRate > 0) {
+                return mediaStreams[i].BitRate;
+            }
+        }
+        return 0;
+    }
+
     function buildSummaryStripHtml(sessionsArray) {
         var total = Array.isArray(sessionsArray) ? sessionsArray.length : 0;
         if (total <= 0) return '';
         var directTotal = 0;
         var transcodingTotal = 0;
+        var totalBps = 0;
+        var lanBps = 0;
+        var wanBps = 0;
+        var hasLocationData = false;
         for (var i = 0; i < sessionsArray.length; i++) {
-            var c = classifyPlaybackSession(sessionsArray[i]);
+            var session = sessionsArray[i];
+            var c = classifyPlaybackSession(session);
             if (c.method === 'Remux' || c.method === 'Transcode') transcodingTotal++;
             else directTotal++;
+
+            var bps = getSessionBitrateBps(session);
+            totalBps += bps;
+            // Local Network vs Remote is itself strictly opt-in (NetworkLocationDisclosure) --
+            // networkLocationLabels stays empty when that's off, so this split degrades to
+            // "unknown" (no split shown) rather than ever guessing.
+            var locLabel = session && session.Id ? networkLocationLabels[session.Id] : null;
+            if (locLabel) {
+                hasLocationData = true;
+                if (locLabel === 'Local Network') lanBps += bps;
+                else wanBps += bps;
+            }
         }
         var streamIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/></svg>';
         var directIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>';
         var transcodeIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-3.5-7.11"/><path d="M21 3v6h-6"/></svg>';
+        var bandwidthIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 20V10M10 20V4M16 20v-7M22 20v-3"/></svg>';
+
+        var bandwidthHtml = '';
+        if (totalBps > 0) {
+            var totalMbps = (totalBps / 1000000).toFixed(1) + ' Mbps';
+            var bandwidthLabel = 'Bandwidth';
+            if (hasLocationData) {
+                bandwidthLabel = 'LAN ' + (lanBps / 1000000).toFixed(1) + ' · WAN ' + (wanBps / 1000000).toFixed(1);
+            }
+            var bandwidthTitle = 'Total outbound bitrate across active sessions';
+            var bandwidthWarnCls = '';
+            // Percentage is against WAN traffic when Local/Remote data is available (that's
+            // what actually crosses the upstream link), otherwise the raw total as a
+            // best-effort estimate -- either way this is display-only, never enforced.
+            if (uploadBandwidthLimitMbps > 0) {
+                var relevantBps = hasLocationData ? wanBps : totalBps;
+                var pctOfLimit = Math.round((relevantBps / 1000000 / uploadBandwidthLimitMbps) * 100);
+                bandwidthLabel += ' (' + pctOfLimit + '% of ' + uploadBandwidthLimitMbps + ' Mbps limit)';
+                bandwidthTitle += ' — ' + pctOfLimit + '% of your configured ' + uploadBandwidthLimitMbps + ' Mbps upload limit';
+                if (pctOfLimit >= 100) bandwidthWarnCls = ' warn-red';
+                else if (pctOfLimit >= 80) bandwidthWarnCls = ' warn-amber';
+            }
+            bandwidthHtml = '<div class="playback-summary-divider"></div>' +
+                '<div class="playback-summary-stat stat-bandwidth' + bandwidthWarnCls + '" title="' + escapeHtml(bandwidthTitle) + '">' + bandwidthIcon +
+                    '<span class="playback-summary-value">' + totalMbps + '</span>' +
+                    '<span class="playback-summary-label">' + bandwidthLabel + '</span>' +
+                '</div>';
+        }
+
         return '<div class="playback-summary-stat">' + streamIcon +
                 '<span class="playback-summary-value">' + total + '</span>' +
                 '<span class="playback-summary-label">' + (total === 1 ? 'Active Stream' : 'Active Streams') + '</span>' +
@@ -3261,7 +3676,7 @@
             '<div class="playback-summary-stat stat-transcode' + (transcodingTotal > 0 ? ' active' : '') + '">' + transcodeIcon +
                 '<span class="playback-summary-value">' + transcodingTotal + '</span>' +
                 '<span class="playback-summary-label">Transcoding</span>' +
-            '</div>';
+            '</div>' + bandwidthHtml;
     }
 
     function updateSummaryStrip(summaryStripEl, sessionsArray) {
@@ -3694,7 +4109,7 @@
         return { title: title, subtitle: subtitle };
     }
 
-    function renderSessionCard(session, index) {
+    function renderSessionCard(session, index, allSessions) {
         try {
             if (!session || typeof session !== 'object') {
                 diagState.ignoredSessionCount++;
@@ -3744,6 +4159,30 @@
             var badgeText = classification.badgeText;
             var isVideoDirect = classification.isVideoDirect;
             var isAudioDirect = classification.isAudioDirect;
+
+            // Zombie-stream tracking: record the first time this session is observed paused,
+            // clear it the moment it isn't. session.Id is the real ephemeral session identity
+            // (stable across polls); falls back to skipping the timer if it's ever missing.
+            var pausedDurationMs = 0;
+            if (session.Id) {
+                if (isPaused) {
+                    if (!pausedSinceBySession[session.Id]) {
+                        pausedSinceBySession[session.Id] = Date.now();
+                    }
+                    pausedDurationMs = Date.now() - pausedSinceBySession[session.Id];
+                } else {
+                    delete pausedSinceBySession[session.Id];
+                }
+            }
+
+            // Concurrent-streams-per-user: counts only sessions actually playing something,
+            // grouped by the real account identity (UserId), never guessed from a display name.
+            var concurrentUserStreamCount = 1;
+            if (Array.isArray(allSessions) && session.UserId) {
+                concurrentUserStreamCount = allSessions.filter(function (s) {
+                    return s && s.UserId === session.UserId && (s.NowPlayingItem || s.MediaTitle);
+                }).length;
+            }
 
             var stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
             if (isPaused) {
@@ -3900,7 +4339,19 @@
             }
 
             var subBadge = extractSubtitleBadge(session, item);
-            if (subBadge) pushPill('sub', subBadge, 'sub', (subBadge.indexOf(':') !== -1 ? subBadge : ('Subtitle: ' + subBadge)));
+            if (subBadge) {
+                var subTitle = subBadge.indexOf(':') !== -1 ? subBadge : ('Subtitle: ' + subBadge);
+                // subBadge is "Sub: XXX" / "CC: XXX" -- expand just the trailing language code in
+                // the hover tooltip (e.g. "Sub: Portuguese") without touching the compact pill text.
+                var subLangMatch = /:\s*([A-Za-z]{2,3})$/.exec(subBadge);
+                if (subLangMatch) {
+                    var subFriendlyLang = getLanguageDisplayName(subLangMatch[1]);
+                    if (subFriendlyLang && subFriendlyLang.toUpperCase() !== subLangMatch[1].toUpperCase()) {
+                        subTitle = subTitle.slice(0, subTitle.length - subLangMatch[1].length) + subFriendlyLang;
+                    }
+                }
+                pushPill('sub', subBadge, 'sub', subTitle);
+            }
 
             // Network location: strictly opt-in (off by default) and populated by a separate,
             // independently-polled admin-only endpoint -- never derived from anything in this
@@ -3909,6 +4360,32 @@
             var netLocLabel = session.Id ? networkLocationLabels[session.Id] : null;
             if (netLocLabel) {
                 pills.push({ text: netLocLabel, cls: 'geo', title: 'Network Location: ' + netLocLabel });
+            }
+
+            // Only surface once paused for a while -- a normal "stepped away for a minute"
+            // pause isn't a zombie stream, and flagging every brief pause would just be noise.
+            if (pausedDurationMs >= 5 * 60 * 1000) {
+                var pausedMinutes = Math.floor(pausedDurationMs / 60000);
+                var pausedLabel = pausedMinutes >= 60
+                    ? ('Paused ' + Math.floor(pausedMinutes / 60) + 'h ' + (pausedMinutes % 60) + 'm')
+                    : ('Paused ' + pausedMinutes + 'm');
+                var isZombie = pausedDurationMs >= ZOMBIE_STREAM_THRESHOLD_MS;
+                pills.push({
+                    text: pausedLabel,
+                    cls: 'zombie',
+                    warn: isZombie ? 'red' : 'amber',
+                    title: isZombie
+                        ? 'Paused for over an hour -- still holding server resources (transcode temp files, hardware encoder lock if transcoding). Consider stopping it.'
+                        : 'Paused a while -- keeps holding server resources for as long as it stays open.'
+                });
+            }
+
+            if (concurrentUserStreamCount > 1) {
+                pills.push({
+                    text: concurrentUserStreamCount + ' concurrent streams',
+                    cls: 'concurrent',
+                    title: 'This account has ' + concurrentUserStreamCount + ' active playback sessions right now.'
+                });
             }
 
             var pillHtml = pills.map(function (p) {
@@ -4798,6 +5275,65 @@
             });
     }
 
+    // Relative "N minutes/hours ago" wording for the Recent Sessions shelf -- deliberately
+    // coarse (no seconds) since this list refreshes on the same slow poll cycle as everything
+    // else, not in real time.
+    function formatRecentSessionAge(timestampIso) {
+        var then = Date.parse(timestampIso);
+        if (!isFinite(then)) return '';
+        var diffMs = Date.now() - then;
+        var minutes = Math.max(0, Math.round(diffMs / 60000));
+        if (minutes < 1) return 'just now';
+        if (minutes < 60) return minutes + (minutes === 1 ? ' minute ago' : ' minutes ago');
+        var hours = Math.round(minutes / 60);
+        return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+    }
+
+    function buildRecentSessionRowHtml(entry) {
+        var titleText = entry.mediaTitle || 'Unknown';
+        if (entry.seriesName) {
+            titleText = entry.seriesName + (entry.seasonNumber != null && entry.episodeNumber != null
+                ? (' — S' + entry.seasonNumber + ':E' + entry.episodeNumber)
+                : ' — ' + titleText);
+        } else if (entry.productionYear) {
+            titleText += ' (' + entry.productionYear + ')';
+        }
+
+        var statusLabel = entry.playedToCompletion ? 'Completed' : 'Stopped';
+        var statusCls = entry.playedToCompletion ? 'completed' : 'stopped';
+        var pctText = (typeof entry.playbackPercentage === 'number') ? (entry.playbackPercentage + '%') : '';
+
+        return '<div class="recent-session-row">' +
+            '<div class="recent-session-main">' +
+                '<span class="recent-session-title">' + escapeHtml(titleText) + '</span>' +
+                (entry.username ? '<span class="recent-session-user">' + escapeHtml(entry.username) + '</span>' : '') +
+            '</div>' +
+            '<div class="recent-session-meta">' +
+                '<span class="recent-session-status ' + statusCls + '">' + statusLabel + (pctText ? ' (' + pctText + ')' : '') + '</span>' +
+                '<span class="recent-session-method">' + escapeHtml(entry.playMethod || '') + '</span>' +
+                (entry.resolution ? '<span class="recent-session-res">' + escapeHtml(entry.resolution) + '</span>' : '') +
+                '<span class="recent-session-age">' + formatRecentSessionAge(entry.timestamp) + '</span>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function loadRecentSessions(page) {
+        if (!page) return Promise.resolve();
+        var elements = getElements(page);
+        if (!elements || !elements.recentShelfEl || !elements.recentListEl) return Promise.resolve();
+
+        return callNotificationApi('PlaybackCard/History/Recent?limit=15', { method: 'GET' })
+            .then(function (data) {
+                var entries = Array.isArray(data) ? data : [];
+                elements.recentShelfEl.style.display = entries.length > 0 ? 'block' : 'none';
+                elements.recentListEl.innerHTML = entries.map(buildRecentSessionRowHtml).join('');
+            })
+            .catch(function (err) {
+                // Non-critical: shelf just stays as it was until the next successful poll.
+                console.error('[PlaybackCard] Failed to load recent sessions:', err);
+            });
+    }
+
     function loadPluginVersionHealth(page) {
         if (!page) return Promise.resolve();
 
@@ -4916,6 +5452,8 @@
                 var chkUser = page.querySelector('#chkUsernameDisclosure');
                 var chkDev = page.querySelector('#chkClientDeviceDisclosure');
                 var chkNetLoc = page.querySelector('#chkNetworkLocationDisclosure');
+                var chkPosterImage = page.querySelector('#chkIncludePosterImage');
+                var numUploadLimit = page.querySelector('#numUploadBandwidthLimit');
 
                 var isMaster = data.notificationsEnabled;
                 if (chkMaster) chkMaster.checked = Boolean(isMaster);
@@ -4982,6 +5520,9 @@
                 if (chkDev) chkDev.checked = Boolean(data.clientDeviceDisclosure);
                 if (chkNetLoc) chkNetLoc.checked = Boolean(data.networkLocationDisclosure);
                 networkLocationEnabled = Boolean(data.networkLocationDisclosure);
+                if (chkPosterImage) chkPosterImage.checked = Boolean(data.includePosterImage);
+                if (numUploadLimit) numUploadLimit.value = data.uploadBandwidthLimitMbps || 0;
+                uploadBandwidthLimitMbps = Number(data.uploadBandwidthLimitMbps) || 0;
 
                 // Update local diag state
                 var notifs = diagState.notifications;
@@ -5053,6 +5594,8 @@
             var chkUser = page.querySelector('#chkUsernameDisclosure');
             var chkDev = page.querySelector('#chkClientDeviceDisclosure');
             var chkNetLoc = page.querySelector('#chkNetworkLocationDisclosure');
+            var chkPosterImage = page.querySelector('#chkIncludePosterImage');
+            var numUploadLimit = page.querySelector('#numUploadBandwidthLimit');
 
             payload.notifyOnStart = chkStart ? chkStart.checked : false;
             payload.notifyOnStop = chkStop ? chkStop.checked : false;
@@ -5063,6 +5606,8 @@
             payload.usernameDisclosure = chkUser ? chkUser.checked : false;
             payload.clientDeviceDisclosure = chkDev ? chkDev.checked : false;
             payload.networkLocationDisclosure = chkNetLoc ? chkNetLoc.checked : false;
+            payload.includePosterImage = chkPosterImage ? chkPosterImage.checked : false;
+            payload.uploadBandwidthLimitMbps = numUploadLimit ? Math.max(0, parseInt(numUploadLimit.value, 10) || 0) : 0;
         }
 
         callNotificationApi('PlaybackCard/Notifications/Configuration', {
@@ -5271,6 +5816,16 @@
         var btnCompact = page.querySelector('#btnModeCompact');
         var btnExtended = page.querySelector('#btnModeExtended');
         var btnCopyDiag = page.querySelector('#btnCopyDiagnostics');
+        var recentToggle = page.querySelector('#recentSessionsToggle');
+        var recentList = page.querySelector('#recentSessionsList');
+
+        if (recentToggle && recentList) {
+            recentToggle.addEventListener('click', function () {
+                var isOpen = recentList.style.display !== 'none';
+                recentList.style.display = isOpen ? 'none' : 'block';
+                recentToggle.classList.toggle('open', !isOpen);
+            });
+        }
 
         if (btnCompact && btnExtended) {
             btnCompact.addEventListener('click', function () {
@@ -5394,6 +5949,7 @@
                         showActionModal({
                             title: 'Send Message',
                             message: 'Send an on-screen message to this session.',
+                            presets: MESSAGE_PRESETS,
                             showInput: true,
                             inputPlaceholder: 'Message text…',
                             confirmLabel: 'Send',
@@ -5453,6 +6009,7 @@
                     return loadNetworkLocations(page);
                 });
                 loadPluginVersionHealth(page);
+                loadRecentSessions(page);
             }
 
             fetchSessions(page, capturedGen, isAdmin);
@@ -5468,6 +6025,7 @@
                 if (isAdmin) {
                     fetchNotificationDiagnostics(page);
                     loadNetworkLocations(page);
+                    loadRecentSessions(page);
                 }
             }, POLL_INTERVAL_MS);
         }).catch(function (err) {
@@ -5571,6 +6129,8 @@
         getTranscodeReasonDetails: getTranscodeReasonDetails,
         summarizePillWarnings: summarizePillWarnings,
         buildSummaryStripHtml: buildSummaryStripHtml,
+        buildRecentSessionRowHtml: buildRecentSessionRowHtml,
+        buildSessionDiagnosticText: buildSessionDiagnosticText,
         prepareRenderPass: prepareRenderPass,
         buildDiagnosticReport: buildDiagnosticReport,
         validateDiagnosticReport: validateDiagnosticReport,

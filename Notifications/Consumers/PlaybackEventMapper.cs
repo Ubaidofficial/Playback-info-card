@@ -210,6 +210,19 @@ public static class PlaybackEventMapper
         // Map truthful "Why" transcode reasons
         var transcodeReasonsWhy = MapTranscodeReasons(rawTranscodeReasons);
 
+        // Primary image, if cached locally -- absent for a remote-only image, an item with no
+        // image at all, or an item type that doesn't support GetImageInfo. Never lets a poster
+        // lookup failure break the rest of the event mapping.
+        string? primaryImagePath = null;
+        try
+        {
+            primaryImagePath = item?.GetImageInfo(ImageType.Primary, 0)?.Path;
+        }
+        catch
+        {
+            primaryImagePath = null;
+        }
+
         // Fallback: extract from item media streams if not populated by transcode info
         IReadOnlyList<MediaStream>? streams = null;
         try
@@ -311,7 +324,8 @@ public static class PlaybackEventMapper
             TranscodeEngine = transcodeEngine,
             TranscodeReasons = rawTranscodeReasons,
             TranscodeReasonsWhy = transcodeReasonsWhy,
-            PlayedToCompletion = playedToCompletion
+            PlayedToCompletion = playedToCompletion,
+            PrimaryImagePath = primaryImagePath
         };
     }
 

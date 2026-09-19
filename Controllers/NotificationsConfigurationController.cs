@@ -172,6 +172,10 @@ public class NotificationsConfigurationController : ControllerBase
 
         if (request.NetworkLocationDisclosure.HasValue) config.NetworkLocationDisclosure = request.NetworkLocationDisclosure.Value;
 
+        if (request.IncludePosterImage.HasValue) config.IncludePosterImage = request.IncludePosterImage.Value;
+
+        if (request.UploadBandwidthLimitMbps.HasValue) config.UploadBandwidthLimitMbps = Math.Max(0, request.UploadBandwidthLimitMbps.Value);
+
         if (request.UserFilterMode.HasValue) config.UserFilterMode = request.UserFilterMode.Value;
 
         if (request.SelectedUserIds != null)
@@ -181,7 +185,14 @@ public class NotificationsConfigurationController : ControllerBase
 
         if (request.TelegramChatId != null)
         {
-            config.TelegramChatId = request.TelegramChatId.Trim();
+            var trimmedChatId = request.TelegramChatId.Trim();
+            if (trimmedChatId.Length > 0 && !TelegramBotApiSender.ValidateChatIdFormat(trimmedChatId, out var chatIdErrCategory))
+            {
+                Plugin.Instance?.SaveConfiguration();
+                return BadRequest(new { error = chatIdErrCategory, message = "Invalid Telegram Chat ID format. Use a numeric ID (e.g. -100123456789) or an @channel username." });
+            }
+
+            config.TelegramChatId = trimmedChatId;
         }
 
         // 2. Handle Discord Webhook Credential (Omitted, Masked, New, or Clear). A
@@ -215,11 +226,13 @@ public class NotificationsConfigurationController : ControllerBase
             var trimmedToken = TelegramBotApiSender.NormalizeToken(request.TelegramBotToken);
             if (!SecretRedactor.IsMasked(trimmedToken))
             {
-                var targetChatId = request.TelegramChatId ?? config.TelegramChatId;
-                if (!TelegramBotApiSender.ValidateEndpoint(trimmedToken, targetChatId, out _, out var errCategory))
+                // Validated on its own syntax, independent of the Chat ID: a token pasted before
+                // a Chat ID has ever been configured (or with the Chat ID field left blank in this
+                // same request) must still be saved rather than rejected.
+                if (!TelegramBotApiSender.ValidateTokenFormat(trimmedToken, out var errCategory))
                 {
                     Plugin.Instance?.SaveConfiguration();
-                    return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format or endpoint." });
+                    return BadRequest(new { error = errCategory, message = "Invalid Telegram bot token format." });
                 }
                 _secretStore.SetTelegramBotToken(trimmedToken);
             }
@@ -300,6 +313,8 @@ public class NotificationsConfigurationController : ControllerBase
             UsernameDisclosure = config.UsernameDisclosure,
             ClientDeviceDisclosure = config.ClientDeviceDisclosure,
             NetworkLocationDisclosure = config.NetworkLocationDisclosure,
+            IncludePosterImage = config.IncludePosterImage,
+            UploadBandwidthLimitMbps = config.UploadBandwidthLimitMbps,
             UserFilterMode = config.UserFilterMode,
             SelectedUserIds = config.SelectedUserIds,
             Diagnostics = _deliveryService.GetDiagnostics()
@@ -380,6 +395,10 @@ public sealed class NotificationConfigurationDto
     public bool IncludeClientAndDeviceName => ClientDeviceDisclosure;
     [JsonPropertyName("networkLocationDisclosure")]
     public bool NetworkLocationDisclosure { get; init; }
+    [JsonPropertyName("includePosterImage")]
+    public bool IncludePosterImage { get; init; }
+    [JsonPropertyName("uploadBandwidthLimitMbps")]
+    public int UploadBandwidthLimitMbps { get; init; }
     [JsonPropertyName("userFilterMode")]
     public UserFilterMode UserFilterMode { get; init; }
     [JsonPropertyName("selectedUserIds")]
@@ -425,6 +444,8 @@ public sealed class UpdateNotificationConfigurationRequest
     public bool? ClientDeviceDisclosure { get; set; }
     public bool? IncludeClientAndDeviceName { get; set; }
     public bool? NetworkLocationDisclosure { get; set; }
+    public bool? IncludePosterImage { get; set; }
+    public int? UploadBandwidthLimitMbps { get; set; }
     public UserFilterMode? UserFilterMode { get; set; }
     public List<string>? SelectedUserIds { get; set; }
 }

@@ -17,7 +17,7 @@ namespace Jellyfin.Plugin.PlaybackCard.Notifications;
 /// </summary>
 public interface IDiscordWebhookSender
 {
-    Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken);
+    Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken, string? posterImagePath = null);
     Task<DeliveryResult> SendTestAsync(string webhookUrl, CancellationToken cancellationToken);
 }
 
@@ -231,12 +231,37 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
     };
 
     /// <inheritdoc />
-    public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken)
+    public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken, string? posterImagePath = null)
     {
         if (!ValidateWebhookUrl(webhookUrl, out var uri, out var errorCat))
         {
             _logger.LogWarning("[DiscordSender] Webhook validation failed: {Category}", errorCat);
             return DeliveryResult.Failed(errorCat, 0, permanent: true);
+        }
+
+        var imageBytes = WebhookImageLoader.TryReadImageBytes(posterImagePath, _logger, "DiscordSender");
+
+        if (imageBytes != null)
+        {
+            var jsonWithImage = BuildDiscordJsonPayload(payload, includeImageAttachment: true);
+            var capturedBytes = imageBytes;
+
+            return await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
+                _httpClient,
+                _logger,
+                DiscordProfile,
+                uri!,
+                () =>
+                {
+                    var multipart = new MultipartFormDataContent();
+                    multipart.Add(new StringContent(jsonWithImage, Encoding.UTF8, "application/json"), "payload_json");
+                    var fileContent = new ByteArrayContent(capturedBytes);
+                    fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+                    multipart.Add(fileContent, "files[0]", "poster.jpg");
+                    return multipart;
+                },
+                DelayAsync,
+                cancellationToken).ConfigureAwait(false);
         }
 
         var jsonBody = BuildDiscordJsonPayload(payload);
@@ -300,7 +325,7 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
     /// Builds strict, sanitized Discord JSON payload enforcing 6000-character embed limit,
     /// field priority preservation, and mention neutralization.
     /// </summary>
-    public static string BuildDiscordJsonPayload(PlaybackNotificationPayload payload)
+    public static string BuildDiscordJsonPayload(PlaybackNotificationPayload payload, bool includeImageAttachment = false)
     {
         ArgumentNullException.ThrowIfNull(payload);
 
@@ -389,8 +414,8 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
 
         if (payload.TotalDuration.HasValue && payload.TotalDuration.Value > TimeSpan.Zero)
         {
-            var pos = payload.Position.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-            var dur = payload.TotalDuration.Value.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
+            var pos = FormatDuration(payload.Position);
+            var dur = FormatDuration(payload.TotalDuration.Value);
             var pct = payload.PlaybackPercentage.HasValue ? $" ({payload.PlaybackPercentage}%)" : "";
             secondaryFields.Add(new DiscordField("Progress", $"{pos} / {dur}{pct}", true));
         }
@@ -448,6 +473,14 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
             ["timestamp"] = payload.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)
         };
 
+        if (includeImageAttachment)
+        {
+            // References the file uploaded alongside this JSON as a separate multipart part
+            // named "files[0]" with this exact filename -- Discord resolves the attachment://
+            // scheme against the attachments included in the same request, never a real URL.
+            embedObj["thumbnail"] = new { url = "attachment://poster.jpg" };
+        }
+
         var rootPayload = new Dictionary<string, object>
         {
             ["content"] = "",
@@ -456,6 +489,16 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
         };
 
         return JsonSerializer.Serialize(rootPayload);
+    }
+
+    /// <summary>
+    /// Formats a <see cref="TimeSpan"/> as H:MM:SS with unbounded hours. The "hh" custom format
+    /// specifier wraps at 24 (a 30-hour audiobook/livestream session would silently display as
+    /// "06:00:00"), so total hours are computed explicitly instead.
+    /// </summary>
+    private static string FormatDuration(TimeSpan ts)
+    {
+        return string.Format(CultureInfo.InvariantCulture, "{0:D2}:{1:D2}:{2:D2}", (int)ts.TotalHours, ts.Minutes, ts.Seconds);
     }
 
     /// <summary>
@@ -523,7 +566,7 @@ internal static class WebhookSenderRetryHelper
     private const int MaxRetries = 3;
     private const double MaxAllowedDelaySeconds = 30.0;
 
-    public static async Task<DeliveryResult> ExecuteWithRetryAsync(
+    public static Task<DeliveryResult> ExecuteWithRetryAsync(
         HttpClient httpClient,
         ILogger logger,
         WebhookSenderProfile profile,
@@ -532,15 +575,36 @@ internal static class WebhookSenderRetryHelper
         Func<TimeSpan, CancellationToken, Task>? delayOverride,
         CancellationToken cancellationToken)
     {
+        return ExecuteWithRetryAsync(httpClient, logger, profile, uri, () => new StringContent(jsonPayload, Encoding.UTF8, "application/json"), delayOverride, cancellationToken);
+    }
+
+    /// <summary>
+    /// Same as the string-payload overload, but takes a content factory so a sender can supply
+    /// binary/multipart content (e.g. a poster image attachment) instead of plain JSON. A factory
+    /// rather than a single <see cref="HttpContent"/> instance is required because <see
+    /// cref="HttpContent"/> can only be sent once -- each retry attempt below needs its own fresh
+    /// instance, exactly as the string overload already rebuilt a fresh <see cref="StringContent"/>
+    /// on every loop iteration.
+    /// </summary>
+    public static async Task<DeliveryResult> ExecuteWithRetryAsync(
+        HttpClient httpClient,
+        ILogger logger,
+        WebhookSenderProfile profile,
+        Uri uri,
+        Func<HttpContent> contentFactory,
+        Func<TimeSpan, CancellationToken, Task>? delayOverride,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(uri);
+        ArgumentNullException.ThrowIfNull(contentFactory);
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, uri);
-            request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+            request.Content = contentFactory();
 
             try
             {

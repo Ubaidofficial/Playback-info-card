@@ -256,7 +256,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         var discordTask = ProcessQueueAsync(
             _discordQueue,
             cfg => cfg.DiscordEnabled && !string.IsNullOrWhiteSpace(_secretStore.GetDiscordWebhookUrl()),
-            (payload, cfg, ct) => _discordSender.SendAsync(payload, _secretStore.GetDiscordWebhookUrl(), ct),
+            (payload, cfg, posterPath, ct) => _discordSender.SendAsync(payload, _secretStore.GetDiscordWebhookUrl(), ct, posterPath),
             value => _discordAvailability = value,
             "DiscordWorker",
             stoppingToken);
@@ -264,7 +264,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         var telegramTask = ProcessQueueAsync(
             _telegramQueue,
             cfg => cfg.TelegramEnabled && !string.IsNullOrWhiteSpace(_secretStore.GetTelegramBotToken()) && !string.IsNullOrWhiteSpace(cfg.TelegramChatId),
-            (payload, cfg, ct) => _telegramSender.SendAsync(payload, _secretStore.GetTelegramBotToken(), cfg.TelegramChatId, ct),
+            (payload, cfg, posterPath, ct) => _telegramSender.SendAsync(payload, _secretStore.GetTelegramBotToken(), cfg.TelegramChatId, ct, posterPath),
             value => _telegramAvailability = value,
             "TelegramWorker",
             stoppingToken);
@@ -281,7 +281,7 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
     private async Task ProcessQueueAsync(
         DestinationQueue queue,
         Func<PluginConfiguration, bool> isConfigured,
-        Func<PlaybackNotificationPayload, PluginConfiguration, CancellationToken, Task<DeliveryResult>> send,
+        Func<PlaybackNotificationPayload, PluginConfiguration, string?, CancellationToken, Task<DeliveryResult>> send,
         Action<string> setAvailability,
         string workerName,
         CancellationToken stoppingToken)
@@ -300,9 +300,10 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
                 }
 
                 var payload = record.ToOutboundPayload(config.UsernameDisclosure, config.ClientDeviceDisclosure);
+                var posterImagePath = config.IncludePosterImage ? record.PrimaryImagePath : null;
 
                 _lastAttemptTimestamp = DateTimeOffset.UtcNow;
-                var result = await send(payload, config, stoppingToken).ConfigureAwait(false);
+                var result = await send(payload, config, posterImagePath, stoppingToken).ConfigureAwait(false);
 
                 _lastHttpStatus = result.StatusCode;
 

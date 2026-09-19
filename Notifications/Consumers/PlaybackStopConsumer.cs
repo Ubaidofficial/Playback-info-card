@@ -14,13 +14,16 @@ namespace Jellyfin.Plugin.PlaybackCard.Notifications.Consumers;
 public sealed class PlaybackStopConsumer : IEventConsumer<PlaybackStopEventArgs>
 {
     private readonly INotificationDeliveryService _deliveryService;
+    private readonly IRecentSessionsHistoryService _historyService;
     private readonly ILogger<PlaybackStopConsumer> _logger;
 
     public PlaybackStopConsumer(
         INotificationDeliveryService deliveryService,
+        IRecentSessionsHistoryService historyService,
         ILogger<PlaybackStopConsumer> logger)
     {
         _deliveryService = deliveryService;
+        _historyService = historyService;
         _logger = logger;
     }
 
@@ -50,6 +53,7 @@ public sealed class PlaybackStopConsumer : IEventConsumer<PlaybackStopEventArgs>
             PlaybackProgressConsumer.RemoveSessionState(record.InternalSessionKey);
 
             _deliveryService.Enqueue(record);
+            _historyService.Record(record);
         }
         catch (Exception ex)
         {

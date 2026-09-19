@@ -41,15 +41,18 @@ Docker, reverse proxies, and rollback steps: [docs/ADVANCED.md](docs/ADVANCED.md
 ## Features
 
 - Compact, Extended, and Show Details view modes
-- Summary strip with a real Direct vs. Transcode split
+- Summary strip with a real Direct vs. Transcode split, plus a live bandwidth gauge (total outbound bitrate, split by Local Network vs. Remote when that's enabled, with an optional upload-capacity percentage)
 - Full telemetry in Compact mode too — resolution, HDR, codecs, bit depth, channels, subtitles, framerate, bitrate
 - Completion ring on the poster, elapsed watch time next to ETA
 - Transcode diagnostics (hardware engine, container, reason) straight from the server, shown as a highlighted callout
 - Show Details grouped into Playback / Video / Audio / Stream / Subtitles sections — each card expands independently
-- ETA, Atmos/DTS:X detection, audio language, subtitle delivery method
+- ETA, Atmos/DTS:X detection, audio language, subtitle delivery method — subtitle/audio language codes expand to full names on hover
+- Zombie-stream warning on sessions paused a while, and a badge when one account has more than one stream running
 - ~35 brand-accurate client/OS logos, bundled locally, no CDN
 - Tautulli-style cards — full-height poster art, blurred backdrop, status ring colored by playback method
-- Admin controls — send a message or stop a session directly from the card via Jellyfin's own Session API (Stop always confirms first)
+- Admin controls — send a message (with quick presets) or stop a session directly from the card via Jellyfin's own Session API (Stop always confirms first)
+- Per-session "Copy Report" button in the Info panel — a sanitized technical summary (no username, device, or IP) for pasting into a forum post or issue
+- Recent Sessions shelf — a short in-memory history of what finished playing, cleared on restart, no database
 
 ![PlayInfo Extended mode with the full technical stream breakdown](screenshots/dashboard-extended.png)
 
@@ -60,6 +63,7 @@ Configure from the PlayInfo page under Playback Notifications (admins only). Tog
 - Usernames and device names are off by default
 - Discord mentions are disabled
 - Telegram output is HTML-escaped
+- Poster art is attached directly to the notification (uploaded with the message, never a link back to your server) — on by default, can be turned off
 
 Bot/webhook setup steps: [docs/ADVANCED.md](docs/ADVANCED.md)
 

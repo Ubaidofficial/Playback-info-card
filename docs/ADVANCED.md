@@ -54,6 +54,7 @@ Removal is always an explicit, one-click, admin-confirmed action — never autom
 - Repeated progress updates for the same session replace the previous pending one in the queue rather than piling up.
 - HTTP 429s are honored via Discord's `Retry-After` / Telegram's `retry_after`. Transient errors (5xx, timeouts) retry up to 3 times with backoff and jitter; permanent client errors (400/401/403/404) fail immediately.
 - On server shutdown, queues get a 3-second drain budget to flush what they can without delaying shutdown.
+- When "Include Poster Image" is on and the item's poster is cached locally, it's uploaded directly as part of the same request (Discord: `files[0]` + `payload_json`; Telegram: `sendPhoto`) — never a link back to your server, so it works even if your Jellyfin isn't internet-reachable. Missing or oversized (>8MB) images just fall back to a text-only message.
 
 ## Telegram bot setup
 
