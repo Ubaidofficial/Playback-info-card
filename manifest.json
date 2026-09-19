@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.5",
+        "changelog": "Release v0.2.7.5 - Added a second Info view: click Info while 'Right' is selected (next to the existing 'Down' toggle) to open a centered dialog with the poster on the left and the full Tautulli-style Product/Player/Quality/Stream/Container/Video/Audio/Subtitle/Location/Bandwidth field list on the right, instead of expanding the card in place. The original Down behavior is unchanged. Transcode reasons are now itemized with red/amber severity, shown both as a details-panel banner and as warning rings on the affected pills, so it is clear at a glance why a stream is transcoding and how serious it is. Compact/Extended switches and opening Info now animate instead of snapping open. Also adds a strictly opt-in (off by default) Local Network/Remote badge, with an optional city/country lookup for remote sessions via a third-party geolocation service -- the raw IP address is never exposed or logged.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.5/jellyfin-plugin-playbackcard.zip",
+        "checksum": "e19b6e988ca3473772176b1c2d5b01d1",
+        "timestamp": "2026-09-19T12:03:18Z"
+      },
+      {
         "version": "0.2.7.4",
         "changelog": "Release v0.2.7.4 - Added detection for stale, superseded plugin version folders left behind after an update. Jellyfin's own plugin loader can, in rare cases, silently keep running an old build instead of a newer one already installed (a real bug in Jellyfin itself, tracked upstream as jellyfin/jellyfin#17699) -- when that happens, fixes from later releases never take effect, with no error shown anywhere. The plugin now checks for this at every startup and logs a warning if found, and the System Diagnostics section shows a banner naming the older folder(s) with an explicit 'Remove' button per folder. Removal is always an admin-confirmed, one-click action -- never automatic -- and it refuses to remove anything unless it can positively confirm the folder belongs to this plugin and is strictly older than the version currently running.",
         "targetAbi": "10.9.0.0",
