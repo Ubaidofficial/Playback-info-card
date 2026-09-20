@@ -18,10 +18,10 @@ if (!scriptMatch) {
 }
 const scriptSource = scriptMatch[1];
 
-function createMockController() {
+function createMockController(hash) {
     const mockModule = { exports: {} };
     const mockWindow = {
-        location: { hash: '#/playbackcard', pathname: '/playbackcard' }
+        location: { hash: hash || '#/playbackcard', pathname: '/playbackcard' }
     };
     const runner = new Function('module', 'exports', 'window', 'globalThis', scriptSource);
     runner(mockModule, mockModule.exports, mockWindow, mockWindow);
@@ -2542,6 +2542,19 @@ describe('Playback Info Card v0.2.7.6 Test Suite', () => {
             assert.ok(html.includes('Completed (87%)'));
             assert.ok(html.includes('Transcode'));
             assert.ok(html.includes('alice'), 'Username is shown in this admin-only history view');
+        });
+
+        it('Copy Diagnostic Report is not blocked by the standard Jellyfin config-page route (which always carries a query string)', () => {
+            // Reached via Dashboard -> Plugins -> PlayInfo, Jellyfin's own hash route for this
+            // page is "#/configurationpage?name=playbackcard" -- a static page identifier, not
+            // sensitive data. The route validator used to reject any "?" outright, which meant
+            // the single most common way to open this page made the Copy button permanently
+            // blocked with "Diagnostic report validation failed".
+            const routedController = createMockController('#/configurationpage?name=playbackcard');
+            const report = routedController.buildDiagnosticReport();
+            assert.equal(report.route, '#/configurationpage', 'Query string is stripped before it ever reaches the report');
+            assert.equal(routedController.validateDiagnosticReport(report), true, 'Report must validate from the real config-page route');
+            assert.equal(routedController.checkSensitiveData(JSON.stringify(report)), false, 'A stripped static route must not trip the sensitive-data scan');
         });
 
         it('builds a sanitized per-session diagnostic report with no username or client/device info', () => {

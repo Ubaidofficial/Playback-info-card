@@ -2648,7 +2648,15 @@
         pluginVersion: PLUGIN_VERSION,
         jellyfinVersion: 'Unavailable',
         webVersion: 'Available',
-        route: (typeof window !== 'undefined' && window.location) ? (window.location.hash || window.location.pathname || '/playbackcard') : '/playbackcard',
+        // Query string stripped before it ever lands in diagState: Jellyfin's own config-page
+        // route is always "#/configurationpage?name=playbackcard" (a static page identifier,
+        // not per-user data), but the diagnostic report's route field is validated to reject
+        // any "?" at all, on the assumption a route would never legitimately carry one -- so
+        // without stripping it here, the single most common way to reach this page made the
+        // "Copy Diagnostic Report" button permanently blocked for everyone using it.
+        route: (typeof window !== 'undefined' && window.location)
+            ? (window.location.hash || window.location.pathname || '/playbackcard').split('?')[0]
+            : '/playbackcard',
         pageLoaded: true,
         webResourcesLoaded: true,
         sessionsApiStatus: 'Waiting for sessions', // 'OK', 'Waiting for sessions', 'Sessions unavailable', 'Timeout'
