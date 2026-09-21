@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.7",
+        "changelog": "Release v0.2.7.7 - Fixed the real cause of 'Telegram only sends when I click Test': every event-type checkbox (Playback Start, Stop, etc.) defaulted to off, so real playback events were silently dropped at the delivery queue's event-enablement check while the Test button, which bypasses that check, kept working. New installs now default Start/Stop to on, and existing installs are auto-recovered at save time if notifications and a destination are active with zero event types ever configured -- without overriding an explicit choice made in the same save. Saving Discord or Telegram settings now also persists the current event-subscription checkboxes, instead of only the separate Preferences section doing so. Fixed 'Copy Diagnostic Report' being permanently blocked when opened from Jellyfin's own standard Dashboard -> Plugins route, which always carries a '?name=playbackcard' query string the report's own validator was rejecting. Poster image upload failures (Discord, Telegram) no longer drop the notification outright, both now fall back to a plain text message if the image itself gets rejected. Parallelized the Local Network/Remote geolocation lookups so a page with several concurrent remote sessions and a cold cache no longer waits on them one at a time.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.7/jellyfin-plugin-playbackcard.zip",
+        "checksum": "f70d1cbbf29a5dfc9272474021a448f6",
+        "timestamp": "2026-09-21T00:18:45Z"
+      },
+      {
         "version": "0.2.7.6",
         "changelog": "Release v0.2.7.6 - Discord/Telegram notifications now attach the item's poster image directly, uploaded as part of the same request rather than a link back to the server, so it works even on servers that aren't internet-reachable; falls back to text-only when no image is cached (on by default, can be turned off). The summary strip gains a live bandwidth gauge showing total outbound bitrate, split by Local Network vs. Remote when that badge is enabled, plus an optional percentage against an admin-configured upload limit. Sessions paused a while now show a warning pill (escalating from amber to red past an hour) so a forgotten paused stream holding server resources doesn't go unnoticed, and a badge appears when one account has more than one stream running. The Send Message admin action now offers quick-fill presets, and the Info panel gets a Copy Report button producing a sanitized per-session technical summary (no username, device, or IP) for sharing in a forum post or issue. Added a Recent Sessions shelf -- a short in-memory history of finished playback, cleared on restart, no database. Also fixes two Telegram bugs: saving a bot token no longer requires a Chat ID to already be set, and notification duration text no longer wraps past 24 hours.",
         "targetAbi": "10.9.0.0",
@@ -39,14 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.3/jellyfin-plugin-playbackcard.zip",
         "checksum": "5002f02ed472b41495f39d62782ac282",
         "timestamp": "2026-09-18T19:08:28Z"
-      },
-      {
-        "version": "0.2.7.2",
-        "changelog": "Release v0.2.7.2 - Fixed the real cause of notification toggles (Master Switch, Discord, Telegram) always showing as off/disabled even when they were saved correctly: the settings API's JSON response used PascalCase field names while the page's JavaScript read camelCase, so every reload silently read undefined instead of the real value. Also fixed the same issue for the Test Discord/Test Telegram buttons and the System Diagnostics telemetry tiles, which had the identical bug. Added a lock around notification config saves to prevent two rapid saves (e.g. flipping the Master Switch and a destination toggle back to back) from racing each other server-side. Removed dead code and consolidated duplicated logic in the notification delivery and session-classification paths; fixed a related bug where a video-direct, audio-transcoding session with a different output container could be mislabeled 'Remux' in Discord/Telegram alerts instead of 'Transcode'.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.2/jellyfin-plugin-playbackcard.zip",
-        "checksum": "51fcb8862f9e0f2f7ec320c9c7fb58a8",
-        "timestamp": "2026-09-18T18:07:29Z"
       }
     ]
   }
