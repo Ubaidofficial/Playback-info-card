@@ -5517,8 +5517,11 @@
                         : (data.telegramEnabled ? 'Save a Bot Token and Chat ID before testing' : 'Enable Telegram Delivery and save a Bot Token and Chat ID before testing');
                 }
 
-                if (chkStart) chkStart.checked = Boolean(data.notifyOnStart);
-                if (chkStop) chkStop.checked = Boolean(data.notifyOnStop);
+                var hasAnyEvent = Boolean(data.notifyOnStart || data.notifyOnStop || data.notifyOnCompletion || data.notifyOnPauseResume || data.notifyOnProgress);
+                var shouldPreselectDefaults = !hasAnyEvent && (isMaster || data.telegramEnabled || data.discordEnabled);
+
+                if (chkStart) chkStart.checked = Boolean(data.notifyOnStart || shouldPreselectDefaults);
+                if (chkStop) chkStop.checked = Boolean(data.notifyOnStop || shouldPreselectDefaults);
                 if (chkComp) chkComp.checked = Boolean(data.notifyOnCompletion);
                 if (chkPause) chkPause.checked = Boolean(data.notifyOnPauseResume);
                 if (chkProg) chkProg.checked = Boolean(data.notifyOnProgress);
@@ -5558,6 +5561,40 @@
             });
     }
 
+    // Shared by the discord/telegram/preferences save paths below: bundling the current event
+    // subscription checkboxes into every destination save (not just the separate Preferences
+    // section) means a user who only ever uses "Save Telegram" still gets their event
+    // subscriptions persisted, instead of them silently staying whatever they were the last
+    // time (or never) the Preferences section itself was saved.
+    function getPreferencesPayload(page) {
+        if (!page) return {};
+        var chkStart = page.querySelector('#chkNotifyOnStart');
+        var chkStop = page.querySelector('#chkNotifyOnStop');
+        var chkComp = page.querySelector('#chkNotifyOnCompletion');
+        var chkPause = page.querySelector('#chkNotifyOnPauseResume');
+        var chkProg = page.querySelector('#chkNotifyOnProgress');
+        var numProg = page.querySelector('#numProgressInterval');
+        var chkUser = page.querySelector('#chkUsernameDisclosure');
+        var chkDev = page.querySelector('#chkClientDeviceDisclosure');
+        var chkNetLoc = page.querySelector('#chkNetworkLocationDisclosure');
+        var chkPosterImage = page.querySelector('#chkIncludePosterImage');
+        var numUploadLimit = page.querySelector('#numUploadBandwidthLimit');
+
+        return {
+            notifyOnStart: chkStart ? chkStart.checked : false,
+            notifyOnStop: chkStop ? chkStop.checked : false,
+            notifyOnCompletion: chkComp ? chkComp.checked : false,
+            notifyOnPauseResume: chkPause ? chkPause.checked : false,
+            notifyOnProgress: chkProg ? chkProg.checked : false,
+            progressIntervalMinutes: numProg ? Math.max(5, Math.min(120, parseInt(numProg.value, 10) || 15)) : 15,
+            usernameDisclosure: chkUser ? chkUser.checked : false,
+            clientDeviceDisclosure: chkDev ? chkDev.checked : false,
+            networkLocationDisclosure: chkNetLoc ? chkNetLoc.checked : false,
+            includePosterImage: chkPosterImage ? chkPosterImage.checked : false,
+            uploadBandwidthLimitMbps: numUploadLimit ? Math.max(0, parseInt(numUploadLimit.value, 10) || 0) : 0
+        };
+    }
+
     function saveNotificationSettings(page, section) {
         if (!page) return;
         var payload = {};
@@ -5581,6 +5618,10 @@
             if (txtWebhook && txtWebhook.value.trim().length > 0) {
                 payload.discordWebhookUrl = txtWebhook.value.trim();
             }
+            var discordPrefs = getPreferencesPayload(page);
+            for (var dk in discordPrefs) {
+                if (Object.prototype.hasOwnProperty.call(discordPrefs, dk)) payload[dk] = discordPrefs[dk];
+            }
         } else if (section === 'telegram') {
             var chkTelegram = page.querySelector('#chkTelegramEnabled');
             var txtToken = page.querySelector('#txtTelegramBotToken');
@@ -5592,30 +5633,15 @@
             if (txtChat) {
                 payload.telegramChatId = txtChat.value.trim();
             }
+            var telegramPrefs = getPreferencesPayload(page);
+            for (var tk in telegramPrefs) {
+                if (Object.prototype.hasOwnProperty.call(telegramPrefs, tk)) payload[tk] = telegramPrefs[tk];
+            }
         } else if (section === 'preferences') {
-            var chkStart = page.querySelector('#chkNotifyOnStart');
-            var chkStop = page.querySelector('#chkNotifyOnStop');
-            var chkComp = page.querySelector('#chkNotifyOnCompletion');
-            var chkPause = page.querySelector('#chkNotifyOnPauseResume');
-            var chkProg = page.querySelector('#chkNotifyOnProgress');
-            var numProg = page.querySelector('#numProgressInterval');
-            var chkUser = page.querySelector('#chkUsernameDisclosure');
-            var chkDev = page.querySelector('#chkClientDeviceDisclosure');
-            var chkNetLoc = page.querySelector('#chkNetworkLocationDisclosure');
-            var chkPosterImage = page.querySelector('#chkIncludePosterImage');
-            var numUploadLimit = page.querySelector('#numUploadBandwidthLimit');
-
-            payload.notifyOnStart = chkStart ? chkStart.checked : false;
-            payload.notifyOnStop = chkStop ? chkStop.checked : false;
-            payload.notifyOnCompletion = chkComp ? chkComp.checked : false;
-            payload.notifyOnPauseResume = chkPause ? chkPause.checked : false;
-            payload.notifyOnProgress = chkProg ? chkProg.checked : false;
-            payload.progressIntervalMinutes = numProg ? Math.max(5, Math.min(120, parseInt(numProg.value, 10) || 15)) : 15;
-            payload.usernameDisclosure = chkUser ? chkUser.checked : false;
-            payload.clientDeviceDisclosure = chkDev ? chkDev.checked : false;
-            payload.networkLocationDisclosure = chkNetLoc ? chkNetLoc.checked : false;
-            payload.includePosterImage = chkPosterImage ? chkPosterImage.checked : false;
-            payload.uploadBandwidthLimitMbps = numUploadLimit ? Math.max(0, parseInt(numUploadLimit.value, 10) || 0) : 0;
+            var prefs = getPreferencesPayload(page);
+            for (var pk in prefs) {
+                if (Object.prototype.hasOwnProperty.call(prefs, pk)) payload[pk] = prefs[pk];
+            }
         }
 
         callNotificationApi('PlaybackCard/Notifications/Configuration', {
@@ -5635,7 +5661,12 @@
                     preferences: 'Preferences'
                 };
                 var name = sectionNames[section] || 'Notification settings';
-                showNotificationFeedback(page, name + ' saved successfully.', false);
+                var hasAnyEvent = data && (data.notifyOnStart || data.notifyOnStop || data.notifyOnCompletion || data.notifyOnPauseResume || data.notifyOnProgress);
+                if (isMasterEnabled && !hasAnyEvent && (section === 'discord' || section === 'telegram' || section === 'preferences')) {
+                    showNotificationFeedback(page, name + ' saved successfully. Note: No event subscriptions (e.g. Playback Start) are enabled below.', false);
+                } else {
+                    showNotificationFeedback(page, name + ' saved successfully.', false);
+                }
             }
             loadNotificationSettings(page);
         }).catch(function (err) {
@@ -6156,6 +6187,7 @@
         STALE_THRESHOLD_MS: STALE_THRESHOLD_MS,
         setActivePageForTesting: function (page) { activePage = page; },
         loadNotificationSettings: loadNotificationSettings,
+        getPreferencesPayload: getPreferencesPayload,
         saveNotificationSettings: saveNotificationSettings,
         clearNotificationSecret: clearNotificationSecret,
         sendTestNotification: sendTestNotification,

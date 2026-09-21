@@ -246,7 +246,7 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
             var jsonWithImage = BuildDiscordJsonPayload(payload, includeImageAttachment: true);
             var capturedBytes = imageBytes;
 
-            return await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
+            var uploadResult = await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
                 _httpClient,
                 _logger,
                 DiscordProfile,
@@ -262,6 +262,15 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
                 },
                 DelayAsync,
                 cancellationToken).ConfigureAwait(false);
+
+            if (uploadResult.Success)
+            {
+                return uploadResult;
+            }
+
+            // Discord itself rejected the attachment -- don't let a poster-specific rejection
+            // cost the admin the notification entirely; fall through to the plain JSON path.
+            _logger.LogWarning("[DiscordSender] Multipart image attachment failed ({Category}: {Description}); falling back to JSON webhook delivery.", uploadResult.Category, uploadResult.Description);
         }
 
         var jsonBody = BuildDiscordJsonPayload(payload);

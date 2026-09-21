@@ -72,12 +72,21 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         // 1. User Filtering
         if (!IsUserAllowed(record, config))
         {
+            _logger.LogDebug(
+                "[Notifications] Playback event {EventType} for user '{UserId}' skipped: excluded by UserFilterMode {FilterMode}.",
+                record.EventType,
+                record.UserId,
+                config.UserFilterMode);
             return;
         }
 
         // 2. Event Type Enablement Check
         if (!IsEventEnabled(record, config))
         {
+            _logger.LogDebug(
+                "[Notifications] Playback event {EventType} for '{MediaTitle}' skipped: event type is not enabled in settings.",
+                record.EventType,
+                record.MediaTitle);
             return;
         }
 
@@ -85,6 +94,11 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
         if (ShouldDedupe(record, config))
         {
             Interlocked.Increment(ref _dedupeCount);
+            _logger.LogDebug(
+                "[Notifications] Playback event {EventType} for '{MediaTitle}' (session {SessionKey}) deduplicated.",
+                record.EventType,
+                record.MediaTitle,
+                record.InternalSessionKey);
             return;
         }
 
@@ -96,6 +110,10 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             {
                 _discordQueue.Enqueue(record);
             }
+            else
+            {
+                _logger.LogWarning("[Notifications] Discord delivery enabled but webhook URL is not configured. Event skipped.");
+            }
         }
 
         if (config.TelegramEnabled)
@@ -104,6 +122,10 @@ public sealed class NotificationDeliveryService : BackgroundService, INotificati
             if (!string.IsNullOrWhiteSpace(token) && !string.IsNullOrWhiteSpace(config.TelegramChatId))
             {
                 _telegramQueue.Enqueue(record);
+            }
+            else
+            {
+                _logger.LogWarning("[Notifications] Telegram delivery enabled but bot token or chat ID is not configured. Event skipped.");
             }
         }
     }

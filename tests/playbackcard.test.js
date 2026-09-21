@@ -624,6 +624,7 @@ describe('Playback Info Card v0.2.7.6 Test Suite', () => {
 
         it('exports notification helper functions on controller', () => {
             assert.equal(typeof controller.loadNotificationSettings, 'function');
+            assert.equal(typeof controller.getPreferencesPayload, 'function');
             assert.equal(typeof controller.saveNotificationSettings, 'function');
             assert.equal(typeof controller.clearNotificationSecret, 'function');
             assert.equal(typeof controller.sendTestNotification, 'function');

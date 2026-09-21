@@ -164,6 +164,16 @@ public class NotificationsConfigurationController : ControllerBase
         var onCompletion = request.NotifyOnCompletion ?? request.NotifyOnPlaybackCompletion;
         if (onCompletion.HasValue) config.NotifyOnCompletion = onCompletion.Value;
 
+        // If notifications are active and a destination is enabled, but no event types were ever enabled,
+        // activate Start and Stop events as safe defaults so delivery is not silently broken.
+        var hasAnyEventConfigured = config.NotifyOnStart || config.NotifyOnStop || config.NotifyOnCompletion ||
+                                   config.NotifyOnPauseResume || config.NotifyOnProgress;
+        if (!hasAnyEventConfigured && config.NotificationsEnabled && (config.TelegramEnabled || config.DiscordEnabled))
+        {
+            if (!onStart.HasValue) config.NotifyOnStart = true;
+            if (!onStop.HasValue) config.NotifyOnStop = true;
+        }
+
         var userDisc = request.UsernameDisclosure ?? request.IncludeUserAccountName;
         if (userDisc.HasValue) config.UsernameDisclosure = userDisc.Value;
 

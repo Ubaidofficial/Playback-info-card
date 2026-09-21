@@ -278,7 +278,7 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
             var photoUri = new Uri($"https://api.telegram.org/bot{NormalizeToken(botToken)}/sendPhoto");
             var capturedBytes = imageBytes;
 
-            return await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
+            var photoResult = await WebhookSenderRetryHelper.ExecuteWithRetryAsync(
                 _httpClient,
                 _logger,
                 TelegramProfile,
@@ -297,6 +297,16 @@ public sealed class TelegramBotApiSender : ITelegramBotApiSender, IDisposable
                 },
                 DelayAsync,
                 cancellationToken).ConfigureAwait(false);
+
+            if (photoResult.Success)
+            {
+                return photoResult;
+            }
+
+            // Telegram itself rejected the photo (bad dimensions, aspect ratio, corrupt data,
+            // etc.) -- don't let a poster-specific rejection cost the admin the notification
+            // entirely; fall through to the plain-text path below instead.
+            _logger.LogWarning("[TelegramSender] Photo delivery failed ({Category}: {Description}); falling back to text delivery.", photoResult.Category, photoResult.Description);
         }
 
         var messageHtml = BuildTelegramMessageHtml(payload);

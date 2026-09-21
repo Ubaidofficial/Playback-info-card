@@ -31,9 +31,9 @@ public class PluginConfiguration : BasePluginConfiguration
         TelegramEnabled = false;
         TelegramChatId = string.Empty;
 
-        // All event types are disabled until explicitly selected
-        NotifyOnStart = false;
-        NotifyOnStop = false;
+        // Playback Start and Stop events enabled by default once notifications are activated
+        NotifyOnStart = true;
+        NotifyOnStop = true;
         NotifyOnPauseResume = false;
         NotifyOnProgress = false;
         ProgressIntervalMinutes = 15;

@@ -216,4 +216,91 @@ public class NotificationsConfigurationControllerTests
 
         Assert.IsType<ForbidResult>(result.Result);
     }
+
+    /// <summary>
+    /// Reproduces the real-world "Telegram only works when I click Test" report: an admin enables
+    /// the Master Switch and Telegram (with a working token/chat ID) but, because every event
+    /// checkbox defaults to off, never explicitly checks any of them. Enqueue() silently drops
+    /// every real playback event at the event-enablement gate, while the Test button bypasses that
+    /// gate entirely -- so Test "works" and nothing else ever does. This asserts the save-time
+    /// auto-recovery: activating notifications + a destination with zero events configured
+    /// activates Start/Stop as safe defaults, without needing a second, separate save.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_EnablingDestinationWithNoEventsConfigured_AutoEnablesStartAndStop()
+    {
+        var config = new PluginConfiguration
+        {
+            NotificationsEnabled = false,
+            TelegramEnabled = false,
+            NotifyOnStart = false,
+            NotifyOnStop = false
+        };
+        var controller = CreateController(config);
+
+        controller.UpdateConfiguration(new UpdateNotificationConfigurationRequest
+        {
+            NotificationsEnabled = true,
+            TelegramEnabled = true
+        });
+
+        Assert.True(config.NotifyOnStart, "Start must be auto-enabled so real playback isn't silently dropped.");
+        Assert.True(config.NotifyOnStop, "Stop must be auto-enabled so real playback isn't silently dropped.");
+    }
+
+    /// <summary>
+    /// The auto-recovery above must never override an admin's own explicit choice made in the same
+    /// request -- e.g. someone who wants only Completion notifications and explicitly unchecks
+    /// Start/Stop in that same save.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_ExplicitEventChoiceInSameRequest_IsNeverOverriddenByAutoRecovery()
+    {
+        var config = new PluginConfiguration
+        {
+            NotificationsEnabled = false,
+            TelegramEnabled = false,
+            NotifyOnStart = false,
+            NotifyOnStop = false,
+            NotifyOnCompletion = false
+        };
+        var controller = CreateController(config);
+
+        controller.UpdateConfiguration(new UpdateNotificationConfigurationRequest
+        {
+            NotificationsEnabled = true,
+            TelegramEnabled = true,
+            NotifyOnStart = false,
+            NotifyOnStop = false,
+            NotifyOnCompletion = true
+        });
+
+        Assert.False(config.NotifyOnStart, "An explicit false in the same request must not be overridden.");
+        Assert.False(config.NotifyOnStop, "An explicit false in the same request must not be overridden.");
+        Assert.True(config.NotifyOnCompletion);
+    }
+
+    /// <summary>
+    /// Auto-recovery only fires once notifications are actually active with a destination enabled
+    /// -- saving event preferences alone (e.g. from the Preferences section, before Telegram/Discord
+    /// is even configured) must not silently flip switches the admin never touched.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_NoDestinationEnabled_DoesNotAutoEnableEvents()
+    {
+        var config = new PluginConfiguration
+        {
+            NotificationsEnabled = false,
+            TelegramEnabled = false,
+            DiscordEnabled = false,
+            NotifyOnStart = false,
+            NotifyOnStop = false
+        };
+        var controller = CreateController(config);
+
+        controller.UpdateConfiguration(new UpdateNotificationConfigurationRequest { ProgressIntervalMinutes = 20 });
+
+        Assert.False(config.NotifyOnStart);
+        Assert.False(config.NotifyOnStop);
+    }
 }
