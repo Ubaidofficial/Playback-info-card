@@ -65,13 +65,21 @@ public class NetworkLocationController : ControllerBase
             .Where(s => s.NowPlayingItem != null && !string.IsNullOrEmpty(s.Id))
             .ToList();
 
-        var result = new Dictionary<string, string>(sessions.Count);
-        foreach (var session in sessions)
+        // Resolved in parallel, not one at a time -- with several concurrent remote sessions
+        // and a cold cache (e.g. right after a restart), a sequential loop could take up to
+        // (session count * the 4s geolocation timeout) to respond, well past this endpoint's
+        // own polling interval.
+        var lookups = sessions
+            .Select(async session => (session.Id, Label: await _locationService.ResolveLabelAsync(session.RemoteEndPoint, cancellationToken).ConfigureAwait(false)))
+            .ToList();
+        var resolved = await Task.WhenAll(lookups).ConfigureAwait(false);
+
+        var result = new Dictionary<string, string>(resolved.Length);
+        foreach (var (id, label) in resolved)
         {
-            var label = await _locationService.ResolveLabelAsync(session.RemoteEndPoint, cancellationToken).ConfigureAwait(false);
             if (label != null)
             {
-                result[session.Id] = label;
+                result[id] = label;
             }
         }
 
