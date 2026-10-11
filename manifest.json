@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.8",
+        "changelog": "Release v0.2.7.8 - Redesigned playback cards with EasyUI Dark Precision styling, interactive cursor-tracking SpotlightCard glow, animated Playing equalizer bars, dual-track transcode buffer bar, and live transcode speed/throttle badges. Added a rolling 20-sample bandwidth sparkline and clickable stream-method filter chips to the summary strip. Simplified the density toggle to Compact (expandable on click) and Extended (always expanded inline). Hardened Discord webhook validation (supporting PTB/Canary domains and structured API error messages), auto-saved unsaved Discord/Telegram inputs when clicking Test, added Tailscale/WireGuard CGNAT (100.64.0.0/10) local IP classification and bounded geo-cache pruning, and consolidated backend admin authorization and DTOs.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.8/jellyfin-plugin-playbackcard.zip",
+        "checksum": "ba003834da2775f34cf6ac1772031663",
+        "timestamp": "2026-10-11T12:36:56Z"
+      },
+      {
         "version": "0.2.7.7",
         "changelog": "Release v0.2.7.7 - Fixed the real cause of 'Telegram only sends when I click Test': every event-type checkbox (Playback Start, Stop, etc.) defaulted to off, so real playback events were silently dropped at the delivery queue's event-enablement check while the Test button, which bypasses that check, kept working. New installs now default Start/Stop to on, and existing installs are auto-recovered at save time if notifications and a destination are active with zero event types ever configured -- without overriding an explicit choice made in the same save. Saving Discord or Telegram settings now also persists the current event-subscription checkboxes, instead of only the separate Preferences section doing so. Fixed 'Copy Diagnostic Report' being permanently blocked when opened from Jellyfin's own standard Dashboard -> Plugins route, which always carries a '?name=playbackcard' query string the report's own validator was rejecting. Poster image upload failures (Discord, Telegram) no longer drop the notification outright, both now fall back to a plain text message if the image itself gets rejected. Parallelized the Local Network/Remote geolocation lookups so a page with several concurrent remote sessions and a cold cache no longer waits on them one at a time.",
         "targetAbi": "10.9.0.0",
@@ -39,14 +47,6 @@
         "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.4/jellyfin-plugin-playbackcard.zip",
         "checksum": "8bcbc9f342cefbb8d965bcc00a4fbfad",
         "timestamp": "2026-09-18T22:37:33Z"
-      },
-      {
-        "version": "0.2.7.3",
-        "changelog": "Release v0.2.7.3 - Replaced hand-drawn approximate client icons with verified real logos: Apple, Apple TV, Linux, Firefox, Microsoft Edge, Brave, Windows, Xbox, PlayStation, Chromecast, Kodi, Google TV, and Chrome (the real current multi-color logo). Official Jellyfin apps (Web/Mobile/Android TV/Desktop) now show Jellyfin's actual mascot mark instead of a generic device outline. Moonfin, Finamp, and Streamyfin icons now match their real app logos instead of approximate shapes. Fixed the original bug properly: the Apple TV and Linux icons weren't just small, they were using a near-black fill against a near-black card background and were rendering as almost invisible. Added a small PlayInfo watermark badge to the corner of every card so the data source is identifiable at a glance.",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.3/jellyfin-plugin-playbackcard.zip",
-        "checksum": "5002f02ed472b41495f39d62782ac282",
-        "timestamp": "2026-09-18T19:08:28Z"
       }
     ]
   }
