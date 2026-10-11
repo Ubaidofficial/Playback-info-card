@@ -8,13 +8,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.PlaybackCard.Controllers;
 
 /// <summary>
-/// Administrator-only API for detecting and safely cleaning up stale, superseded plugin version
-/// folders left behind in Jellyfin's plugins directory. Jellyfin's own plugin loader is supposed to
-/// keep only the newest version installed, but this has not always happened reliably in the wild
-/// (see jellyfin/jellyfin#12959) -- when it doesn't, Jellyfin can silently keep running an old build
-/// indefinitely, with fixes from later releases never taking effect and no visible error anywhere.
-/// This controller makes that condition visible and lets an administrator clean it up with one
-/// explicit, confirmed action, rather than the plugin silently deleting files on its own.
+/// Administrator-only API for detecting and safely cleaning up superseded plugin version
+/// folders left behind in Jellyfin's plugins directory.
 /// </summary>
 [ApiController]
 [Route("PlaybackCard/Maintenance")]
@@ -22,17 +17,7 @@ namespace Jellyfin.Plugin.PlaybackCard.Controllers;
 [Authorize(Policy = "RequiresElevation")]
 public class PluginMaintenanceController : ControllerBase
 {
-    private bool IsAdministrator()
-    {
-        if (User.IsInRole("Administrator") ||
-            User.HasClaim("IsAdministrator", "true") ||
-            User.HasClaim(c => c.Type.Equals("IsAdministrator", StringComparison.OrdinalIgnoreCase) && c.Value.Equals("true", StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        return false;
-    }
+    private bool IsAdministrator() => ControllerAuthHelper.IsAdministrator(User);
 
     /// <summary>
     /// Reports whether any older, superseded version folders of this plugin are currently sitting

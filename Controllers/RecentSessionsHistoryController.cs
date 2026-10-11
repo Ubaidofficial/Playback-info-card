@@ -27,12 +27,7 @@ public class RecentSessionsHistoryController : ControllerBase
         _historyService = historyService;
     }
 
-    private bool IsAdministrator()
-    {
-        return User.IsInRole("Administrator") ||
-               User.HasClaim("IsAdministrator", "true") ||
-               User.HasClaim(c => c.Type.Equals("IsAdministrator", StringComparison.OrdinalIgnoreCase) && c.Value.Equals("true", StringComparison.OrdinalIgnoreCase));
-    }
+    private bool IsAdministrator() => ControllerAuthHelper.IsAdministrator(User);
 
     /// <summary>
     /// Retrieves up to <paramref name="limit"/> recently finished sessions, newest first.

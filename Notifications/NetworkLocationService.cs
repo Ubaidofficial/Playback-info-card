@@ -89,6 +89,17 @@ public sealed class NetworkLocationService : INetworkLocationService, IDisposabl
             return cached.Label ?? "Remote";
         }
 
+        if (_cache.Count > 500)
+        {
+            foreach (var kvp in _cache)
+            {
+                if (kvp.Value.Expiry <= now)
+                {
+                    _cache.TryRemove(kvp.Key, out _);
+                }
+            }
+        }
+
         var label = await LookupGeoAsync(ip, cancellationToken).ConfigureAwait(false);
         _cache[ip] = (label, now.Add(label != null ? CacheTtl : NegativeCacheTtl));
         return label ?? "Remote";
@@ -122,8 +133,8 @@ public sealed class NetworkLocationService : INetworkLocationService, IDisposabl
     }
 
     /// <summary>
-    /// True for loopback, RFC 1918 private ranges, link-local, and IPv6 unique-local/link-local
-    /// addresses -- i.e. anything that isn't routed over the public internet.
+    /// True for loopback, RFC 1918 private ranges, RFC 6598 CGNAT/Tailscale (100.64.0.0/10),
+    /// link-local, and IPv6 unique-local/link-local addresses.
     /// </summary>
     internal static bool IsLocal(string ip)
     {
@@ -146,11 +157,12 @@ public sealed class NetworkLocationService : INetworkLocationService, IDisposabl
 
         if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
         {
-            // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (link-local)
+            // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (link-local), 100.64.0.0/10 (CGNAT/Tailscale)
             if (bytes[0] == 10) return true;
             if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) return true;
             if (bytes[0] == 192 && bytes[1] == 168) return true;
             if (bytes[0] == 169 && bytes[1] == 254) return true;
+            if (bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127) return true;
             return false;
         }
 
@@ -162,7 +174,7 @@ public sealed class NetworkLocationService : INetworkLocationService, IDisposabl
             return false;
         }
 
-        return true; // Unknown address family: fail closed rather than guess "remote".
+        return true;
     }
 
     private async Task<string?> LookupGeoAsync(string ip, CancellationToken cancellationToken)

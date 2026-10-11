@@ -33,17 +33,7 @@ public class NetworkLocationController : ControllerBase
         _locationService = locationService;
     }
 
-    private bool IsAdministrator()
-    {
-        if (User.IsInRole("Administrator") ||
-            User.HasClaim("IsAdministrator", "true") ||
-            User.HasClaim(c => c.Type.Equals("IsAdministrator", StringComparison.OrdinalIgnoreCase) && c.Value.Equals("true", StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        return false;
-    }
+    private bool IsAdministrator() => ControllerAuthHelper.IsAdministrator(User);
 
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -65,10 +55,6 @@ public class NetworkLocationController : ControllerBase
             .Where(s => s.NowPlayingItem != null && !string.IsNullOrEmpty(s.Id))
             .ToList();
 
-        // Resolved in parallel, not one at a time -- with several concurrent remote sessions
-        // and a cold cache (e.g. right after a restart), a sequential loop could take up to
-        // (session count * the 4s geolocation timeout) to respond, well past this endpoint's
-        // own polling interval.
         var lookups = sessions
             .Select(async session => (session.Id, Label: await _locationService.ResolveLabelAsync(session.RemoteEndPoint, cancellationToken).ConfigureAwait(false)))
             .ToList();

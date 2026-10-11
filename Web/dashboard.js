@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.7.7)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.7.8)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,8 +7,8 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.7.7';
-    var ASSET_REVISION = '0.2.7.7';
+    var VERSION = '0.2.7.8';
+    var ASSET_REVISION = '0.2.7.8';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -68,10 +68,70 @@
         // Admin-configured upstream cap for the bandwidth gauge's percentage display, mirrored
         // from the saved setting by ensureNetworkLocationConfigLoaded's periodic config check.
         // 0 = unset. Purely cosmetic, never enforced.
-        uploadBandwidthLimitMbps: 0
+        uploadBandwidthLimitMbps: 0,
+
+        // Preserves SpotlightCard cursor coordinates across 3s poll re-renders keyed by cardDomId
+        cardPointerCoords: {},
+
+        // Rolling outbound bandwidth history (Mbps) across polls for the summary strip sparkline
+        bandwidthHistory: [],
+
+        // Optional header chip filter ('directPlay' | 'directStream' | 'remux' | 'transcode' | 'paused' | null)
+        methodFilter: null,
+
+        // Session ID of currently open 'right' Info modal so polls can live-refresh its telemetry
+        activeInfoModalSessionId: null
     };
 
     var ZOMBIE_STREAM_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+
+    function saveUserPref(key, value) {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.setItem === 'function') {
+                window.localStorage.setItem(key, String(value));
+            }
+        } catch (_) {}
+    }
+
+    function loadUserPrefs() {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
+                state.displayMode = 'extended';
+                state.infoViewStyle = 'down';
+            }
+        } catch (_) {}
+    }
+
+    function showToast(message, variant) {
+        if (typeof document === 'undefined' || !document.body || typeof document.createElement !== 'function') return null;
+        try {
+            var container = typeof document.querySelector === 'function' ? document.querySelector('.pi-toast-container') : null;
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'pi-toast-container';
+                if (typeof document.body.appendChild === 'function') {
+                    document.body.appendChild(container);
+                }
+            }
+            var toast = document.createElement('div');
+            var tone = (variant === 'error' || variant === 'info') ? variant : 'success';
+            toast.className = 'pi-toast ' + tone;
+            toast.setAttribute('role', 'status');
+            toast.innerHTML = '<span>' + escapeHtml(message) + '</span>';
+            if (typeof container.appendChild === 'function') {
+                container.appendChild(toast);
+            }
+            var removeToast = function () {
+                if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+            };
+            if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+                window.setTimeout(removeToast, 2600);
+            }
+            return toast;
+        } catch (_) {
+            return null;
+        }
+    }
 
     function escapeHtml(str) {
         if (!str) return '';
@@ -1305,7 +1365,7 @@
             var stateLabel = isPaused ? 'Paused' : 'Playing';
             var stateBadgeCls = isPaused ? 'paused' : 'playing';
 
-            var stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+            var stateIcon = '<span class="pi-eq-bars" aria-hidden="true"><span></span><span></span><span></span></span><svg class="badge-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
             if (isPaused) {
                 stateIcon = '<svg class="badge-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
             }
@@ -1313,10 +1373,7 @@
             var videoBadgeCls = (isVideoDirect === false) ? 'stream-badge video-transcode' : 'stream-badge video-direct';
             var audioBadgeCls = (isAudioDirect === false) ? 'stream-badge audio-transcode' : 'stream-badge audio-direct';
 
-            // Canonical telemetry model (section 8) -- single source of truth shared with the
-            // compact pill row, the extended-mode rows, and the inline "Show Details"/Info grid
-            // below, so all three always agree. Computed early so bitrate/frame rate can also
-            // feed the compact pill row, not just the extended rows.
+            // Canonical telemetry model shared across the pill row, extended summary rows, and inline details grid.
             var model = buildTelemetryModel(session);
 
             // Per-reason severity ("red" hard-incompatible vs. "amber" soft/negotiated) and
@@ -1325,9 +1382,7 @@
             var reasonDetails = classification.method === 'Transcode' ? getTranscodeReasonDetails(session) : [];
             var pillWarnings = summarizePillWarnings(reasonDetails);
 
-            // Compact badge priority (section 11): Resolution, HDR/Dynamic range, Method,
-            // Video codec, Bit depth, Audio format/channels, Container -- always shown,
-            // wrapping onto additional lines on narrow screens rather than being cut off.
+            // Priority pill order: Resolution, HDR/Dynamic range, Method, Video codec, Bit depth, Audio format/channels, Container.
             var pills = [];
             function pushPill(targetKey, text, cls, title) {
                 var warn = targetKey ? pillWarnings[targetKey] : null;
@@ -1502,8 +1557,7 @@
             var elapsedText = session.Id ? formatElapsedDuration(state.sessionStartTimes[session.Id]) : null;
 
 
-            // Extended mode: icon-led summary rows (section 11), truthful values only --
-            // Reason/Engine read "Not applicable" (never a fabricated value) outside Transcode.
+            // Extended mode summary rows (truthful values only; Reason/Engine read "Not applicable" outside Transcode).
             var extendedRowsHtml = '';
             if (displayMode === 'extended') {
                 var videoDetail = [
@@ -1522,11 +1576,6 @@
                     : 'Not reported';
                 if (model.overallBitrateStr) containerDetail += '<span class="playback-ext-sep">&bull;</span>Overall bitrate: ' + escapeHtml(model.overallBitrateStr);
 
-                // Entrance-only animation (section: compact/extended transition) -- animates
-                // in exactly once, the render pass right after a Compact->Extended click
-                // (state.modeAnimatePending), never on an ambient poll refresh that happens
-                // to land while already in Extended (which renders straight into the "open"
-                // state so nothing replays/flickers every few seconds).
                 var extAnimateIn = Boolean(state.modeAnimatePending);
                 extendedRowsHtml = '<div class="playback-ext-rows' + (extAnimateIn ? '' : ' open') + '"' + (extAnimateIn ? ' data-anim-in="true"' : '') + '>' +
                     '<div class="playback-ext-row"><span class="playback-ext-label">Video</span><span class="' + videoBadgeCls + '">' + escapeHtml(model.isVideoDirect === false ? 'Transcode' : 'Direct') + '</span><span class="playback-ext-detail">' + (videoDetail || 'Not reported') + '</span></div>' +
@@ -1536,17 +1585,9 @@
                     '<div class="playback-ext-row"><span class="playback-ext-label">HDR</span><span class="playback-ext-detail">' + escapeHtml(model.hdrStatus || 'Not reported') + '<span class="playback-ext-sep">&bull;</span>Tone mapping: ' + escapeHtml(model.hdrToSdrVal) + '</span></div>' +
                     '<div class="playback-ext-row"><span class="playback-ext-label">Engine</span><span class="playback-ext-detail">' + escapeHtml(model.hardwareEngineStr || (classification.method === 'Transcode' ? 'Not reported' : 'Not applicable')) + '</span></div>' +
                 '</div>';
-                // Reason is deliberately NOT a plain row here -- it's the main thing an admin
-                // needs to diagnose a transcode, so it always gets the highlighted callout
-                // below instead of being buried as one more line among Video/Audio/HDR/etc.
             }
 
-            // The "why is this transcoding" highlight -- the main thing an admin needs to
-            // diagnose a transcode, so it's the same prominent callout in both Compact and
-            // Extended (never demoted to a plain text row), and only when actually transcoding.
-            // Itemized (one line per real reason, colored by severity) rather than one flat
-            // amber sentence, so a hard "codec not supported" failure reads differently from
-            // a soft "bitrate throttled" limit.
+            // Itemized transcode reasons colored by severity (red: hard incompatibility, amber: soft/negotiated limit).
             var transcodeReasonHtml = '';
             if (classification.method === 'Transcode') {
                 var reasonItems = reasonDetails.length > 0 ? reasonDetails : [{ code: null, label: 'Reason not reported by server', severity: 'amber' }];
@@ -1562,16 +1603,6 @@
                 transcodeReasonHtml = '<div class="playback-transcode-reasons">' + reasonRowsHtml + '</div>';
             }
 
-            // Info button and "Show Details" (global toggle) both reveal the same full
-            // field breakdown inline on the card, grouped into titled sections (Playback/
-            // Video/Audio/Stream/Subtitles) rather than one flat list -- this is the
-            // original behavior, unchanged, and it's what the Info button still does
-            // whenever infoViewStyle is 'down' (the default). A card with an explicit
-            // override in infoOverrides follows that instead of the global value, so one
-            // card can be collapsed (or expanded) independently of the rest. When
-            // infoViewStyle is 'right' instead, Info opens the separate Tautulli-style
-            // side panel (showInfoSidePanel) rather than toggling this at all -- a second,
-            // additive option, not a replacement for this one.
             state.cardSessionMap = state.cardSessionMap || {};
             state.cardSessionMap[cardDomId] = session.Id || null;
             state.infoOverrides = state.infoOverrides || {};
@@ -1592,11 +1623,7 @@
                 : ('<button type="button" class="playback-btn-info' + (infoIsOpenForThisCard ? ' expanded' : '') + '" data-action="toggle-info" data-card-id="' + escapeHtml(cardDomId) + '" aria-expanded="' + (infoIsOpenForThisCard ? 'true' : 'false') + '" aria-controls="' + detailsDomId + '" id="btn-info-' + cardDomId + '" aria-label="' + (infoIsOpenForThisCard ? 'Collapse' : 'Expand') + ' full technical stream details" title="' + (infoIsOpenForThisCard ? 'Collapse' : 'Expand') + ' full technical stream details">' +
                     '<svg class="playback-chevron-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></button>');
 
-            // Admin-only session controls (Stop / Message). A deliberate, later addition to
-            // the project's original read-only-observation scope -- both call Jellyfin's own
-            // native Session API (Sessions/{id}/Playing/Stop, Sessions/{id}/Message) via the
-            // shared ApiClient, exactly as Jellyfin-web's own remote-control features do.
-            // Hidden entirely for non-admins (My Playback self-view).
+            // Admin-only session controls (Stop / Message) via Jellyfin's native Session API.
             var sessionActionsHtml = '';
             if (!state.isNonAdmin && session.Id) {
                 var sidAttr = escapeHtml(session.Id);
@@ -1628,8 +1655,6 @@
                 posterHtml = '<div class="playback-poster-fallback" data-artwork-role="poster-fallback" aria-label="No artwork"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20" stroke="currentColor"/></svg></div>';
             }
 
-            // Small watermark badge, like a TV channel bug -- a glance at any card should be
-            // enough to know this data is coming from PlayInfo, not a stock Jellyfin widget.
             var brandBadgeHtml = '<div class="playback-brand-badge" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg>' +
                 '<span>PlayInfo</span>' +
@@ -1659,7 +1684,30 @@
                 ? 'poster-sm'
                 : (displayMode === 'extended' ? 'poster-md' : 'poster-lg');
 
-            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-card="true" data-playback-method="' + escapeHtml(classification.method) + '">' +
+            var savedCoords = state.cardPointerCoords && state.cardPointerCoords[cardDomId];
+            var cardPointerStyle = (savedCoords && savedCoords.x && savedCoords.y)
+                ? ' style="--mouse-x: ' + escapeHtml(savedCoords.x) + '; --mouse-y: ' + escapeHtml(savedCoords.y) + ';"'
+                : '';
+
+            var bufferBarHtml = (model.transcodeBufferPct != null && model.transcodeBufferPct > 0)
+                ? '<div class="playback-progress-buffer-fill" style="width: ' + model.transcodeBufferPct.toFixed(1) + '%;" title="Transcode buffer: ' + Math.round(model.transcodeBufferPct) + '%"></div>'
+                : '';
+
+            var transcodeSpeedBadgeHtml = model.transcodeSpeedText
+                ? '<span class="playback-transcode-speed' + (model.isTranscodeThrottled ? ' throttled' : '') + '" title="Live transcode speed">' + escapeHtml(model.transcodeSpeedText) + '</span>'
+                : '';
+
+            var centerTimeHtml = '';
+            if (model.etaText) {
+                centerTimeHtml = '<span class="playback-eta">ETA ' + escapeHtml(model.etaText) + (elapsedText ? ' &bull; ' + escapeHtml(elapsedText) + ' watched' : '') + '</span>';
+            } else if (elapsedText) {
+                centerTimeHtml = '<span class="playback-eta">' + escapeHtml(elapsedText) + ' watched</span>';
+            }
+            if (transcodeSpeedBadgeHtml) {
+                centerTimeHtml = centerTimeHtml ? (centerTimeHtml + ' ' + transcodeSpeedBadgeHtml) : transcodeSpeedBadgeHtml;
+            }
+
+            return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-card="true" data-playback-method="' + escapeHtml(classification.method) + '"' + cardPointerStyle + '>' +
                 '<div class="playback-card-backdrop" data-artwork-role="backdrop"' + backdropStyle + '></div>' +
                 '<div class="playback-card-top">' +
                     '<div class="playback-poster-wrap ' + posterSizeCls + '">' + posterHtml + brandBadgeHtml + posterProgressHtml + '</div>' +
@@ -1685,11 +1733,12 @@
                                 (subtitle ? '<div class="playback-card-subtitle">' + subtitle + '</div>' : '') +
                                 '<div class="playback-card-progress">' +
                                     '<div class="playback-progress-bar-track">' +
+                                        bufferBarHtml +
                                         '<div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div>' +
                                     '</div>' +
                                     '<div class="playback-progress-times">' +
                                         '<span>' + formatTicks(positionTicks) + '</span>' +
-                                        (model.etaText ? '<span class="playback-eta">ETA ' + escapeHtml(model.etaText) + (elapsedText ? ' &bull; ' + escapeHtml(elapsedText) + ' watched' : '') + '</span>' : (elapsedText ? '<span class="playback-eta">' + escapeHtml(elapsedText) + ' watched</span>' : '')) +
+                                        centerTimeHtml +
                                         '<span>' + formatTicks(runtimeTicks) + '</span>' +
                                     '</div>' +
                                 '</div>' +
@@ -1715,9 +1764,8 @@
     }
 
     /**
-     * Canonical telemetry model (section 8): normalizes a session exactly once so the
-     * inline "Show Details"/Info grid's full 26-field breakdown always agrees with the
-     * card/header.
+     * Normalizes a session into a canonical telemetry model shared by the card body,
+     * extended rows, and inline details grid.
      */
     function buildTelemetryModel(session) {
         var item = (session && session.NowPlayingItem) || {};
@@ -1770,9 +1818,6 @@
         var audioChannelsLayout = (audioStream && (audioStream.ChannelLayout || (audioStream.Channels ? (audioStream.Channels + ' ch') : null))) || null;
         if (audioChannelsLayout && audioLanguage) audioChannelsLayout = audioLanguage + ' ' + audioChannelsLayout;
 
-        // Subtitle delivery method (Encode/Embed/External/Hls) is real, server-reported data --
-        // burned-in ("Encode") subtitles are a genuine, common reason a video gets transcoded
-        // even when its codec is otherwise compatible, so this is surfaced as fact, not guessed.
         var DELIVERY_METHOD_LABELS = { Encode: 'Burned into video (forces transcode)', Embed: 'Embedded', External: 'External file', Hls: 'Segmented (HLS)', Drop: 'Dropped' };
         var subIndex = (playStateM.SubtitleStreamIndex != null) ? playStateM.SubtitleStreamIndex : ((session && session.SubtitleStreamIndex != null) ? session.SubtitleStreamIndex : -1);
         var subtitleField = null;
@@ -1797,6 +1842,30 @@
         var runtimeTicks = (typeof session.RunTimeTicks === 'number' && isFinite(session.RunTimeTicks)) ? session.RunTimeTicks
             : ((typeof item.RunTimeTicks === 'number' && isFinite(item.RunTimeTicks)) ? item.RunTimeTicks : 0);
         var etaText = (!isPaused && runtimeTicks > positionTicks) ? formatEta(runtimeTicks - positionTicks) : null;
+
+        // Transcode buffer completion percentage and live transcoding speed / throttle telemetry
+        var transcodeBufferPct = (tInfo && typeof tInfo.CompletionPercentage === 'number' && isFinite(tInfo.CompletionPercentage) && tInfo.CompletionPercentage > 0)
+            ? Math.min(100, Math.max(0, tInfo.CompletionPercentage))
+            : null;
+        var transcodeFps = (tInfo && typeof tInfo.Framerate === 'number' && isFinite(tInfo.Framerate) && tInfo.Framerate > 0 && tInfo.Framerate <= 240)
+            ? tInfo.Framerate
+            : null;
+        var sourceFpsVal = (videoStream && typeof videoStream.AverageFrameRate === 'number' && videoStream.AverageFrameRate > 0)
+            ? videoStream.AverageFrameRate
+            : ((videoStream && typeof videoStream.RealFrameRate === 'number' && videoStream.RealFrameRate > 0) ? videoStream.RealFrameRate : null);
+        var transcodeSpeedRatio = (transcodeFps && sourceFpsVal) ? (transcodeFps / sourceFpsVal) : null;
+        var isTranscodeThrottled = Boolean(tInfo && tInfo.IsThrottled);
+        var transcodeSpeedText = null;
+        if (classification.method === 'Transcode') {
+            if (transcodeSpeedRatio && isFinite(transcodeSpeedRatio) && transcodeSpeedRatio > 0) {
+                transcodeSpeedText = transcodeSpeedRatio.toFixed(1) + 'x' + (transcodeFps ? ' (' + Math.round(transcodeFps) + ' fps)' : '');
+            } else if (transcodeFps) {
+                transcodeSpeedText = Math.round(transcodeFps) + ' fps';
+            }
+            if (isTranscodeThrottled) {
+                transcodeSpeedText = (transcodeSpeedText ? transcodeSpeedText + ' · ' : '') + 'Throttled';
+            }
+        }
 
         var clientBrand = resolveClientBrand({ client: session && session.Client, deviceName: session && session.DeviceName });
 
@@ -1831,14 +1900,17 @@
             atmosBadge: atmosBadge,
             subtitleField: subtitleField,
             etaText: etaText,
+            transcodeBufferPct: transcodeBufferPct,
+            transcodeFps: transcodeFps,
+            transcodeSpeedRatio: transcodeSpeedRatio,
+            isTranscodeThrottled: isTranscodeThrottled,
+            transcodeSpeedText: transcodeSpeedText,
             clientBrand: clientBrand
         };
     }
 
     /**
-     * Single source of truth for the canonical field list (section 8/14), grouped.
-     * Consumed by the inline per-card "Show Details"/Info grid (all fields minus the
-     * identity rows already shown in the card header, flattened with no group headers).
+     * Builds the grouped technical field list consumed by the inline stream details grid.
      */
     function buildFieldGroups(m) {
         var c = m.classification;
@@ -1994,6 +2066,25 @@
         return 0;
     }
 
+    function buildBandwidthSparklineSvg(history) {
+        var pts = Array.isArray(history) ? history.filter(function (n) { return typeof n === 'number' && isFinite(n) && n >= 0; }) : [];
+        if (pts.length === 0) return '';
+        var series = pts.length === 1 ? [pts[0], pts[0]] : pts;
+        var maxVal = Math.max.apply(null, series);
+        if (maxVal <= 0) maxVal = 1;
+        var w = 48;
+        var h = 16;
+        var pad = 2;
+        var coords = series.map(function (v, idx) {
+            var x = (idx / (series.length - 1)) * w;
+            var y = (h - pad) - ((v / maxVal) * (h - pad * 2));
+            return x.toFixed(1) + ',' + y.toFixed(1);
+        }).join(' ');
+        return '<svg class="playback-bandwidth-sparkline" viewBox="0 0 48 16" aria-hidden="true">' +
+            '<polyline fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" points="' + coords + '"/>' +
+        '</svg>';
+    }
+
     function buildSummaryStripHtml(activeSessions) {
         var sessions = Array.isArray(activeSessions) ? activeSessions : [];
         if (sessions.length <= 0) return '';
@@ -2028,6 +2119,10 @@
 
         var bandwidthHtml = '';
         if (totalBps > 0) {
+            state.bandwidthHistory = Array.isArray(state.bandwidthHistory) ? state.bandwidthHistory : [];
+            state.bandwidthHistory.push(Number((totalBps / 1000000).toFixed(2)));
+            if (state.bandwidthHistory.length > 16) state.bandwidthHistory.shift();
+
             var totalMbps = (totalBps / 1000000).toFixed(1) + ' Mbps';
             var bandwidthLabel = 'Bandwidth';
             if (hasLocationData) {
@@ -2035,6 +2130,7 @@
             }
             var bandwidthTitle = 'Total outbound bitrate across active sessions';
             var bandwidthWarnCls = '';
+            var gaugeHtml = '';
             var uploadLimit = state.uploadBandwidthLimitMbps || 0;
             if (uploadLimit > 0) {
                 var relevantBps = hasLocationData ? wanBps : totalBps;
@@ -2043,11 +2139,14 @@
                 bandwidthTitle += ' — ' + pctOfLimit + '% of your configured ' + uploadLimit + ' Mbps upload limit';
                 if (pctOfLimit >= 100) bandwidthWarnCls = ' warn-red';
                 else if (pctOfLimit >= 80) bandwidthWarnCls = ' warn-amber';
+                gaugeHtml = '<div class="playback-bandwidth-gauge" aria-hidden="true"><div class="playback-bandwidth-gauge-fill" style="width: ' + Math.min(100, Math.max(0, pctOfLimit)) + '%;"></div></div>';
             }
+            var sparklineSvg = buildBandwidthSparklineSvg(state.bandwidthHistory);
             bandwidthHtml = '<div class="playback-summary-divider"></div>' +
                 '<div class="playback-summary-stat stat-bandwidth' + bandwidthWarnCls + '" title="' + escapeHtml(bandwidthTitle) + '">' + bandwidthIcon +
                     '<span class="playback-summary-value">' + totalMbps + '</span>' +
                     '<span class="playback-summary-label">' + bandwidthLabel + '</span>' +
+                    gaugeHtml + sparklineSvg +
                 '</div>';
         }
 
@@ -2153,8 +2252,19 @@
             }
         }
 
+        // Live-refresh the open Right Info modal if its session is still active
+        if (state.activeInfoModalSessionId) {
+            for (var mi = 0; mi < activeSessions.length; mi++) {
+                if (activeSessions[mi] && activeSessions[mi].Id === state.activeInfoModalSessionId) {
+                    updateActiveInfoModal(activeSessions[mi]);
+                    break;
+                }
+            }
+        }
+
         var counts = calculateSessionCounts(activeSessions);
         var isCompact = (state.displayMode === 'compact');
+        var mf = state.methodFilter;
 
         var headerHtml = '<div class="playback-dashboard-header">' +
             '<div class="playback-dashboard-title-group">' +
@@ -2165,11 +2275,11 @@
                 '</h2>' +
                 '<div class="playback-live-indicator"><span class="playback-live-dot"></span> Live</div>' +
                 '<div class="playback-dashboard-counts">' +
-                    '<span class="playback-count-chip count-dp" data-count-method="directPlay" data-count-value="' + counts.directPlay + '"><span class="count-val">' + counts.directPlay + '</span> Direct Play</span>' +
-                    '<span class="playback-count-chip count-ds" data-count-method="directStream" data-count-value="' + counts.directStream + '"><span class="count-val">' + counts.directStream + '</span> Direct Stream</span>' +
-                    '<span class="playback-count-chip count-remux" data-count-method="remux" data-count-value="' + counts.remux + '"><span class="count-val">' + counts.remux + '</span> Remux</span>' +
-                    '<span class="playback-count-chip count-tc" data-count-method="transcode" data-count-value="' + counts.transcode + '"><span class="count-val">' + counts.transcode + '</span> Transcode</span>' +
-                    '<span class="playback-count-chip count-paused" data-count-method="paused" data-count-value="' + counts.paused + '"><span class="count-val">' + counts.paused + '</span> Paused</span>' +
+                    '<span class="playback-count-chip count-dp' + (mf === 'directPlay' ? ' active-filter' : '') + '" data-count-method="directPlay" data-count-value="' + counts.directPlay + '" title="Filter by Direct Play"><span class="count-val">' + counts.directPlay + '</span> Direct Play</span>' +
+                    '<span class="playback-count-chip count-ds' + (mf === 'directStream' ? ' active-filter' : '') + '" data-count-method="directStream" data-count-value="' + counts.directStream + '" title="Filter by Direct Stream"><span class="count-val">' + counts.directStream + '</span> Direct Stream</span>' +
+                    '<span class="playback-count-chip count-remux' + (mf === 'remux' ? ' active-filter' : '') + '" data-count-method="remux" data-count-value="' + counts.remux + '" title="Filter by Remux"><span class="count-val">' + counts.remux + '</span> Remux</span>' +
+                    '<span class="playback-count-chip count-tc' + (mf === 'transcode' ? ' active-filter' : '') + '" data-count-method="transcode" data-count-value="' + counts.transcode + '" title="Filter by Transcode"><span class="count-val">' + counts.transcode + '</span> Transcode</span>' +
+                    '<span class="playback-count-chip count-paused' + (mf === 'paused' ? ' active-filter' : '') + '" data-count-method="paused" data-count-value="' + counts.paused + '" title="Filter by Paused"><span class="count-val">' + counts.paused + '</span> Paused</span>' +
                 '</div>' +
             '</div>' +
             '<div class="playback-dashboard-controls">' +
@@ -2189,13 +2299,27 @@
 
         var summaryStripHtml = buildSummaryStripHtml(activeSessions);
 
+        var displayedSessions = activeSessions;
+        if (mf) {
+            displayedSessions = activeSessions.filter(function (s) {
+                var c = classifyPlaybackSession(s);
+                if (mf === 'paused') return c.isPaused;
+                if (c.isPaused) return false;
+                if (mf === 'directPlay') return c.method === 'DirectPlay';
+                if (mf === 'directStream') return c.method === 'DirectStream';
+                if (mf === 'remux') return c.method === 'Remux';
+                if (mf === 'transcode') return c.method === 'Transcode';
+                return true;
+            });
+        }
+
         var contentHtml = '';
-        if (activeSessions.length === 0) {
+        if (displayedSessions.length === 0) {
             contentHtml = '<div class="playback-dashboard-empty">' +
-                '<p>No active playback</p>' +
+                '<p>' + (mf && activeSessions.length > 0 ? 'No matching sessions for active filter' : 'No active playback') + '</p>' +
                 '</div>';
         } else {
-            var cardsHtml = activeSessions.map(function (s, idx) {
+            var cardsHtml = displayedSessions.map(function (s, idx) {
                 return renderSessionCard(s, idx, state.displayMode, state.showAllDetails, activeSessions);
             }).join('');
             contentHtml = '<div class="playback-dashboard-grid">' + cardsHtml + '</div>';
@@ -2248,7 +2372,7 @@
      * that can be flagged as "danger" for the destructive Stop case).
      */
     // Quick-fill presets for the "Send Message" admin action -- fills the input for review,
-    // never sends directly, so an admin can still edit before confirming.
+     // never sends directly, so an admin can still edit before confirming.
     var MESSAGE_PRESETS = [
         'Server restarting for maintenance in 5 minutes.',
         'Please switch playback quality to reduce transcoding load.',
@@ -2315,6 +2439,8 @@
     // Only one Info modal open at a time -- clicking a different card's Info button while
     // one is already open closes it first instead of stacking overlays.
     var closeActiveInfoModal = null;
+    var activeInfoModalPanel = null;
+    var activeInfoModalSession = null;
 
     /**
      * Single source of truth for the Tautulli-style field set (Product/Player/Quality/
@@ -2429,17 +2555,6 @@
     }
 
     /**
-     * The Tautulli-style Info dialog: a centered overlay with the poster art on the left
-     * and, on the right, the same flat Product/Player/Quality/Stream/Container/Video/
-     * Audio/Subtitle/Location/Bandwidth field set Tautulli's own activity popup shows,
-     * plus the itemized "why transcoding" list. A standalone document.body node (same
-     * pattern as showActionModal above), never part of the poll-driven card grid's
-     * innerHTML, so it animates open/closed cleanly and is never touched by an ambient
-     * re-render while open. This is purely additive -- it opens only while infoViewStyle
-     * is 'right'; the original inline expand-down behavior (infoOverrides) is completely
-     * unaffected and unchanged.
-     */
-    /**
      * Plain-text, sanitized per-session technical report for pasting into a forum post or
      * GitHub issue -- title, playback method, codecs, container, resolution, bitrate, hardware
      * engine, and transcode reason only. Deliberately excludes username, device name, client
@@ -2505,6 +2620,27 @@
         ].join('\n');
     }
 
+    function updateActiveInfoModal(session) {
+        if (!activeInfoModalPanel || !session || typeof activeInfoModalPanel.querySelector !== 'function') return;
+        activeInfoModalSession = session;
+        var data = computeInfoViewData(session);
+        var bodyEl = activeInfoModalPanel.querySelector('.pi-info-modal-body');
+        if (bodyEl) bodyEl.innerHTML = data.fieldsHtml;
+        var progEl = activeInfoModalPanel.querySelector('.pi-info-modal-progress');
+        if (progEl && data.runtimeTicks > 0) {
+            var modalBufferBar = (data.model.transcodeBufferPct != null && data.model.transcodeBufferPct > 0)
+                ? '<div class="playback-progress-buffer-fill" style="width: ' + data.model.transcodeBufferPct.toFixed(1) + '%;"></div>'
+                : '';
+            progEl.innerHTML =
+                '<div class="playback-progress-bar-track">' + modalBufferBar + '<div class="playback-progress-bar-fill" style="width: ' + data.percent.toFixed(1) + '%;"></div></div>' +
+                '<div class="playback-progress-times">' +
+                    '<span>' + formatTicks(data.positionTicks) + '</span>' +
+                    (data.model.etaText ? '<span>ETA ' + escapeHtml(data.model.etaText) + '</span>' : '<span></span>') +
+                    '<span>' + formatTicks(data.runtimeTicks) + '</span>' +
+                '</div>';
+        }
+    }
+
     function showInfoSidePanel(session) {
         if (typeof document === 'undefined' || !session) return;
         if (typeof closeActiveInfoModal === 'function') closeActiveInfoModal();
@@ -2525,6 +2661,10 @@
         var posterHtml = art.posterUrl
             ? '<img src="' + escapeHtml(art.posterUrl) + '" alt="" onerror="this.style.display=\'none\'" />'
             : '<div class="pi-info-poster-fallback"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20"/></svg></div>';
+
+        var modalBufferBar = (model.transcodeBufferPct != null && model.transcodeBufferPct > 0)
+            ? '<div class="playback-progress-buffer-fill" style="width: ' + model.transcodeBufferPct.toFixed(1) + '%;"></div>'
+            : '';
 
         var scrim = document.createElement('div');
         scrim.className = 'pi-info-panel-scrim';
@@ -2551,7 +2691,7 @@
                 '<div class="pi-info-modal-body">' + fieldsHtml + '</div>' +
                 (runtimeTicks > 0 ? (
                 '<div class="pi-info-modal-progress">' +
-                    '<div class="playback-progress-bar-track"><div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div></div>' +
+                    '<div class="playback-progress-bar-track">' + modalBufferBar + '<div class="playback-progress-bar-fill" style="width: ' + percent.toFixed(1) + '%;"></div></div>' +
                     '<div class="playback-progress-times">' +
                         '<span>' + formatTicks(positionTicks) + '</span>' +
                         (model.etaText ? '<span>ETA ' + escapeHtml(model.etaText) + '</span>' : '<span></span>') +
@@ -2564,9 +2704,16 @@
         scrim.appendChild(panel);
         document.body.appendChild(scrim);
 
+        activeInfoModalPanel = panel;
+        activeInfoModalSession = session;
+        state.activeInfoModalSessionId = session.Id || null;
+
         function close() {
             document.removeEventListener('keydown', onKeydown);
             closeActiveInfoModal = null;
+            activeInfoModalPanel = null;
+            activeInfoModalSession = null;
+            state.activeInfoModalSessionId = null;
             if (typeof scrim.classList !== 'undefined' && typeof scrim.classList.remove === 'function') scrim.classList.remove('show');
             var remove = function () { if (scrim.parentNode) scrim.parentNode.removeChild(scrim); };
             if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
@@ -2586,14 +2733,16 @@
         var copyBtn = panel.querySelector('.pi-info-panel-copy');
         if (copyBtn) {
             copyBtn.addEventListener('click', function () {
-                var reportText = buildSessionDiagnosticText(session);
+                var reportText = buildSessionDiagnosticText(activeInfoModalSession || session);
                 if (!reportText) {
                     copyBtn.textContent = 'Blocked';
                 } else if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
                     navigator.clipboard.writeText(reportText).then(function () {
                         copyBtn.textContent = 'Copied!';
+                        showToast('Session report copied to clipboard', 'success');
                     }).catch(function () {
                         copyBtn.textContent = 'Failed';
+                        showToast('Failed to copy session report', 'error');
                     });
                 } else {
                     copyBtn.textContent = 'Unsupported';
@@ -2620,9 +2769,41 @@
         if (typeof container.setAttribute === 'function') container.setAttribute('data-events-attached', 'true');
         if (typeof container.addEventListener !== 'function') return;
 
+        // EasyUI SpotlightCard cursor tracking: updates --mouse-x and --mouse-y on the hovered
+        // .playback-card or .playback-device-card so its radial glow and border highlight
+        // follow the pointer smoothly without extra wrapper nodes, and caches coordinates in
+        // state.cardPointerCoords so 3s poll re-renders preserve the spotlight position.
+        container.addEventListener('mousemove', function (e) {
+            if (!e || !e.target || typeof e.target.closest !== 'function') return;
+            var card = e.target.closest('.playback-card, .playback-device-card');
+            if (!card || typeof card.getBoundingClientRect !== 'function' || !card.style || typeof card.style.setProperty !== 'function') return;
+            var rect = card.getBoundingClientRect();
+            if (!rect) return;
+            var mx = (e.clientX - rect.left) + 'px';
+            var my = (e.clientY - rect.top) + 'px';
+            card.style.setProperty('--mouse-x', mx);
+            card.style.setProperty('--mouse-y', my);
+            if (typeof card.getAttribute === 'function') {
+                var cardKey = card.getAttribute('data-card-id');
+                if (cardKey) {
+                    state.cardPointerCoords = state.cardPointerCoords || {};
+                    state.cardPointerCoords[cardKey] = { x: mx, y: my };
+                }
+            }
+        });
+
         container.addEventListener('click', function (e) {
             var target = e.target;
             if (!target) return;
+
+            // Header count chip filter toggle (Direct Play / Direct Stream / Remux / Transcode / Paused)
+            var countChip = target.closest('.playback-count-chip[data-count-method]');
+            if (countChip) {
+                var filterKey = countChip.getAttribute('data-count-method');
+                state.methodFilter = (state.methodFilter === filterKey) ? null : filterKey;
+                renderDashboardContainer(container, state.activeSessions, state.allSessions);
+                return;
+            }
 
             // Toggle mode button (Compact / Extended). Switching TO Extended plays a
             // one-shot entrance animation on the newly-revealed pill row (modeAnimatePending,
@@ -2637,19 +2818,26 @@
                 var newMode = modeBtn.getAttribute('data-mode');
                 if (newMode && newMode !== state.displayMode) {
                     state.displayMode = newMode;
+                    saveUserPref('playinfo_display_mode', newMode);
                     state.modeAnimatePending = (newMode === 'extended');
                     renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 }
                 return;
             }
 
-            // Info view style toggle (Down / Right) -- a display preference, so it just
-            // re-renders; it never touches which sessions exist or any per-session state.
+            // Info view style toggle (Down) -- toggles the inline technical details drawer
             var infoViewBtn = target.closest('[data-infoview]');
             if (infoViewBtn) {
                 var newInfoView = infoViewBtn.getAttribute('data-infoview');
-                if (newInfoView && newInfoView !== state.infoViewStyle) {
+                if (newInfoView === 'down') {
+                    state.infoViewStyle = 'down';
+                    state.showAllDetails = !state.showAllDetails;
+                    state.infoOverrides = {};
+                    saveUserPref('playinfo_info_view_style', 'down');
+                    renderDashboardContainer(container, state.activeSessions, state.allSessions);
+                } else if (newInfoView && newInfoView !== state.infoViewStyle) {
                     state.infoViewStyle = newInfoView;
+                    saveUserPref('playinfo_info_view_style', newInfoView);
                     renderDashboardContainer(container, state.activeSessions, state.allSessions);
                 }
                 return;
@@ -2715,8 +2903,11 @@
                         onConfirm: function () {
                             var stopApiClient = getApiClient();
                             if (stopApiClient && typeof stopApiClient.sendPlayStateCommand === 'function') {
-                                stopApiClient.sendPlayStateCommand(stopSessionId, 'Stop').catch(function (err) {
+                                Promise.resolve(stopApiClient.sendPlayStateCommand(stopSessionId, 'Stop')).then(function () {
+                                    showToast('Stop command sent to session', 'info');
+                                }).catch(function (err) {
                                     console.error('[PlaybackCard] Failed to stop session:', err);
+                                    showToast('Failed to stop session', 'error');
                                 });
                             }
                         }
@@ -2743,8 +2934,11 @@
                             if (!text) return;
                             var messageApiClient = getApiClient();
                             if (messageApiClient && typeof messageApiClient.sendMessageCommand === 'function') {
-                                messageApiClient.sendMessageCommand(messageSessionId, { Header: 'Message from Server', Text: text }).catch(function (err) {
+                                Promise.resolve(messageApiClient.sendMessageCommand(messageSessionId, { Header: 'Message from Server', Text: text })).then(function () {
+                                    showToast('Message sent to session', 'success');
+                                }).catch(function (err) {
                                     console.error('[PlaybackCard] Failed to send message:', err);
+                                    showToast('Failed to send message', 'error');
                                 });
                             }
                         }
@@ -2907,6 +3101,7 @@
 
     function init() {
         if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        loadUserPrefs();
 
         // Listen for SPA navigation events
         if (typeof window.addEventListener === 'function') {
@@ -2972,6 +3167,7 @@
         renderSessionCard: renderSessionCard,
         calculateSessionCounts: calculateSessionCounts,
         buildSummaryStripHtml: buildSummaryStripHtml,
+        buildBandwidthSparklineSvg: buildBandwidthSparklineSvg,
         renderDashboardContainer: renderDashboardContainer,
         attachContainerEvents: attachContainerEvents,
         formatTicks: formatTicks,
@@ -3003,7 +3199,11 @@
         resolveTitleParts: resolveTitleParts,
         showActionModal: showActionModal,
         showInfoSidePanel: showInfoSidePanel,
+        updateActiveInfoModal: updateActiveInfoModal,
         computeInfoViewData: computeInfoViewData,
+        showToast: showToast,
+        saveUserPref: saveUserPref,
+        loadUserPrefs: loadUserPrefs,
         startPolling: startPolling,
         stopPolling: stopPolling,
         pollSessions: pollSessions,

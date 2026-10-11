@@ -13,7 +13,7 @@
                     <div class="playbackMonitorTitleGroup">
                         <div class="playbackMonitorTitleRow">
                             <h2 class="sectionTitle playbackMonitorTitle">PlayInfo</h2>
-                            <span class="playbackMonitorVersionBadge">v0.2.7.7</span>
+                            <span class="playbackMonitorVersionBadge">v0.2.7.8</span>
                         </div>
                         <p class="playbackMonitorDescription">Real-time playback telemetry reported by Jellyfin. Local &amp; privacy-first.</p>
                     </div>
@@ -305,7 +305,7 @@
                     <div class="diagnosticsGrid">
                         <div class="diagItem">
                             <span class="diagLabel">Plugin Version</span>
-                            <span id="diagPluginVersion" class="diagValue">0.2.7.7</span>
+                            <span id="diagPluginVersion" class="diagValue">0.2.7.8</span>
                         </div>
                         <div class="diagItem">
                             <span class="diagLabel">Server Version</span>
@@ -377,15 +377,37 @@
         </div>
 
         <style>
-/* Base Page & Layout */
+/* Base Page & Layout -- EasyUI Dark Precision & Liquid Glass Hybrid */
+.playbackMonitorPage,
+.pi-modal-scrim,
+.pi-info-panel-scrim {
+    --easyui-bg-base: #0E0E0E;
+    --easyui-bg-surface: #141414;
+    --easyui-bg-card: #151515;
+    --easyui-bg-elevated: #202020;
+    --easyui-bg-active: #242424;
+    --easyui-border-subtle: #1F1F1F;
+    --easyui-border-default: #2C2C2C;
+    --easyui-border-hover: #484848;
+    --easyui-text-primary: #FFFFFF;
+    --easyui-text-secondary: #8A8A8A;
+    --easyui-text-muted: #525252;
+    --easyui-font-sans: 'Geist', 'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --easyui-font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --easyui-ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .playbackMonitorPage {
     box-sizing: border-box;
+    font-family: var(--easyui-font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .playbackMonitorPage .playbackMonitorContainer {
     width: 100%;
     margin-top: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--easyui-font-sans);
     color: #e2e8f0;
 }
 
@@ -396,7 +418,7 @@
     align-items: flex-end;
     gap: 1rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
     margin-bottom: 1.25rem;
     flex-wrap: wrap;
 }
@@ -418,17 +440,19 @@
     margin: 0;
     font-size: 1.4rem;
     font-weight: 700;
-    color: #f8fafc;
+    letter-spacing: -0.025em;
+    color: var(--easyui-text-primary, #ffffff);
     line-height: 1.25;
 }
 
 .playbackMonitorPage .playbackMonitorVersionBadge {
-    font-size: 0.75rem;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.72rem;
     font-weight: 600;
-    padding: 0.15rem 0.5rem;
+    padding: 0.16rem 0.55rem;
     border-radius: 9999px;
-    background: rgba(0, 164, 220, 0.18);
-    border: 1px solid rgba(0, 164, 220, 0.4);
+    background: rgba(56, 189, 248, 0.14);
+    border: 1px solid rgba(56, 189, 248, 0.38);
     color: #38bdf8;
     letter-spacing: 0.02em;
 }
@@ -436,7 +460,7 @@
 .playbackMonitorPage .playbackMonitorDescription {
     margin: 0;
     font-size: 0.9rem;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
     line-height: 1.4;
 }
 
@@ -447,47 +471,54 @@
     flex-wrap: wrap;
 }
 
-/* Density Toggle */
+/* Density Toggle (EasyUI AnimatedTabs Segmented Control) */
 .playbackMonitorPage .playbackModeToggle {
     display: inline-flex;
-    background: rgba(255, 255, 255, 0.06);
-    backdrop-filter: blur(10px) saturate(160%);
-    -webkit-backdrop-filter: blur(10px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 6px;
-    padding: 2px;
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .playbackMonitorPage .modeBtn {
     background: transparent;
-    border: none;
-    color: #94a3b8;
-    font-size: 0.8rem;
+    border: 1px solid transparent;
+    color: var(--easyui-text-secondary, #8A8A8A);
+    font-family: var(--easyui-font-sans);
+    font-size: 0.78rem;
     font-weight: 600;
     padding: 0.3rem 0.75rem;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.22s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .modeBtn:hover {
-    color: #f1f5f9;
+    color: #e4e4e7;
+}
+
+.playbackMonitorPage .modeBtn:active {
+    transform: scale(0.96);
 }
 
 .playbackMonitorPage .modeBtn.active {
-    background: #00a4dc;
-    color: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(180deg, #242424 0%, #1b1b1b 100%);
+    border-color: #363636;
+    color: var(--easyui-text-primary, #ffffff);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .playbackMonitorPage .playbackMonitorCadence {
-    font-size: 0.8rem;
-    color: #94a3b8;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.74rem;
+    color: var(--easyui-text-secondary, #8A8A8A);
     white-space: nowrap;
     padding: 0.35rem 0.65rem;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     flex-shrink: 0;
 }
 
@@ -495,7 +526,7 @@
 .playbackMonitorPage .playbackMonitorStatusMsg {
     margin-bottom: 1.25rem;
     padding: 0.85rem 1.15rem;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 0.9rem;
     line-height: 1.4;
     word-break: break-word;
@@ -503,9 +534,9 @@
 }
 
 .playbackMonitorPage .playbackMonitorStatusMsg.loading {
-    background-color: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #cbd5e1;
+    background-color: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    color: #d4d4d8;
 }
 
 .playbackMonitorPage .playbackMonitorStatusMsg.error {
@@ -518,9 +549,9 @@
 .playbackMonitorPage .playbackMonitorEmptyState {
     text-align: center;
     padding: 3.5rem 1.5rem;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px dashed rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px dashed var(--easyui-border-default, #2C2C2C);
+    border-radius: 12px;
     margin: 1.25rem 0;
     display: flex;
     flex-direction: column;
@@ -529,7 +560,7 @@
 }
 
 .playbackMonitorPage .playbackMonitorEmptyState .emptyIcon {
-    color: #64748b;
+    color: var(--easyui-text-muted, #525252);
     stroke-width: 1.25;
 }
 
@@ -537,13 +568,14 @@
     margin: 0;
     font-size: 1.1rem;
     font-weight: 600;
-    color: #e2e8f0;
+    letter-spacing: -0.015em;
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .playbackMonitorPage .playbackMonitorEmptyState .emptySubtitle {
     margin: 0;
     font-size: 0.88rem;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
     max-width: 480px;
     line-height: 1.4;
 }
@@ -556,72 +588,120 @@
     margin-top: 0.5rem;
 }
 
-/* Session Card -- "Liquid Glass": deep blur + saturation boost behind a translucent
-   tint, a specular highlight riding the top surface, and a bright/dim edge split so
-   the card reads as a lit sheet of glass rather than a flat tinted rectangle. */
+/* Session Card -- EasyUI SpotlightCard + Liquid Glass hybrid:
+   Combines cursor-tracking radial spotlight (--mouse-x, --mouse-y), dynamic border
+   illumination mask (::after), status-tinted perimeter ring, and deep backdrop blur. */
 .playbackMonitorPage .playback-card {
+    --mouse-x: -1000px;
+    --mouse-y: -1000px;
+    --spotlight-color: rgba(56, 189, 248, 0.09);
     position: relative;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(20, 26, 36, 0.85) 100%), #141a24;
+    background:
+        radial-gradient(140% 100% at 100% 0%, var(--status-glow, transparent) 0%, transparent 55%),
+        linear-gradient(155deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 40%, rgba(20, 20, 20, 0.88) 100%),
+        var(--easyui-bg-surface, #141414);
     backdrop-filter: blur(32px) saturate(200%);
     -webkit-backdrop-filter: blur(32px) saturate(200%);
-    border: 1.5px solid var(--status-ring, rgba(255, 255, 255, 0.14));
+    border: 1.5px solid var(--status-ring, var(--easyui-border-default, #2C2C2C));
     border-radius: 16px;
     overflow: hidden;
     display: flex;
     align-items: stretch;
     box-shadow:
-        0 10px 30px -6px rgba(0, 0, 0, 0.5),
-        0 22px 48px -16px rgba(0, 0, 0, 0.45),
-        inset 0 1.5px 0 0 rgba(255, 255, 255, 0.24),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.32),
+        0 12px 30px -10px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.35),
         0 0 0 1px var(--status-glow, transparent);
     min-width: 0;
-    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    transition:
+        transform 0.28s var(--easyui-ease-soft),
+        border-color 0.28s var(--easyui-ease-soft),
+        box-shadow 0.28s var(--easyui-ease-soft);
     isolation: isolate;
 }
 
-.playbackMonitorPage .playback-card[data-playback-method="DirectPlay"] { --status-ring: rgba(74, 222, 128, 0.45); --status-glow: rgba(74, 222, 128, 0.16); }
-.playbackMonitorPage .playback-card[data-playback-method="DirectStream"] { --status-ring: rgba(56, 189, 248, 0.45); --status-glow: rgba(56, 189, 248, 0.16); }
-.playbackMonitorPage .playback-card[data-playback-method="Remux"] { --status-ring: rgba(192, 132, 252, 0.5); --status-glow: rgba(192, 132, 252, 0.18); }
-.playbackMonitorPage .playback-card[data-playback-method="Transcode"] { --status-ring: rgba(248, 113, 113, 0.5); --status-glow: rgba(248, 113, 113, 0.18); }
+.playbackMonitorPage .playback-card[data-playback-method="DirectPlay"] {
+    --status-ring: rgba(52, 211, 153, 0.45);
+    --status-glow: rgba(16, 185, 129, 0.16);
+    --spotlight-color: rgba(52, 211, 153, 0.11);
+}
+.playbackMonitorPage .playback-card[data-playback-method="DirectStream"] {
+    --status-ring: rgba(56, 189, 248, 0.45);
+    --status-glow: rgba(56, 189, 248, 0.16);
+    --spotlight-color: rgba(56, 189, 248, 0.11);
+}
+.playbackMonitorPage .playback-card[data-playback-method="Remux"] {
+    --status-ring: rgba(192, 132, 252, 0.5);
+    --status-glow: rgba(192, 132, 252, 0.18);
+    --spotlight-color: rgba(192, 132, 252, 0.12);
+}
+.playbackMonitorPage .playback-card[data-playback-method="Transcode"] {
+    --status-ring: rgba(248, 113, 113, 0.5);
+    --status-glow: rgba(248, 113, 113, 0.18);
+    --spotlight-color: rgba(248, 113, 113, 0.12);
+}
 
 .playbackMonitorPage .playback-card::before {
     content: '';
     position: absolute;
     inset: 0;
     z-index: 2;
-    background: radial-gradient(120% 60% at 18% -12%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 55%);
+    background:
+        radial-gradient(360px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px), var(--spotlight-color, rgba(56, 189, 248, 0.09)), transparent 80%),
+        radial-gradient(120% 60% at 18% -12%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 55%);
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.25s var(--easyui-ease-soft);
+}
+
+.playbackMonitorPage .playback-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: radial-gradient(240px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px), rgba(255, 255, 255, 0.34), transparent 80%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .playback-card:hover {
-    border-color: rgba(255, 255, 255, 0.24);
+    transform: translateY(-2px);
+    border-color: var(--status-ring, var(--easyui-border-hover, #484848));
     box-shadow:
-        0 14px 36px -6px rgba(0, 0, 0, 0.6),
-        0 26px 56px -16px rgba(0, 0, 0, 0.5),
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
-        inset 0 -1px 0 0 rgba(0, 0, 0, 0.36);
+        0 18px 38px -10px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.26),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.4),
+        0 0 22px -6px var(--status-glow, transparent);
 }
 
-.playbackMonitorPage .playback-card:hover::before {
-    background: radial-gradient(120% 60% at 18% -12%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0) 55%);
+.playbackMonitorPage .playback-card:hover::after {
+    opacity: 1;
 }
 
-/* Movie art backdrop -- deliberately much less blurred and much less muted than a soft
-   ambient tint: the actual artwork's color and detail should read clearly through the
-   card, with a real top-to-bottom poster-style gradient (dark enough at the header and
-   footer for text contrast, genuinely open in the middle) rather than a flat, even wash. */
+/* Movie art backdrop */
 .playbackMonitorPage .playback-card-backdrop {
     position: absolute;
     inset: 0;
     background-size: cover;
     background-position: center;
-    opacity: 0.62;
-    filter: blur(9px) saturate(165%);
+    opacity: 0.56;
+    filter: blur(11px) saturate(165%);
     pointer-events: none;
     transform: scale(1.08);
     z-index: 0;
+    transition: opacity 0.35s var(--easyui-ease-soft), transform 0.45s var(--easyui-ease-soft);
+}
+
+.playbackMonitorPage .playback-card:hover .playback-card-backdrop {
+    opacity: 0.64;
+    transform: scale(1.11);
 }
 
 .playbackMonitorPage .playback-card-backdrop::after {
@@ -629,8 +709,8 @@
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(180deg, rgba(10, 14, 20, 0.82) 0%, rgba(10, 14, 20, 0.32) 32%, rgba(10, 14, 20, 0.4) 58%, rgba(10, 14, 20, 0.9) 100%),
-        linear-gradient(100deg, rgba(10, 14, 20, 0.55) 0%, rgba(10, 14, 20, 0.15) 40%, rgba(10, 14, 20, 0.35) 100%);
+        linear-gradient(180deg, rgba(14, 14, 14, 0.84) 0%, rgba(14, 14, 14, 0.36) 32%, rgba(14, 14, 14, 0.44) 58%, rgba(14, 14, 14, 0.90) 100%),
+        linear-gradient(100deg, rgba(14, 14, 14, 0.60) 0%, rgba(14, 14, 14, 0.18) 40%, rgba(14, 14, 14, 0.40) 100%);
 }
 
 .playbackMonitorPage .playback-card-inner {
@@ -658,7 +738,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     padding-bottom: 0.65rem;
 }
 
@@ -674,9 +754,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    color: #94a3b8;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: #a1a1aa;
     flex-shrink: 0;
 }
 
@@ -689,8 +772,9 @@
 
 .playbackMonitorPage .playback-card-user {
     font-weight: 600;
-    font-size: 0.95rem;
-    color: #f1f5f9;
+    font-size: 0.96rem;
+    letter-spacing: -0.015em;
+    color: var(--easyui-text-primary, #ffffff);
     line-height: 1.25;
     word-break: break-word;
     overflow-wrap: anywhere;
@@ -705,19 +789,20 @@
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .playbackMonitorPage .playback-eta {
-    color: #64748b;
+    font-family: var(--easyui-font-mono);
+    color: #a1a1aa;
     font-size: 0.68rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
 }
 
 .playbackMonitorPage .playback-card-client {
     font-size: 0.78rem;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
     line-height: 1.25;
     word-break: break-word;
     overflow-wrap: anywhere;
@@ -730,49 +815,50 @@
     flex-shrink: 0;
 }
 
-/* Badges */
+/* Badges (EasyUI Badge soft pill style) */
 .playbackMonitorPage .playback-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
     font-size: 0.7rem;
     font-weight: 700;
-    padding: 0.2rem 0.55rem;
-    border-radius: 4px;
+    padding: 0.22rem 0.58rem;
+    border-radius: 9999px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
     flex-shrink: 0;
     backdrop-filter: blur(8px) saturate(160%);
     -webkit-backdrop-filter: blur(8px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .playbackMonitorPage .playback-badge.direct-play {
-    background-color: rgba(34, 197, 94, 0.16);
-    border: 1px solid rgba(34, 197, 94, 0.35);
-    color: #4ade80;
+    background-color: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #34d399;
 }
 
 .playbackMonitorPage .playback-badge.direct-stream {
-    background-color: rgba(56, 189, 248, 0.16);
+    background-color: rgba(56, 189, 248, 0.14);
     border: 1px solid rgba(56, 189, 248, 0.35);
     color: #38bdf8;
 }
 
 .playbackMonitorPage .playback-badge.remux {
-    background-color: rgba(168, 85, 247, 0.16);
-    border: 1px solid rgba(168, 85, 247, 0.35);
+    background-color: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.38);
     color: #c084fc;
 }
 
 .playbackMonitorPage .playback-badge.transcode {
-    background-color: rgba(239, 68, 68, 0.16);
-    border: 1px solid rgba(239, 68, 68, 0.35);
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.38);
     color: #f87171;
 }
 
 .playbackMonitorPage .playback-badge.paused {
-    background-color: rgba(245, 158, 11, 0.16);
+    background-color: rgba(245, 158, 11, 0.14);
     border: 1px solid rgba(245, 158, 11, 0.35);
     color: #fbbf24;
 }
@@ -790,17 +876,14 @@
     flex: 0 0 108px;
     align-self: stretch;
     overflow: hidden;
-    background: #0f141d;
+    background: var(--easyui-bg-base, #0E0E0E);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: flex-basis 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: flex-basis 0.28s var(--easyui-ease-soft);
 }
 
-/* Poster width tiers -- large while the details panel is closed, small once it's open
-   (see the posterSizeCls comment in renderSessionCard above). The height/aspect-ratio
-   cap right below is a separate axis and applies on top of whichever width tier is set. */
 .playbackMonitorPage .playback-poster-wrap.poster-lg {
     flex-basis: 140px;
 }
@@ -809,13 +892,6 @@
     flex-basis: 90px;
 }
 
-/* When Show Details is open, the card grows well past a natural poster height -- letting
-   the poster keep stretching to match would force object-fit: cover to crop an extreme,
-   heavily zoomed sliver out of a portrait image. Cap it to a real poster proportion instead
-   and let it sit at the top of the card once expanded; the (now much more vivid) backdrop
-   gradient carries the rest of the card's height gracefully on its own. Desktop/side-by-side
-   layout only -- below 641px the card stacks vertically and already uses a fixed poster
-   height (see the max-width: 640px block), so this must not compete with that rule. */
 @media (min-width: 641px) {
     .playbackMonitorPage .playback-card:has(.playback-details-panel.open) .playback-poster-wrap {
         align-self: flex-start;
@@ -832,9 +908,6 @@
     display: block;
 }
 
-/* Small watermark badge, like a TV channel bug -- a glance at any card identifies it as
-   PlayInfo data, not a stock Jellyfin widget. Deliberately subtle: low opacity at rest,
-   brightens slightly on card hover, never competes with the poster or telemetry for attention. */
 .playbackMonitorPage .playback-brand-badge {
     position: absolute;
     top: 0.5rem;
@@ -871,7 +944,7 @@
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: #475569;
+    color: #52525b;
 }
 
 .playbackMonitorPage .playback-card-body {
@@ -885,21 +958,22 @@
 .playbackMonitorPage .playback-card-title {
     font-size: 1rem;
     font-weight: 700;
-    color: #ffffff;
+    letter-spacing: -0.02em;
+    color: var(--easyui-text-primary, #ffffff);
     line-height: 1.3;
     word-break: break-word;
     overflow-wrap: anywhere;
 }
 
 .playbackMonitorPage .playback-card-subtitle {
-    font-size: 0.83rem;
-    color: #94a3b8;
+    font-size: 0.82rem;
+    color: var(--easyui-text-secondary, #8A8A8A);
     line-height: 1.35;
     word-break: break-word;
     overflow-wrap: anywhere;
 }
 
-/* Stream Pill Badges */
+/* Stream Pill Badges (EasyUI monospace telemetry pills) */
 .playbackMonitorPage .playback-pill-row {
     display: flex;
     flex-wrap: wrap;
@@ -907,12 +981,6 @@
     margin-top: 0.25rem;
 }
 
-/* "Why" transcode-reason list, always visible on the card body (Compact included) --
-   this is the single most actionable fact when a session is transcoding, so it doesn't
-   wait behind a Show Details click the way the rest of the technical breakdown does.
-   Itemized (one row per real reason) and colored by severity, rather than one flat
-   sentence, so a hard "codec not supported" failure reads differently from a soft
-   "bitrate throttled" limit. */
 .playbackMonitorPage .playback-why-banners {
     display: flex;
     flex-direction: column;
@@ -943,16 +1011,24 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    font-family: var(--easyui-font-mono);
     font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.15rem 0.45rem;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
+    padding: 0.18rem 0.48rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.045);
     backdrop-filter: blur(8px) saturate(150%);
     -webkit-backdrop-filter: blur(8px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #d4d4d8;
     white-space: nowrap;
+    transition: transform 0.18s var(--easyui-ease-soft), border-color 0.18s var(--easyui-ease-soft), background 0.18s var(--easyui-ease-soft);
+}
+
+.playbackMonitorPage .playback-pill:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .playbackMonitorPage .pill-icon {
@@ -965,43 +1041,39 @@
 .playbackMonitorPage .playback-pill.sub,
 .playbackMonitorPage .playback-pill.geo {
     font-weight: 700;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
 }
 
 .playbackMonitorPage .playback-pill.res {
     color: #38bdf8;
-    border-color: rgba(56, 189, 248, 0.25);
-    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.32);
+    background: rgba(56, 189, 248, 0.11);
 }
 
 .playbackMonitorPage .playback-pill.hdr {
-    color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.25);
-    background: rgba(245, 158, 11, 0.08);
+    color: #facc15;
+    border-color: rgba(234, 179, 8, 0.32);
+    background: rgba(234, 179, 8, 0.11);
 }
 
 .playbackMonitorPage .playback-pill.audio {
-    color: #a855f7;
-    border-color: rgba(168, 85, 247, 0.25);
-    background: rgba(168, 85, 247, 0.08);
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.32);
+    background: rgba(168, 85, 247, 0.11);
 }
 
 .playbackMonitorPage .playback-pill.sub {
     color: #f472b6;
-    border-color: rgba(236, 72, 153, 0.25);
-    background: rgba(236, 72, 153, 0.08);
+    border-color: rgba(236, 72, 153, 0.32);
+    background: rgba(236, 72, 153, 0.11);
 }
 
 .playbackMonitorPage .playback-pill.geo {
     color: #2dd4bf;
-    border-color: rgba(45, 212, 191, 0.25);
-    background: rgba(45, 212, 191, 0.08);
+    border-color: rgba(45, 212, 191, 0.32);
+    background: rgba(45, 212, 191, 0.11);
 }
 
-/* Warning ring: overlaid on whichever pill a real transcode reason is actually about
-   (see REASON_PILL_TARGETS), on top of that pill's own category color -- "red" for a
-   hard incompatibility, "amber" for a soft/negotiated limit. The pill's title attribute
-   carries the specific reason text. */
 .playbackMonitorPage .playback-pill.warn-red {
     box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.65) inset;
     background: rgba(239, 68, 68, 0.16);
@@ -1030,23 +1102,26 @@
 .playbackMonitorPage .playback-progress-bar-track {
     width: 100%;
     height: 5px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+    border-radius: 9999px;
     overflow: hidden;
 }
 
 .playbackMonitorPage .playback-progress-bar-fill {
     height: 100%;
-    background: #00a4dc;
-    border-radius: 3px;
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, #0284c7 0%, #38bdf8 100%);
+    border-radius: 9999px;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+    transition: width 0.35s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .playback-progress-times {
     display: flex;
     justify-content: space-between;
-    font-size: 0.75rem;
-    color: #94a3b8;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.7rem;
+    color: var(--easyui-text-secondary, #8A8A8A);
     font-variant-numeric: tabular-nums;
 }
 
@@ -1058,48 +1133,60 @@
     overflow-wrap: anywhere;
 }
 
-/* Accessible Info Toggle Button. Icon-only (aria-label carries the name) so it sits as
-   one consistent group with the Message/Stop action buttons next to it. */
+/* Accessible Info & Action Buttons (EasyUI PressButton tactile micro-interaction) */
 .playbackMonitorPage .playback-btn-info,
 .playbackMonitorPage .playback-btn-action {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     padding: 0;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    background: rgba(20, 20, 20, 0.75);
     backdrop-filter: blur(8px) saturate(160%);
     -webkit-backdrop-filter: blur(8px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #cbd5e1;
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    color: #d4d4d8;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s var(--easyui-ease-soft);
     flex-shrink: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-/* Summary Strip: prominent "at a glance" glass bar above the grid */
+.playbackMonitorPage .playback-btn-info:active,
+.playbackMonitorPage .playback-btn-action:active {
+    transform: scale(0.92);
+}
+
+/* Summary Strip: EasyUI MetricHUD bar with subtle dot-grid backdrop and crisp border */
 .playbackMonitorPage .playback-summary-strip {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.6rem 1.1rem;
+    padding: 0.65rem 1.15rem;
     margin-bottom: 1rem;
     border-radius: 12px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 100%);
+    background-color: var(--easyui-bg-card, #151515);
+    background-image:
+        radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    background-size: 16px 16px, 100% 100%;
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    box-shadow:
+        0 12px 30px -10px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
     flex-wrap: wrap;
 }
 
 .playbackMonitorPage .recent-sessions-shelf {
     margin-top: 1.25rem;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     overflow: hidden;
 }
 
@@ -1111,19 +1198,20 @@
     padding: 0.7rem 1rem;
     background: transparent;
     border: none;
-    color: #cbd5e1;
+    color: #d4d4d8;
     font-size: 0.85rem;
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
+    transition: color 0.18s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .recent-sessions-toggle:hover {
-    color: #f8fafc;
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .playbackMonitorPage .recent-sessions-chevron {
-    transition: transform 0.15s ease;
+    transition: transform 0.22s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .recent-sessions-toggle.open .recent-sessions-chevron {
@@ -1145,7 +1233,8 @@
     gap: 0.4rem 1rem;
     padding: 0.5rem 0.7rem;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
     font-size: 0.78rem;
 }
 
@@ -1157,7 +1246,7 @@
 }
 
 .playbackMonitorPage .recent-session-title {
-    color: #e2e8f0;
+    color: var(--easyui-text-primary, #ffffff);
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -1165,7 +1254,7 @@
 }
 
 .playbackMonitorPage .recent-session-user {
-    color: #64748b;
+    color: var(--easyui-text-secondary, #8A8A8A);
     font-size: 0.72rem;
 }
 
@@ -1173,12 +1262,12 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    color: #94a3b8;
+    color: #a1a1aa;
     flex-shrink: 0;
 }
 
 .playbackMonitorPage .recent-session-status.completed {
-    color: #4ade80;
+    color: #34d399;
 }
 
 .playbackMonitorPage .recent-session-status.stopped {
@@ -1186,15 +1275,16 @@
 }
 
 .playbackMonitorPage .recent-session-age {
-    color: #64748b;
-    font-size: 0.72rem;
+    font-family: var(--easyui-font-mono);
+    color: var(--easyui-text-secondary, #8A8A8A);
+    font-size: 0.7rem;
 }
 
 .playbackMonitorPage .playback-summary-stat {
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    color: #94a3b8;
+    color: #a1a1aa;
 }
 
 .playbackMonitorPage .playback-summary-stat svg {
@@ -1202,29 +1292,32 @@
 }
 
 .playbackMonitorPage .playback-summary-value {
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: #f8fafc;
+    font-family: var(--easyui-font-mono);
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--easyui-text-primary, #ffffff);
     font-variant-numeric: tabular-nums;
 }
 
 .playbackMonitorPage .playback-summary-label {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+    color: var(--easyui-text-secondary, #8A8A8A);
 }
 
 .playbackMonitorPage .playback-summary-divider {
     width: 1px;
     height: 20px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--easyui-border-default, #2C2C2C);
     flex-shrink: 0;
 }
 
 .playbackMonitorPage .playback-summary-stat.stat-direct svg,
 .playbackMonitorPage .playback-summary-stat.stat-direct .playback-summary-value {
-    color: #4ade80;
+    color: #34d399;
 }
 
 .playbackMonitorPage .playback-summary-stat.stat-transcode.active svg,
@@ -1244,36 +1337,37 @@
 
 .playbackMonitorPage .playback-btn-info:hover,
 .playbackMonitorPage .playback-btn-info:focus-visible {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.25);
-    color: #ffffff;
+    background: var(--easyui-bg-elevated, #202020);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
+    transform: translateY(-1px);
     outline: none;
 }
 
 .playbackMonitorPage .playback-btn-info[aria-expanded="true"] {
-    background: rgba(0, 164, 220, 0.2);
-    border-color: rgba(0, 164, 220, 0.5);
+    background: rgba(56, 189, 248, 0.2);
+    border-color: rgba(56, 189, 248, 0.5);
     color: #38bdf8;
 }
 
 .playbackMonitorPage .playback-btn-action.btn-message:hover {
     background: rgba(56, 189, 248, 0.16);
-    border-color: rgba(56, 189, 248, 0.4);
+    border-color: rgba(56, 189, 248, 0.45);
     color: #38bdf8;
+    transform: translateY(-1px);
 }
 
-/* Stop carries a faint red tint at rest, not just on hover -- visible as destructive
-   before the pointer is even near it. */
 .playbackMonitorPage .playback-btn-action.btn-stop {
-    background: rgba(239, 68, 68, 0.08);
-    border-color: rgba(239, 68, 68, 0.22);
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.28);
     color: #fca5a5;
 }
 
 .playbackMonitorPage .playback-btn-action.btn-stop:hover {
-    background: rgba(239, 68, 68, 0.18);
-    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.55);
     color: #f87171;
+    transform: translateY(-1px);
 }
 
 /* Video & Audio Status Badges */
@@ -1289,35 +1383,36 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    font-size: 0.68rem;
-    font-weight: 600;
-    padding: 0.15rem 0.45rem;
-    border-radius: 4px;
-    letter-spacing: 0.02em;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 0.15rem 0.48rem;
+    border-radius: 9999px;
+    letter-spacing: 0.03em;
     white-space: nowrap;
 }
 
 .playbackMonitorPage .stream-badge.video-direct {
-    background-color: rgba(34, 197, 94, 0.12);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #4ade80;
+    background-color: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.32);
+    color: #34d399;
 }
 
 .playbackMonitorPage .stream-badge.video-transcode {
-    background-color: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background-color: rgba(239, 68, 68, 0.14);
+    border: 1px solid rgba(239, 68, 68, 0.32);
     color: #f87171;
 }
 
 .playbackMonitorPage .stream-badge.audio-direct {
-    background-color: rgba(34, 197, 94, 0.12);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #4ade80;
+    background-color: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.32);
+    color: #34d399;
 }
 
 .playbackMonitorPage .stream-badge.audio-transcode {
-    background-color: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.3);
+    background-color: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.32);
     color: #fbbf24;
 }
 
@@ -1326,11 +1421,11 @@
     display: none;
     margin-top: 0.35rem;
     padding: 0.6rem 0.8rem;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--easyui-bg-base, #0E0E0E);
+    border-radius: 8px;
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     font-size: 0.76rem;
-    color: #cbd5e1;
+    color: #d4d4d8;
     flex-direction: column;
     gap: 0.4rem;
     min-width: 0;
@@ -1350,9 +1445,10 @@
 .playbackMonitorPage .playbackNotificationsCard {
     margin-top: 2rem;
     padding: 1.25rem;
-    background: #111620;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    border-radius: 14px;
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .playbackMonitorPage .notificationsHeader {
@@ -1361,7 +1457,7 @@
     align-items: center;
     gap: 1rem;
     padding-bottom: 0.85rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
     margin-bottom: 1rem;
     flex-wrap: wrap;
 }
@@ -1376,39 +1472,42 @@
 .playbackMonitorPage .notificationsTitle {
     margin: 0;
     font-size: 1rem;
-    font-weight: 600;
-    color: #f1f5f9;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--easyui-text-primary, #ffffff);
     display: flex;
     align-items: center;
     gap: 0.45rem;
 }
 
 .playbackMonitorPage .notifIcon {
-    color: #00a4dc;
+    color: #38bdf8;
 }
 
 .playbackMonitorPage .notificationsNotice {
-    font-size: 0.75rem;
-    color: #64748b;
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.04);
+    font-family: var(--easyui-font-mono);
+    font-size: 0.72rem;
+    color: var(--easyui-text-secondary, #8A8A8A);
+    padding: 0.16rem 0.52rem;
+    border-radius: 9999px;
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
 }
 
 .playbackMonitorPage .notifDisclosureBanner {
     font-size: 0.8rem;
-    line-height: 1.4;
-    color: #94a3b8;
-    background: rgba(0, 164, 220, 0.08);
-    border: 1px solid rgba(0, 164, 220, 0.25);
-    border-radius: 6px;
+    line-height: 1.45;
+    color: #a1a1aa;
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 8px;
     padding: 0.75rem 1rem;
     margin-bottom: 1.25rem;
 }
 
 .playbackMonitorPage .notificationsFeedback {
     padding: 0.65rem 0.85rem;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 0.82rem;
     margin-bottom: 1rem;
 }
@@ -1432,45 +1531,67 @@
     margin-bottom: 1.25rem;
 }
 
+/* EasyUI SpotlightCard styling for Notification Destination Cards */
 .playbackMonitorPage .notifDestCard {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
+    --mouse-x: -1000px;
+    --mouse-y: -1000px;
+    position: relative;
+    overflow: hidden;
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    border-radius: 12px;
     padding: 1rem;
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
+    transition: border-color 0.25s var(--easyui-ease-soft), box-shadow 0.25s var(--easyui-ease-soft);
+}
+
+.playbackMonitorPage .notifDestCard::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(300px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px), rgba(56, 189, 248, 0.08), transparent 80%);
+    pointer-events: none;
+}
+
+.playbackMonitorPage .notifDestCard:hover {
+    border-color: var(--easyui-border-hover, #484848);
+    box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.7);
 }
 
 .playbackMonitorPage .notifDestHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
     padding-bottom: 0.5rem;
 }
 
 .playbackMonitorPage .notifDestTitle {
     font-size: 0.95rem;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--easyui-text-primary, #ffffff);
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
 .playbackMonitorPage .notifBadge {
-    font-size: 0.7rem;
-    padding: 0.15rem 0.45rem;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    color: #94a3b8;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 0.16rem 0.5rem;
+    border-radius: 9999px;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    color: var(--easyui-text-secondary, #8A8A8A);
 }
 
 .playbackMonitorPage .notifBadge.active {
-    background: rgba(16, 185, 129, 0.15);
+    background: rgba(16, 185, 129, 0.14);
     color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 .playbackMonitorPage .notifFieldGroup {
@@ -1482,29 +1603,31 @@
 .playbackMonitorPage .notifFieldLabel {
     font-size: 0.78rem;
     font-weight: 500;
-    color: #cbd5e1;
+    color: #d4d4d8;
 }
 
 .playbackMonitorPage .notifInput {
     width: 100%;
     box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 4px;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    border-radius: 6px;
     padding: 0.45rem 0.65rem;
-    font-size: 0.82rem;
-    color: #f8fafc;
-    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--easyui-text-primary, #ffffff);
+    font-family: var(--easyui-font-mono);
+    transition: border-color 0.2s var(--easyui-ease-soft), box-shadow 0.2s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .notifInput:focus {
     outline: none;
-    border-color: #00a4dc;
+    border-color: rgba(56, 189, 248, 0.65);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
 .playbackMonitorPage .notifInputHint {
     font-size: 0.7rem;
-    color: #64748b;
+    color: var(--easyui-text-secondary, #8A8A8A);
 }
 
 .playbackMonitorPage .notifBtnRow {
@@ -1515,13 +1638,17 @@
 }
 
 .playbackMonitorPage .btnNotifAction {
-    font-size: 0.78rem;
-    font-weight: 500;
-    padding: 0.35rem 0.7rem;
-    border-radius: 4px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 0.38rem 0.75rem;
+    border-radius: 7px;
     cursor: pointer;
     border: 1px solid transparent;
-    transition: background 0.15s ease;
+    transition: all 0.2s var(--easyui-ease-soft);
+}
+
+.playbackMonitorPage .btnNotifAction:active:not(:disabled) {
+    transform: scale(0.96);
 }
 
 .playbackMonitorPage .btnNotifAction:disabled {
@@ -1530,32 +1657,36 @@
 }
 
 .playbackMonitorPage .btnNotifAction.btnPrimary {
-    background: #00a4dc;
+    background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
+    border-color: rgba(56, 189, 248, 0.4);
     color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-.playbackMonitorPage .btnNotifAction.btnPrimary:hover {
-    background: #0088b6;
+.playbackMonitorPage .btnNotifAction.btnPrimary:hover:not(:disabled) {
+    background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%);
 }
 
 .playbackMonitorPage .btnNotifAction.btnSecondary {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #e2e8f0;
+    background: var(--easyui-bg-elevated, #202020);
+    border-color: var(--easyui-border-default, #2C2C2C);
+    color: #e4e4e7;
 }
 
-.playbackMonitorPage .btnNotifAction.btnSecondary:hover {
-    background: rgba(255, 255, 255, 0.14);
+.playbackMonitorPage .btnNotifAction.btnSecondary:hover:not(:disabled) {
+    background: var(--easyui-bg-active, #242424);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .playbackMonitorPage .btnNotifAction.btnDanger {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.32);
     color: #fca5a5;
 }
 
-.playbackMonitorPage .btnNotifAction.btnDanger:hover {
-    background: rgba(239, 68, 68, 0.25);
+.playbackMonitorPage .btnNotifAction.btnDanger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.24);
 }
 
 .playbackMonitorPage .toggleSwitchLabel {
@@ -1573,44 +1704,46 @@
 }
 
 .playbackMonitorPage .toggleSwitchTrack {
-    width: 32px;
-    height: 18px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 9px;
+    width: 34px;
+    height: 19px;
+    background: var(--easyui-bg-elevated, #202020);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    border-radius: 9999px;
     position: relative;
-    transition: background 0.2s ease;
+    transition: background 0.22s var(--easyui-ease-soft), border-color 0.22s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .toggleSwitchThumb {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     background: #ffffff;
     border-radius: 50%;
     position: absolute;
-    top: 2px;
-    left: 2px;
-    transition: transform 0.2s ease;
+    top: 1px;
+    left: 1px;
+    transition: transform 0.22s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .notifCheckbox:checked + .toggleSwitchTrack {
-    background: #00a4dc;
+    background: #0ea5e9;
+    border-color: #38bdf8;
 }
 
 .playbackMonitorPage .notifCheckbox:checked + .toggleSwitchTrack .toggleSwitchThumb {
-    transform: translateX(14px);
+    transform: translateX(15px);
 }
 
 .playbackMonitorPage .toggleSwitchText {
     font-size: 0.82rem;
     font-weight: 500;
-    color: #e2e8f0;
+    color: #e4e4e7;
 }
 
 .playbackMonitorPage .notifPrefsCard,
 .playbackMonitorPage .notifTelemetryCard {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
+    border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1rem;
 }
@@ -1620,7 +1753,7 @@
     margin: 0 0 0.85rem 0;
     font-size: 0.9rem;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .playbackMonitorPage .notifCheckGrid {
@@ -1634,7 +1767,7 @@
     align-items: center;
     gap: 0.45rem;
     font-size: 0.82rem;
-    color: #cbd5e1;
+    color: #d4d4d8;
     cursor: pointer;
 }
 
@@ -1651,23 +1784,24 @@
     align-items: center;
     gap: 0.35rem;
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
 }
 
 .playbackMonitorPage .notifNumberInput {
-    width: 60px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-    padding: 0.25rem 0.4rem;
+    width: 64px;
+    font-family: var(--easyui-font-mono);
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    border-radius: 6px;
+    padding: 0.25rem 0.45rem;
     font-size: 0.8rem;
-    color: #f8fafc;
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .playbackMonitorPage .notifDisclosureGroup {
     margin-top: 1rem;
     padding-top: 0.75rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-top: 1px solid var(--easyui-border-subtle, #1F1F1F);
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -1675,7 +1809,7 @@
 
 .playbackMonitorPage .notifDisclosureNote {
     font-size: 0.72rem;
-    color: #64748b;
+    color: var(--easyui-text-secondary, #8A8A8A);
     margin-left: 1.4rem;
 }
 
@@ -1686,36 +1820,38 @@
 }
 
 .playbackMonitorPage .notifTelemItem {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 6px;
-    padding: 0.5rem 0.65rem;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
+    border-radius: 8px;
+    padding: 0.55rem 0.7rem;
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
 }
 
 .playbackMonitorPage .telemLabel {
-    font-size: 0.68rem;
-    color: #64748b;
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: var(--easyui-text-secondary, #8A8A8A);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
 }
 
 .playbackMonitorPage .telemValue {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: #e2e8f0;
-    font-family: monospace;
+    color: var(--easyui-text-primary, #ffffff);
+    font-family: var(--easyui-font-mono);
 }
 
 /* Diagnostics Card */
 .playbackMonitorPage .playbackDiagnosticsCard {
     margin-top: 2rem;
     padding: 1.25rem;
-    background: #111620;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    border-radius: 14px;
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .playbackMonitorPage .diagnosticsHeader {
@@ -1724,7 +1860,7 @@
     align-items: center;
     gap: 1rem;
     padding-bottom: 0.85rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
     margin-bottom: 1rem;
     flex-wrap: wrap;
 }
@@ -1739,8 +1875,9 @@
 .playbackMonitorPage .diagnosticsTitle {
     margin: 0;
     font-size: 1rem;
-    font-weight: 600;
-    color: #f1f5f9;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--easyui-text-primary, #ffffff);
     display: flex;
     align-items: center;
     gap: 0.45rem;
@@ -1751,11 +1888,13 @@
 }
 
 .playbackMonitorPage .diagnosticsNotice {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    background: rgba(255, 255, 255, 0.04);
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.72rem;
+    color: var(--easyui-text-secondary, #8A8A8A);
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
+    padding: 0.18rem 0.55rem;
+    border-radius: 9999px;
 }
 
 .playbackMonitorPage .diagnosticsActions {
@@ -1769,46 +1908,51 @@
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 600;
-    padding: 0.35rem 0.75rem;
-    border-radius: 5px;
+    padding: 0.38rem 0.78rem;
+    border-radius: 8px;
     cursor: pointer;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #e2e8f0;
+    background: var(--easyui-bg-elevated, #202020);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    color: #e4e4e7;
     text-decoration: none;
-    transition: all 0.15s ease;
+    transition: all 0.2s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .btnDiagAction:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
+    background: var(--easyui-bg-active, #242424);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
+}
+
+.playbackMonitorPage .btnDiagAction:active {
+    transform: scale(0.96);
 }
 
 .playbackMonitorPage .btnDiagAction.linkAction {
-    background: rgba(0, 164, 220, 0.15);
-    border-color: rgba(0, 164, 220, 0.35);
+    background: rgba(56, 189, 248, 0.14);
+    border-color: rgba(56, 189, 248, 0.35);
     color: #38bdf8;
 }
 
 .playbackMonitorPage .btnDiagAction.linkAction:hover {
-    background: rgba(0, 164, 220, 0.25);
+    background: rgba(56, 189, 248, 0.24);
     color: #7dd3fc;
 }
 
 .playbackMonitorPage .diagnosticsFeedback {
     margin-bottom: 0.85rem;
     padding: 0.5rem 0.85rem;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 0.8rem;
     line-height: 1.4;
 }
 
 .playbackMonitorPage .diagnosticsFeedback.success {
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #86efac;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #6ee7b7;
 }
 
 .playbackMonitorPage .diagnosticsFeedback.error {
@@ -1825,7 +1969,7 @@
     gap: 0.75rem;
     margin-bottom: 0.85rem;
     padding: 0.65rem 0.9rem;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 0.82rem;
     line-height: 1.45;
     background: rgba(245, 158, 11, 0.14);
@@ -1857,7 +2001,7 @@
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.15s ease;
+    transition: all 0.18s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .btnRemoveStaleVersion:hover {
@@ -1879,28 +2023,30 @@
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    background: rgba(0, 0, 0, 0.25);
-    padding: 0.5rem 0.75rem;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: var(--easyui-bg-base, #0E0E0E);
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
 }
 
 .playbackMonitorPage .diagLabel {
-    font-size: 0.72rem;
-    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--easyui-text-secondary, #8A8A8A);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
 }
 
 .playbackMonitorPage .diagValue {
-    font-size: 0.85rem;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.8rem;
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--easyui-text-primary, #ffffff);
     word-break: break-word;
 }
 
 .playbackMonitorPage .diagValue.status-ok {
-    color: #4ade80;
+    color: #34d399;
 }
 
 .playbackMonitorPage .diagValue.status-waiting {
@@ -1963,22 +2109,23 @@
     }
 }
 
-/* Technical Stream Details panel -- previously had zero matching CSS anywhere on this
-   page, so it rendered as unstyled stacked divs with no separation between key and value. */
+/* Technical Stream Details panel (EasyUI SmoothAccordion / ExpandableDataRow inspired) */
 .playbackMonitorPage .playback-details-panel {
     display: none;
     margin-top: 0.6rem;
-    padding: 0.75rem 0.85rem;
-    border-radius: 8px;
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.8rem 0.9rem;
+    border-radius: 10px;
+    background-color: var(--easyui-bg-base, #0E0E0E);
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 14px 14px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     font-size: 0.78rem;
     line-height: 1.45;
     gap: 0.5rem;
     flex-direction: column;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .playbackMonitorPage .playback-details-panel.open {
@@ -1990,7 +2137,7 @@
     align-items: center;
     justify-content: space-between;
     padding-bottom: 0.4rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
 }
 
 .playbackMonitorPage .playback-drawer-title-wrap {
@@ -2005,7 +2152,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #f1f5f9;
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .playbackMonitorPage .playback-stream-badges {
@@ -2016,20 +2163,15 @@
 }
 
 .playbackMonitorPage .stream-badge {
-    font-size: 0.68rem;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.66rem;
     font-weight: 700;
-    padding: 0.15rem 0.45rem;
-    border-radius: 3px;
+    padding: 0.15rem 0.48rem;
+    border-radius: 9999px;
     text-transform: uppercase;
 }
 
-/* Extended-mode icon-led summary rows -- ported from the Dashboard widget so both
-   surfaces present this middle tier of detail (between the pill row and the full Show
-   Details grid) the same way. Collapsed by default (max-height: 0) so the one-shot
-   Compact->Extended entrance transition (modeAnimatePending) has something to animate
-   from; .open is either present from the first render (an ambient poll landing while
-   already in Extended -- no animation) or added a frame later via
-   requestAnimationFrame (the actual toggle click). */
+/* Extended-mode icon-led summary rows */
 .playbackMonitorPage .playback-ext-rows {
     display: flex;
     flex-direction: column;
@@ -2037,7 +2179,7 @@
     max-height: 0;
     opacity: 0;
     overflow: hidden;
-    transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.26s ease, margin-top 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.34s var(--easyui-ease-soft), opacity 0.26s ease, margin-top 0.34s var(--easyui-ease-soft);
 }
 
 .playbackMonitorPage .playback-ext-rows.open {
@@ -2056,45 +2198,46 @@
 
 .playbackMonitorPage .playback-ext-label {
     flex: 0 0 72px;
-    font-size: 0.66rem;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.65rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
 }
 
 .playbackMonitorPage .playback-ext-detail {
-    color: #cbd5e1;
+    color: #d4d4d8;
     word-break: break-word;
 }
 
 .playbackMonitorPage .playback-ext-sep {
-    color: #475569;
+    color: #52525b;
     margin: 0 0.4rem;
 }
 
 .playbackMonitorPage .stream-badge.video-direct,
 .playbackMonitorPage .stream-badge.audio-direct {
-    background: rgba(34, 197, 94, 0.15);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #4ade80;
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.32);
+    color: #34d399;
 }
 
 .playbackMonitorPage .stream-badge.video-transcode,
 .playbackMonitorPage .stream-badge.audio-transcode {
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.14);
+    border: 1px solid rgba(239, 68, 68, 0.32);
     color: #f87171;
 }
 
 .playbackMonitorPage .playback-details-row {
-    color: #cbd5e1;
+    color: #d4d4d8;
     word-break: break-word;
 }
 
 .playbackMonitorPage .playback-extended-summary {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
     padding: 0.2rem 0.4rem;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 4px;
@@ -2114,17 +2257,23 @@
     gap: 0.4rem 0.6rem;
     margin-top: 0.4rem;
     padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--easyui-border-subtle, #1F1F1F);
 }
 
 .playbackMonitorPage .playback-info-row {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
-    padding: 0.35rem 0.5rem;
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 5px;
+    padding: 0.38rem 0.55rem;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-subtle, #1F1F1F);
+    border-radius: 6px;
+    transition: border-color 0.18s var(--easyui-ease-soft), background 0.18s var(--easyui-ease-soft);
+}
+
+.playbackMonitorPage .playback-info-row:hover {
+    border-color: var(--easyui-border-default, #2C2C2C);
+    background: var(--easyui-bg-elevated, #202020);
 }
 
 .playbackMonitorPage .playback-info-row.full-width {
@@ -2132,22 +2281,22 @@
 }
 
 .playbackMonitorPage .playback-info-key {
-    font-size: 0.66rem;
+    font-size: 0.64rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #94a3b8;
+    letter-spacing: 0.05em;
+    color: var(--easyui-text-secondary, #8A8A8A);
 }
 
 .playbackMonitorPage .playback-info-val {
-    font-size: 0.8rem;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.77rem;
     font-weight: 500;
-    color: #f8fafc;
+    color: var(--easyui-text-primary, #ffffff);
     word-break: break-word;
 }
 
-/* Grouped Show Details sections (Playback/Video/Audio/Stream/Subtitles), matching the
-   Dashboard widget's drawer layout instead of one flat, undifferentiated grid. */
+/* Grouped Show Details sections */
 .playbackMonitorPage .playback-drawer-group {
     margin-bottom: 1.1rem;
 }
@@ -2163,7 +2312,7 @@
     font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0.06em;
-    color: #7dd3fc;
+    color: #38bdf8;
     margin-bottom: 0.5rem;
 }
 
@@ -2174,47 +2323,51 @@
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
-/* Custom confirm/prompt modal, replacing native confirm()/prompt() for Stop/Message so
-   they match the rest of the page's own styling instead of a bare OS dialog box. */
+/* Custom confirm/prompt modal (EasyUI SettleModal inspired) */
 .pi-modal-scrim {
     position: fixed;
     inset: 0;
-    background: rgba(5, 7, 10, 0.65);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(5, 5, 5, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
     box-sizing: border-box;
+    font-family: var(--easyui-font-sans);
 }
 
 .pi-modal {
     width: 100%;
-    max-width: 340px;
+    max-width: 360px;
     border-radius: 16px;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.015) 45%, rgba(20, 26, 36, 0.92) 100%), #141a24;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+        linear-gradient(155deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 45%, rgba(20, 20, 20, 0.96) 100%),
+        var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     box-shadow:
-        inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
-        0 20px 50px -10px rgba(0, 0, 0, 0.6);
-    padding: 18px;
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.14),
+        0 24px 60px -12px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
+    padding: 20px;
     box-sizing: border-box;
 }
 
 .pi-modal-title {
-    font-size: 0.95rem;
+    font-size: 0.98rem;
     font-weight: 700;
-    color: #f8fafc;
+    letter-spacing: -0.015em;
+    color: var(--easyui-text-primary, #ffffff);
     margin-bottom: 0.4rem;
 }
 
 .pi-modal-body {
     font-size: 0.82rem;
-    color: #94a3b8;
-    line-height: 1.4;
-    margin-bottom: 0.85rem;
+    color: var(--easyui-text-secondary, #8A8A8A);
+    line-height: 1.45;
+    margin-bottom: 0.9rem;
 }
 
 .pi-modal-presets {
@@ -2226,38 +2379,41 @@
 
 .pi-modal-preset-btn {
     font-size: 0.72rem;
-    padding: 0.3rem 0.6rem;
+    padding: 0.3rem 0.65rem;
     border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.05);
-    color: #cbd5e1;
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    background: var(--easyui-bg-base, #0E0E0E);
+    color: #d4d4d8;
     cursor: pointer;
     font-family: inherit;
     text-align: left;
+    transition: all 0.18s var(--easyui-ease-soft);
 }
 
 .pi-modal-preset-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #f1f5f9;
+    background: var(--easyui-bg-elevated, #202020);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .pi-modal-input {
     width: 100%;
     box-sizing: border-box;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: var(--easyui-bg-base, #0E0E0E);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     border-radius: 8px;
-    padding: 0.5rem 0.65rem;
+    padding: 0.55rem 0.7rem;
     font-size: 0.85rem;
-    color: #f1f5f9;
-    margin-bottom: 0.9rem;
+    color: var(--easyui-text-primary, #ffffff);
+    margin-bottom: 0.95rem;
     font-family: inherit;
+    transition: border-color 0.2s var(--easyui-ease-soft), box-shadow 0.2s var(--easyui-ease-soft);
 }
 
 .pi-modal-input:focus {
     outline: none;
-    border-color: rgba(255, 145, 66, 0.6);
-    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(56, 189, 248, 0.65);
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
 .pi-modal-actions {
@@ -2268,48 +2424,47 @@
 
 .pi-modal-btn {
     font-size: 0.8rem;
-    font-weight: 700;
-    padding: 0.45rem 0.9rem;
+    font-weight: 600;
+    padding: 0.45rem 0.95rem;
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.06);
-    color: #e2e8f0;
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    background: var(--easyui-bg-elevated, #202020);
+    color: #e4e4e7;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s var(--easyui-ease-soft);
 }
 
 .pi-modal-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--easyui-bg-active, #242424);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
+}
+
+.pi-modal-btn:active {
+    transform: scale(0.96);
 }
 
 .pi-modal-btn.pi-modal-confirm {
-    background: rgba(255, 145, 66, 0.18);
-    border-color: rgba(255, 145, 66, 0.5);
-    color: #ffb27a;
+    background: rgba(56, 189, 248, 0.16);
+    border-color: rgba(56, 189, 248, 0.45);
+    color: #38bdf8;
 }
 
 .pi-modal-btn.pi-modal-confirm:hover {
-    background: rgba(255, 145, 66, 0.28);
+    background: rgba(56, 189, 248, 0.25);
 }
 
 .pi-modal-btn.pi-modal-confirm.danger {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.55);
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.5);
     color: #fca5a5;
 }
 
 .pi-modal-btn.pi-modal-confirm.danger:hover {
-    background: rgba(239, 68, 68, 0.32);
+    background: rgba(239, 68, 68, 0.3);
 }
 
-/* Info side panel: a Tautulli-style Product/Player/Quality/Stream/Container/Video/
-   Audio/Subtitle/Location/Bandwidth field readout, opened by a card's Info button while
-   infoViewStyle is 'right' (see showInfoSidePanel above). Purely additive -- the original
-   "down" inline expand behavior (playback-details-panel/openInfoSessionIds) is untouched
-   and still the default. Presented as a centered dialog with the poster art on the left
-   and the full field list on the right (not a right-edge drawer), matching the Tautulli
-   reference layout. Scales/fades in (.show toggled a frame after mount/before removal)
-   rather than the plain confirm/prompt modal's instant show/hide. */
+/* Info side panel: Tautulli-style field readout with EasyUI SettleModal spring physics */
 .pi-info-panel-scrim {
     position: fixed;
     inset: 0;
@@ -2319,17 +2474,18 @@
     justify-content: center;
     box-sizing: border-box;
     padding: 24px;
-    background: rgba(3, 7, 15, 0);
+    background: rgba(5, 5, 5, 0);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.24s ease, background 0.24s ease, visibility 0.24s;
+    font-family: var(--easyui-font-sans);
+    transition: opacity 0.26s var(--easyui-ease-soft), background 0.26s var(--easyui-ease-soft), visibility 0.26s;
 }
 
 .pi-info-panel-scrim.show {
-    background: rgba(3, 7, 15, 0.66);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: rgba(5, 5, 5, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
@@ -2342,13 +2498,18 @@
     max-height: 86vh;
     border-radius: 18px;
     overflow: hidden;
-    background: linear-gradient(155deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.015) 45%, rgba(13, 17, 23, 0.98) 100%), #11161d;
-    border: 1px solid rgba(255, 255, 255, 0.13);
-    box-shadow: 0 40px 90px -18px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    background:
+        linear-gradient(155deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 45%, rgba(20, 20, 20, 0.98) 100%),
+        var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    box-shadow:
+        0 40px 90px -18px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
     box-sizing: border-box;
     transform: scale(0.94) translateY(10px);
     opacity: 0;
-    transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.24s ease;
+    transition: transform 0.34s var(--easyui-ease-soft), opacity 0.24s ease;
 }
 
 .pi-info-panel-scrim.show .pi-info-panel {
@@ -2360,7 +2521,8 @@
     position: relative;
     flex: 0 0 260px;
     align-self: stretch;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--easyui-bg-base, #0E0E0E);
+    border-right: 1px solid var(--easyui-border-subtle, #1F1F1F);
     overflow: hidden;
 }
 
@@ -2375,7 +2537,7 @@
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(200deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 32%),
+        linear-gradient(200deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 32%),
         linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 42%);
     pointer-events: none;
 }
@@ -2383,7 +2545,7 @@
 .pi-info-poster-fallback {
     position: absolute;
     inset: 0;
-    color: #64748b;
+    color: #52525b;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2398,18 +2560,20 @@
 
 .pi-info-panel-heading {
     padding: 1.15rem 2.6rem 0.8rem 1.15rem;
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
 }
 
 .pi-info-panel-title {
-    font-size: 1.05rem;
+    font-size: 1.06rem;
     font-weight: 700;
-    color: #f8fafc;
+    letter-spacing: -0.02em;
+    color: var(--easyui-text-primary, #ffffff);
     line-height: 1.3;
 }
 
 .pi-info-panel-subtitle {
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: var(--easyui-text-secondary, #8A8A8A);
     margin-top: 0.2rem;
 }
 
@@ -2421,20 +2585,26 @@
     flex-shrink: 0;
     width: 28px;
     height: 28px;
-    border: none;
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     border-radius: 7px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #94a3b8;
+    background: var(--easyui-bg-elevated, #202020);
+    color: #a1a1aa;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: all 0.2s var(--easyui-ease-soft);
 }
 
 .pi-info-panel-close:hover {
-    background: rgba(255, 255, 255, 0.16);
-    color: #f8fafc;
+    background: var(--easyui-bg-active, #242424);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
+}
+
+.pi-info-panel-close:active,
+.pi-info-panel-copy:active {
+    transform: scale(0.94);
 }
 
 .pi-info-panel-copy {
@@ -2444,23 +2614,24 @@
     z-index: 2;
     flex-shrink: 0;
     height: 28px;
-    padding: 0 0.6rem;
-    border: none;
+    padding: 0 0.65rem;
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
     border-radius: 7px;
-    background: rgba(255, 255, 255, 0.08);
-    color: #94a3b8;
+    background: var(--easyui-bg-elevated, #202020);
+    color: #d4d4d8;
     font-size: 0.72rem;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: all 0.2s var(--easyui-ease-soft);
     font-family: inherit;
 }
 
 .pi-info-panel-copy:hover {
-    background: rgba(255, 255, 255, 0.16);
-    color: #f8fafc;
+    background: var(--easyui-bg-active, #242424);
+    border-color: var(--easyui-border-hover, #484848);
+    color: var(--easyui-text-primary, #ffffff);
 }
 
 .pi-info-warnings {
@@ -2486,8 +2657,8 @@
 }
 
 .pi-info-warning.sev-amber {
-    background: rgba(251, 191, 36, 0.1);
-    border: 1px solid rgba(251, 191, 36, 0.28);
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.28);
     color: #fcd34d;
 }
 
@@ -2509,13 +2680,11 @@
     justify-content: space-between;
     align-items: baseline;
     gap: 0.6rem;
-    padding: 0.4rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.42rem 0;
+    border-bottom: 1px solid var(--easyui-border-subtle, #1F1F1F);
     font-size: 0.78rem;
 }
 
-/* Long, comma-joined values (Transcode Reason) span both grid columns and stack the
-   value under the key instead of squeezing into one narrow right-aligned column. */
 .pi-info-field.wide {
     grid-column: 1 / -1;
     flex-direction: column;
@@ -2528,16 +2697,18 @@
 }
 
 .pi-info-field-key {
-    color: #7c8aa3;
+    color: var(--easyui-text-secondary, #8A8A8A);
     font-weight: 700;
-    letter-spacing: 0.02em;
-    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    font-size: 0.66rem;
     text-transform: uppercase;
     flex-shrink: 0;
 }
 
 .pi-info-field-val {
-    color: #e2e8f0;
+    font-family: var(--easyui-font-mono);
+    font-size: 0.75rem;
+    color: var(--easyui-text-primary, #ffffff);
     font-weight: 600;
     text-align: right;
     overflow-wrap: anywhere;
@@ -2575,6 +2746,127 @@
     }
 }
 
+/* 3-bar animated equalizer for Playing badge */
+.playbackMonitorPage .pi-eq-bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1.5px;
+    height: 9px;
+    margin-right: 0.1rem;
+    vertical-align: middle;
+}
+
+.playbackMonitorPage .pi-eq-bars i {
+    display: block;
+    width: 1.8px;
+    background: currentColor;
+    border-radius: 1px;
+    animation: pi-eq-bounce 0.85s ease-in-out infinite alternate;
+}
+
+.playbackMonitorPage .pi-eq-bars i:nth-child(1) { height: 4px; animation-delay: 0s; }
+.playbackMonitorPage .pi-eq-bars i:nth-child(2) { height: 9px; animation-delay: 0.22s; }
+.playbackMonitorPage .pi-eq-bars i:nth-child(3) { height: 6px; animation-delay: 0.44s; }
+
+@keyframes pi-eq-bounce {
+    0% { transform: scaleY(0.35); }
+    100% { transform: scaleY(1); }
+}
+
+/* Dual-track transcode buffer bar inside progress track */
+.playbackMonitorPage .playback-progress-bar-track {
+    position: relative;
+}
+
+.playbackMonitorPage .playback-progress-buffer-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.25) 0%, rgba(251, 191, 36, 0.38) 100%);
+    border-radius: 9999px;
+    transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.playbackMonitorPage .playback-progress-bar-fill {
+    position: relative;
+    z-index: 2;
+}
+
+.playbackMonitorPage .playback-transcode-speed {
+    font-family: var(--easyui-font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.26);
+    padding: 0.05rem 0.38rem;
+    border-radius: 9999px;
+    letter-spacing: 0.01em;
+}
+
+.playbackMonitorPage .playback-transcode-speed.throttled {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.26);
+}
+
+/* EasyUI Toast Notifications */
+.pi-toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    font-family: var(--easyui-font-sans);
+}
+
+.pi-toast {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.65rem 0.95rem;
+    border-radius: 10px;
+    background: var(--easyui-bg-surface, #141414);
+    border: 1px solid var(--easyui-border-default, #2C2C2C);
+    box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    color: var(--easyui-text-primary, #ffffff);
+    font-size: 0.78rem;
+    font-weight: 600;
+    pointer-events: auto;
+    animation: pi-toast-in 0.28s var(--easyui-ease-soft) forwards;
+}
+
+.pi-toast.success {
+    border-color: rgba(16, 185, 129, 0.45);
+    color: #34d399;
+}
+
+.pi-toast.error {
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #fca5a5;
+}
+
+.pi-toast.info {
+    border-color: rgba(56, 189, 248, 0.45);
+    color: #38bdf8;
+}
+
+@keyframes pi-toast-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.playbackMonitorPage #btnModeCompact,
+.playbackMonitorPage #btnInfoViewRight {
+    display: none;
+}
+
         </style>
 
         <script type="text/javascript">
@@ -2585,7 +2877,7 @@
         window.__playbackInfoCardMonitorController.dispose();
     }
 
-    var PLUGIN_VERSION = '0.2.7.7';
+    var PLUGIN_VERSION = '0.2.7.8';
     var POLL_INTERVAL_MS = 3000;
     var STALE_THRESHOLD_MS = POLL_INTERVAL_MS * 2; // Stale if > 6s without update
 
@@ -2688,8 +2980,8 @@
         }
     };
 
-    // Sensitive data detection pattern
-    var SENSITIVE_PATTERN = /(RemoteEndPoint|ipAddress|endpoint|\bLAN\b|\bWAN\b|\bCELLULAR\b|\bWIFI\b|geolocation|api_key|token|authorization|cookie|password|file\s*path|username|media\s*title|\b192\.168\.\d{1,3}\.\d{1,3}\b|\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\b172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\b)/i;
+    // Sensitive data detection pattern: blocks sensitive keys, webhook/bot tokens, query strings, private IPs, and absolute paths
+    var SENSITIVE_PATTERN = /(RemoteEndPoint|ipAddress|endpoint|\bLAN\b|\bWAN\b|\bCELLULAR\b|\bWIFI\b|geolocation|api_key|token|authorization|cookie|password|file\s*path|username|media\s*title|\/api\/webhooks\/\d+\/|\b\d{8,11}:[a-zA-Z0-9_-]{20,}\b|\b192\.168\.\d{1,3}\.\d{1,3}\b|\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\b172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\b|\b127\.0\.0\.1\b|[?&][a-zA-Z0-9_]+=[^&\s]+|\/Users\/|\/home\/|[A-Za-z]:\\)/i;
 
     function escapeHtml(str) {
         if (str == null) return '';
@@ -4638,19 +4930,11 @@
                 posterHtml = '<div class="playback-poster-fallback" aria-label="No artwork"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor"/><path d="M7 3v18M17 3v18M2 9h20M2 15h20" stroke="currentColor"/></svg></div>';
             }
 
-            // Small watermark badge, like a TV channel bug -- a glance at any card should be
-            // enough to know this data is coming from PlayInfo, not a stock Jellyfin widget.
             var brandBadgeHtml = '<div class="playback-brand-badge" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" width="11" height="11"><path d="M8 5v14l11-7z" fill="#fff"/></svg>' +
                 '<span>PlayInfo</span>' +
             '</div>';
 
-            // Poster width tier: large while the panel is closed (Compact, nothing
-            // expanded), small once it's open -- Extended and the inline Info panel both
-            // reveal the same full field grid on this page (no separate lighter-weight
-            // Extended-only view here, unlike the Dashboard widget), so there's no real
-            // medium state to distinguish. The existing :has(.playback-details-panel.open)
-            // rule already caps height/aspect-ratio in that case; this is the width axis.
             var posterSizeCls = isPanelOpen ? 'poster-sm' : 'poster-lg';
 
             return '<div class="playback-card" data-card-id="' + escapeHtml(cardDomId) + '" data-playback-method="' + escapeHtml(classification.method) + '">' +
@@ -4822,9 +5106,6 @@
             console.error('[PlaybackCard] Error updating diagnostics view:', e);
         }
     }
-
-    // Sensitive data detection pattern: blocks sensitive keys, query strings, private IPs, and absolute paths
-    var SENSITIVE_PATTERN = /(RemoteEndPoint|ipAddress|endpoint|\bLAN\b|\bWAN\b|\bCELLULAR\b|\bWIFI\b|geolocation|api_key|token|authorization|cookie|password|file\s*path|username|media\s*title|\b192\.168\.\d{1,3}\.\d{1,3}\b|\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b|\b172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\b|\b127\.0\.0\.1\b|[?&][a-zA-Z0-9_]+=[^&\s]+|\/Users\/|\/home\/|[A-Za-z]:\\)/i;
 
     var ALLOWED_REPORT_KEYS = [
         'pluginVersion',
@@ -5015,7 +5296,7 @@
             console.error('[PlaybackCard] Failed to copy diagnostic report:', err);
             if (feedbackEl) {
                 feedbackEl.className = 'diagnosticsFeedback error';
-                feedbackEl.textContent = 'Could not copy diagnostic report: ' + escapeHtml(err.message);
+                feedbackEl.textContent = 'Could not copy diagnostic report: ' + err.message;
                 feedbackEl.style.display = 'block';
             }
             return false;
@@ -5468,7 +5749,7 @@
                 if (chkDiscord) chkDiscord.checked = Boolean(data.discordEnabled);
                 if (txtDiscord) {
                     txtDiscord.value = '';
-                    var maskedDiscord = data.discordWebhookMasked || data.discordWebhookUrlMasked;
+                    var maskedDiscord = data.discordWebhookMasked;
                     if (maskedDiscord) {
                         txtDiscord.placeholder = maskedDiscord;
                     }
@@ -5702,9 +5983,47 @@
     function sendTestNotification(page, destination) {
         if (!page) return;
         showNotificationFeedback(page, 'Sending test ' + destination + ' notification…', false);
-        callNotificationApi('PlaybackCard/Notifications/Test', {
-            method: 'POST',
-            body: { destination: destination }
+
+        // If the user typed a new Discord Webhook URL or Telegram Bot Token/Chat ID and clicked
+        // Test before clicking Save, persist the typed credentials first so the server tests
+        // what is currently on screen rather than failing against stale/empty config.
+        var preSavePayload = null;
+        if (destination === 'Discord') {
+            var txtWebhook = page.querySelector('#txtDiscordWebhookUrl');
+            if (txtWebhook && txtWebhook.value && txtWebhook.value.trim().length > 0) {
+                var chkDiscord = page.querySelector('#chkDiscordEnabled');
+                if (chkDiscord) chkDiscord.checked = true;
+                preSavePayload = {
+                    discordEnabled: true,
+                    discordWebhookUrl: txtWebhook.value.trim()
+                };
+            }
+        } else if (destination === 'Telegram') {
+            var txtToken = page.querySelector('#txtTelegramBotToken');
+            var txtChat = page.querySelector('#txtTelegramChatId');
+            var hasTypedToken = Boolean(txtToken && txtToken.value && txtToken.value.trim().length > 0);
+            if (hasTypedToken) {
+                var chkTelegram = page.querySelector('#chkTelegramEnabled');
+                if (chkTelegram) chkTelegram.checked = true;
+                preSavePayload = {
+                    telegramEnabled: true,
+                    telegramBotToken: txtToken.value.trim()
+                };
+                if (txtChat && txtChat.value && txtChat.value.trim().length > 0) {
+                    preSavePayload.telegramChatId = txtChat.value.trim();
+                }
+            }
+        }
+
+        var preSavePromise = preSavePayload
+            ? callNotificationApi('PlaybackCard/Notifications/Configuration', { method: 'POST', body: preSavePayload })
+            : Promise.resolve();
+
+        preSavePromise.then(function () {
+            return callNotificationApi('PlaybackCard/Notifications/Test', {
+                method: 'POST',
+                body: { destination: destination }
+            });
         }).then(function (result) {
             if (result && result.success) {
                 // Test intentionally bypasses the Master Switch (so a token can be
@@ -5730,6 +6049,7 @@
                 }
                 showNotificationFeedback(page, 'Test ' + destination + ' failed: ' + reason, true);
             }
+            if (preSavePayload) loadNotificationSettings(page);
             fetchNotificationDiagnostics(page);
         }).catch(function (err) {
             console.error('[PlaybackCard] Test notification dispatch error:', err);
@@ -5821,6 +6141,16 @@
             });
         }
 
+        var txtDiscordWebhook = page.querySelector('#txtDiscordWebhookUrl');
+        if (txtDiscordWebhook && btnTestDiscord) {
+            txtDiscordWebhook.addEventListener('input', function () {
+                if (txtDiscordWebhook.value && txtDiscordWebhook.value.trim().length > 0) {
+                    btnTestDiscord.disabled = false;
+                    btnTestDiscord.title = 'Save and send a test notification to Discord';
+                }
+            });
+        }
+
         var btnSaveTelegram = page.querySelector('#btnSaveTelegram');
         if (btnSaveTelegram) {
             btnSaveTelegram.addEventListener('click', function () {
@@ -5841,6 +6171,20 @@
                 sendTestNotification(page, 'Telegram');
             });
         }
+
+        var txtTelegramToken = page.querySelector('#txtTelegramBotToken');
+        var txtTelegramChat = page.querySelector('#txtTelegramChatId');
+        var updateTelegramTestBtn = function () {
+            if (!btnTestTelegram) return;
+            var hasToken = Boolean(txtTelegramToken && txtTelegramToken.value && txtTelegramToken.value.trim().length > 0);
+            var hasChat = Boolean(txtTelegramChat && txtTelegramChat.value && txtTelegramChat.value.trim().length > 0);
+            if (hasToken && hasChat) {
+                btnTestTelegram.disabled = false;
+                btnTestTelegram.title = 'Save and send a test notification to Telegram';
+            }
+        };
+        if (txtTelegramToken) txtTelegramToken.addEventListener('input', updateTelegramTestBtn);
+        if (txtTelegramChat) txtTelegramChat.addEventListener('input', updateTelegramTestBtn);
 
         var btnSavePrefs = page.querySelector('#btnSavePreferences');
         if (btnSavePrefs) {
@@ -5909,6 +6253,18 @@
         }
 
         var gridEl = page.querySelector('#playbackSessionsGrid');
+        if (typeof page.addEventListener === 'function' && !page._hasSpotlightListener) {
+            page._hasSpotlightListener = true;
+            page.addEventListener('mousemove', function (e) {
+                if (!e || !e.target || typeof e.target.closest !== 'function') return;
+                var card = e.target.closest('.playback-card, .notifDestCard');
+                if (!card || typeof card.getBoundingClientRect !== 'function' || !card.style || typeof card.style.setProperty !== 'function') return;
+                var rect = card.getBoundingClientRect();
+                if (!rect) return;
+                card.style.setProperty('--mouse-x', (e.clientX - rect.left) + 'px');
+                card.style.setProperty('--mouse-y', (e.clientY - rect.top) + 'px');
+            });
+        }
         if (gridEl && !gridEl._hasInfoListener) {
             gridEl._hasInfoListener = true;
             gridEl.addEventListener('click', function (e) {

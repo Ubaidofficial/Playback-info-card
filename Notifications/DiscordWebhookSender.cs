@@ -127,9 +127,13 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
             return false;
         }
 
-        // Host must be exactly discord.com or discordapp.com
+        // Host must be an official Discord webhook domain (stable, PTB, or Canary)
         if (!host.Equals("discord.com", StringComparison.OrdinalIgnoreCase) &&
-            !host.Equals("discordapp.com", StringComparison.OrdinalIgnoreCase))
+            !host.Equals("discordapp.com", StringComparison.OrdinalIgnoreCase) &&
+            !host.Equals("ptb.discord.com", StringComparison.OrdinalIgnoreCase) &&
+            !host.Equals("ptb.discordapp.com", StringComparison.OrdinalIgnoreCase) &&
+            !host.Equals("canary.discord.com", StringComparison.OrdinalIgnoreCase) &&
+            !host.Equals("canary.discordapp.com", StringComparison.OrdinalIgnoreCase))
         {
             errorCategory = "InvalidConfiguration";
             return false;
@@ -201,9 +205,7 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
     /// <summary>
     /// Sender-specific configuration handed to <see cref="WebhookSenderRetryHelper"/>: how to
     /// recognize a successful 2xx response, how to parse a 429 Retry-After value, and how to
-    /// describe a permanent 4xx client error. Discord never needs the response body except for
-    /// the 429 case (its 2xx responses are typically 204 No Content, and its 4xx descriptions
-    /// are fixed strings), which this profile preserves exactly.
+    /// describe a permanent 4xx client error.
     /// </summary>
     private static readonly WebhookSenderProfile DiscordProfile = new()
     {
@@ -219,16 +221,42 @@ public sealed class DiscordWebhookSender : IDiscordWebhookSender, IDisposable
             return DeliveryResult.Ok(status);
         },
         ParseRetryAfter = (response, body) => ParseRetryAfter(response, body),
-        ReadClientErrorBody = false,
-        DescribeClientError = (status, _) => status switch
+        ReadClientErrorBody = true,
+        DescribeClientError = (status, body) =>
         {
-            400 => "Bad Request (malformed Discord payload or parameters)",
-            401 => "Unauthorized (invalid or revoked Discord webhook token)",
-            403 => "Forbidden (Discord webhook lacks permissions in channel)",
-            404 => "Not Found (Discord webhook URL does not exist or channel was deleted)",
-            _ => null
+            var errorDesc = ParseDiscordErrorDescription(body);
+            return status switch
+            {
+                400 => errorDesc ?? "Bad Request (malformed Discord payload or parameters)",
+                401 => errorDesc ?? "Unauthorized (invalid or revoked Discord webhook token)",
+                403 => errorDesc ?? "Forbidden (Discord webhook lacks permissions in channel)",
+                404 => errorDesc ?? "Not Found (Discord webhook URL does not exist or channel was deleted)",
+                _ => errorDesc
+            };
         }
     };
+
+    private static string? ParseDiscordErrorDescription(string? responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            if (doc.RootElement.TryGetProperty("message", out var msgProp) && msgProp.ValueKind == JsonValueKind.String)
+            {
+                var msg = msgProp.GetString();
+                if (!string.IsNullOrWhiteSpace(msg))
+                {
+                    return SecretRedactor.Redact(msg);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Ignore parse failures
+        }
+        return null;
+    }
 
     /// <inheritdoc />
     public async Task<DeliveryResult> SendAsync(PlaybackNotificationPayload payload, string webhookUrl, CancellationToken cancellationToken, string? posterImagePath = null)

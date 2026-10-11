@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.PlaybackCard.Notifications;
@@ -10,6 +11,25 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.PlaybackCard.Controllers;
+
+/// <summary>
+/// Shared authorization helper for administrator-only plugin controllers.
+/// </summary>
+internal static class ControllerAuthHelper
+{
+    public static bool IsAdministrator(ClaimsPrincipal? user)
+    {
+        if (user == null)
+        {
+            return false;
+        }
+
+        return user.IsInRole("Administrator") ||
+               user.HasClaim("IsAdministrator", "true") ||
+               user.HasClaim(c => c.Type.Equals("IsAdministrator", StringComparison.OrdinalIgnoreCase) &&
+                                  c.Value.Equals("true", StringComparison.OrdinalIgnoreCase));
+    }
+}
 
 /// <summary>
 /// Administrator-only API controller for managing native notification settings,
@@ -27,12 +47,7 @@ public class NotificationsConfigurationController : ControllerBase
     private readonly PluginConfiguration? _testConfig;
     private readonly ILogger _logger;
 
-    // ASP.NET Core creates a new controller instance per request, but Plugin.Instance.Configuration
-    // is one shared mutable object. Two saves fired close together (e.g. flipping the Master Switch
-    // and a destination toggle within the same second, which auto-save independently) run on
-    // different threads and can otherwise interleave their read-modify-write of that object, so one
-    // save's SaveConfiguration() call persists a snapshot that doesn't yet include the other's
-    // change. This serializes the whole read-modify-write-persist sequence per process.
+    // Serializes concurrent read-modify-write updates against the shared PluginConfiguration instance.
     private static readonly object ConfigLock = new();
 
     public NotificationsConfigurationController(
@@ -62,17 +77,7 @@ public class NotificationsConfigurationController : ControllerBase
         _logger = logger ?? NullLogger.Instance;
     }
 
-    private bool IsAdministrator()
-    {
-        if (User.IsInRole("Administrator") ||
-            User.HasClaim("IsAdministrator", "true") ||
-            User.HasClaim(c => c.Type.Equals("IsAdministrator", StringComparison.OrdinalIgnoreCase) && c.Value.Equals("true", StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        return false;
-    }
+    private bool IsAdministrator() => ControllerAuthHelper.IsAdministrator(User);
 
     /// <summary>
     /// Obtains current notification settings with masked credentials and real-time diagnostics.
@@ -126,10 +131,7 @@ public class NotificationsConfigurationController : ControllerBase
 
     private ActionResult<NotificationConfigurationDto> ApplyConfigurationUpdate(PluginConfiguration config, UpdateNotificationConfigurationRequest request)
     {
-        // 1. Update switches and event preferences first (only overwrite when explicitly
-        // supplied). These must not be lost just because a credential further down turns
-        // out to be malformed -- a rejected bot token shouldn't silently revert the
-        // enable switch the user just flipped in the same request.
+        // 1. Update switches and event preferences first (only overwrite when explicitly supplied).
         var notifsEnabled = request.NotificationsEnabled ?? request.Enabled;
         if (notifsEnabled.HasValue)
         {
@@ -146,46 +148,27 @@ public class NotificationsConfigurationController : ControllerBase
             config.TelegramEnabled = request.TelegramEnabled.Value;
         }
 
-        var onStart = request.NotifyOnStart ?? request.NotifyOnPlaybackStart;
-        if (onStart.HasValue) config.NotifyOnStart = onStart.Value;
+        if (request.NotifyOnStart.HasValue) config.NotifyOnStart = request.NotifyOnStart.Value;
+        if (request.NotifyOnStop.HasValue) config.NotifyOnStop = request.NotifyOnStop.Value;
+        if (request.NotifyOnPauseResume.HasValue) config.NotifyOnPauseResume = request.NotifyOnPauseResume.Value;
+        if (request.NotifyOnProgress.HasValue) config.NotifyOnProgress = request.NotifyOnProgress.Value;
+        if (request.ProgressIntervalMinutes.HasValue) config.ProgressIntervalMinutes = Math.Max(5, request.ProgressIntervalMinutes.Value);
+        if (request.NotifyOnCompletion.HasValue) config.NotifyOnCompletion = request.NotifyOnCompletion.Value;
 
-        var onStop = request.NotifyOnStop ?? request.NotifyOnPlaybackStop;
-        if (onStop.HasValue) config.NotifyOnStop = onStop.Value;
-
-        var onPauseResume = request.NotifyOnPauseResume ?? request.NotifyOnPlaybackPauseResume;
-        if (onPauseResume.HasValue) config.NotifyOnPauseResume = onPauseResume.Value;
-
-        var onProgress = request.NotifyOnProgress ?? request.NotifyOnPlaybackProgress;
-        if (onProgress.HasValue) config.NotifyOnProgress = onProgress.Value;
-
-        var progInterval = request.ProgressIntervalMinutes ?? request.PlaybackProgressIntervalMinutes;
-        if (progInterval.HasValue) config.ProgressIntervalMinutes = Math.Max(5, progInterval.Value);
-
-        var onCompletion = request.NotifyOnCompletion ?? request.NotifyOnPlaybackCompletion;
-        if (onCompletion.HasValue) config.NotifyOnCompletion = onCompletion.Value;
-
-        // If notifications are active and a destination is enabled, but no event types were ever enabled,
-        // activate Start and Stop events as safe defaults so delivery is not silently broken.
+        // If notifications and a destination are active with no event types enabled, default Start and Stop to true.
         var hasAnyEventConfigured = config.NotifyOnStart || config.NotifyOnStop || config.NotifyOnCompletion ||
-                                   config.NotifyOnPauseResume || config.NotifyOnProgress;
+                                    config.NotifyOnPauseResume || config.NotifyOnProgress;
         if (!hasAnyEventConfigured && config.NotificationsEnabled && (config.TelegramEnabled || config.DiscordEnabled))
         {
-            if (!onStart.HasValue) config.NotifyOnStart = true;
-            if (!onStop.HasValue) config.NotifyOnStop = true;
+            if (!request.NotifyOnStart.HasValue) config.NotifyOnStart = true;
+            if (!request.NotifyOnStop.HasValue) config.NotifyOnStop = true;
         }
 
-        var userDisc = request.UsernameDisclosure ?? request.IncludeUserAccountName;
-        if (userDisc.HasValue) config.UsernameDisclosure = userDisc.Value;
-
-        var devDisc = request.ClientDeviceDisclosure ?? request.IncludeClientAndDeviceName;
-        if (devDisc.HasValue) config.ClientDeviceDisclosure = devDisc.Value;
-
+        if (request.UsernameDisclosure.HasValue) config.UsernameDisclosure = request.UsernameDisclosure.Value;
+        if (request.ClientDeviceDisclosure.HasValue) config.ClientDeviceDisclosure = request.ClientDeviceDisclosure.Value;
         if (request.NetworkLocationDisclosure.HasValue) config.NetworkLocationDisclosure = request.NetworkLocationDisclosure.Value;
-
         if (request.IncludePosterImage.HasValue) config.IncludePosterImage = request.IncludePosterImage.Value;
-
         if (request.UploadBandwidthLimitMbps.HasValue) config.UploadBandwidthLimitMbps = Math.Max(0, request.UploadBandwidthLimitMbps.Value);
-
         if (request.UserFilterMode.HasValue) config.UserFilterMode = request.UserFilterMode.Value;
 
         if (request.SelectedUserIds != null)
@@ -205,9 +188,7 @@ public class NotificationsConfigurationController : ControllerBase
             config.TelegramChatId = trimmedChatId;
         }
 
-        // 2. Handle Discord Webhook Credential (Omitted, Masked, New, or Clear). A
-        // validation failure here saves everything above before returning the error, so
-        // the switches/preferences the user just set are never lost by a bad credential.
+        // 2. Handle Discord Webhook Credential (Omitted, Masked, New, or Clear).
         if (request.ClearDiscordWebhook == true || string.Equals(request.DiscordWebhookUrl, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
         {
             _secretStore.ClearDiscordWebhookUrl();
@@ -226,7 +207,7 @@ public class NotificationsConfigurationController : ControllerBase
             }
         }
 
-        // 3. Handle Telegram Bot Token Credential (Omitted, Masked, New, or Clear)
+        // 3. Handle Telegram Bot Token Credential (Omitted, Masked, New, or Clear).
         if (request.ClearTelegramBotToken == true || string.Equals(request.TelegramBotToken, "[CLEAR]", StringComparison.OrdinalIgnoreCase))
         {
             _secretStore.ClearTelegramBotToken();
@@ -236,9 +217,6 @@ public class NotificationsConfigurationController : ControllerBase
             var trimmedToken = TelegramBotApiSender.NormalizeToken(request.TelegramBotToken);
             if (!SecretRedactor.IsMasked(trimmedToken))
             {
-                // Validated on its own syntax, independent of the Chat ID: a token pasted before
-                // a Chat ID has ever been configured (or with the Chat ID field left blank in this
-                // same request) must still be saved rather than rejected.
                 if (!TelegramBotApiSender.ValidateTokenFormat(trimmedToken, out var errCategory))
                 {
                     Plugin.Instance?.SaveConfiguration();
@@ -335,15 +313,8 @@ public class NotificationsConfigurationController : ControllerBase
 /// <summary>
 /// Masked DTO returned to client for safe rendering.
 /// Never contains plaintext Discord webhook URLs or Telegram bot tokens.
-/// Explicit <see cref="JsonPropertyNameAttribute"/> on every property: this controller is
-/// discovered by Jellyfin's own plugin assembly scanning rather than going through a locally
-/// configured MVC pipeline, and its actual JSON output does not follow camelCase by default
-/// (unlike what the hand-written frontend JS assumes) -- confirmed live: the browser's Network
-/// tab showed "NotificationsEnabled": true on the wire while the JS read `data.notificationsEnabled`
-/// (lowercase n), which is a different, always-undefined property in JS. That silently produced
-/// `Boolean(undefined) === false` on every single load, regardless of the real saved value -- not
-/// a save bug, a read bug, invisible to any test that mocks the fetch response or inspects the C#
-/// DTO directly instead of the real serialized JSON.
+/// Uses explicit camelCase <see cref="JsonPropertyNameAttribute"/> attributes to ensure consistent
+/// wire serialization regardless of host-level MVC JSON naming policy configuration.
 /// </summary>
 public sealed class NotificationConfigurationDto
 {
@@ -358,8 +329,6 @@ public sealed class NotificationConfigurationDto
     public bool HasDiscordWebhook { get; init; }
     [JsonPropertyName("discordWebhookMasked")]
     public string DiscordWebhookMasked { get; init; } = string.Empty;
-    [JsonPropertyName("discordWebhookUrlMasked")]
-    public string DiscordWebhookUrlMasked => DiscordWebhookMasked;
 
     [JsonPropertyName("telegramEnabled")]
     public bool TelegramEnabled { get; init; }
@@ -372,37 +341,21 @@ public sealed class NotificationConfigurationDto
 
     [JsonPropertyName("notifyOnStart")]
     public bool NotifyOnStart { get; init; }
-    [JsonPropertyName("notifyOnPlaybackStart")]
-    public bool NotifyOnPlaybackStart => NotifyOnStart;
     [JsonPropertyName("notifyOnStop")]
     public bool NotifyOnStop { get; init; }
-    [JsonPropertyName("notifyOnPlaybackStop")]
-    public bool NotifyOnPlaybackStop => NotifyOnStop;
     [JsonPropertyName("notifyOnPauseResume")]
     public bool NotifyOnPauseResume { get; init; }
-    [JsonPropertyName("notifyOnPlaybackPauseResume")]
-    public bool NotifyOnPlaybackPauseResume => NotifyOnPauseResume;
     [JsonPropertyName("notifyOnProgress")]
     public bool NotifyOnProgress { get; init; }
-    [JsonPropertyName("notifyOnPlaybackProgress")]
-    public bool NotifyOnPlaybackProgress => NotifyOnProgress;
     [JsonPropertyName("progressIntervalMinutes")]
     public int ProgressIntervalMinutes { get; init; }
-    [JsonPropertyName("playbackProgressIntervalMinutes")]
-    public int PlaybackProgressIntervalMinutes => ProgressIntervalMinutes;
     [JsonPropertyName("notifyOnCompletion")]
     public bool NotifyOnCompletion { get; init; }
-    [JsonPropertyName("notifyOnPlaybackCompletion")]
-    public bool NotifyOnPlaybackCompletion => NotifyOnCompletion;
 
     [JsonPropertyName("usernameDisclosure")]
     public bool UsernameDisclosure { get; init; }
-    [JsonPropertyName("includeUserAccountName")]
-    public bool IncludeUserAccountName => UsernameDisclosure;
     [JsonPropertyName("clientDeviceDisclosure")]
     public bool ClientDeviceDisclosure { get; init; }
-    [JsonPropertyName("includeClientAndDeviceName")]
-    public bool IncludeClientAndDeviceName => ClientDeviceDisclosure;
     [JsonPropertyName("networkLocationDisclosure")]
     public bool NetworkLocationDisclosure { get; init; }
     [JsonPropertyName("includePosterImage")]
@@ -437,22 +390,14 @@ public sealed class UpdateNotificationConfigurationRequest
     public string? TelegramChatId { get; set; }
 
     public bool? NotifyOnStart { get; set; }
-    public bool? NotifyOnPlaybackStart { get; set; }
     public bool? NotifyOnStop { get; set; }
-    public bool? NotifyOnPlaybackStop { get; set; }
     public bool? NotifyOnPauseResume { get; set; }
-    public bool? NotifyOnPlaybackPauseResume { get; set; }
     public bool? NotifyOnProgress { get; set; }
-    public bool? NotifyOnPlaybackProgress { get; set; }
     public int? ProgressIntervalMinutes { get; set; }
-    public int? PlaybackProgressIntervalMinutes { get; set; }
     public bool? NotifyOnCompletion { get; set; }
-    public bool? NotifyOnPlaybackCompletion { get; set; }
 
     public bool? UsernameDisclosure { get; set; }
-    public bool? IncludeUserAccountName { get; set; }
     public bool? ClientDeviceDisclosure { get; set; }
-    public bool? IncludeClientAndDeviceName { get; set; }
     public bool? NetworkLocationDisclosure { get; set; }
     public bool? IncludePosterImage { get; set; }
     public int? UploadBandwidthLimitMbps { get; set; }

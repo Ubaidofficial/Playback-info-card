@@ -42,7 +42,7 @@ function createMockDashboard() {
     return mockModule.exports;
 }
 
-describe('Playback Info Card v0.2.7.7 Test Suite', () => {
+describe('Playback Info Card v0.2.7.8 Test Suite', () => {
     let controller;
 
     beforeEach(() => {
@@ -50,9 +50,9 @@ describe('Playback Info Card v0.2.7.7 Test Suite', () => {
     });
 
     describe('1. Diagnostics Panel States', () => {
-        it('initializes with default waiting state and version 0.2.7.7', () => {
-            assert.equal(controller.version, '0.2.7.7');
-            assert.equal(controller.diagState.pluginVersion, '0.2.7.7');
+        it('initializes with default waiting state and version 0.2.7.8', () => {
+            assert.equal(controller.version, '0.2.7.8');
+            assert.equal(controller.diagState.pluginVersion, '0.2.7.8');
             assert.equal(controller.diagState.sessionsApiStatus, 'Waiting for sessions');
             assert.equal(controller.diagState.pollingState, 'active');
             assert.equal(controller.diagState.lastErrorCategory, 'OK');
@@ -191,7 +191,7 @@ describe('Playback Info Card v0.2.7.7 Test Suite', () => {
             controller.diagState.lastSuccessTime = Date.now() - 5000;
             const report = controller.buildDiagnosticReport();
 
-            assert.equal(report.pluginVersion, '0.2.7.7');
+            assert.equal(report.pluginVersion, '0.2.7.8');
             assert.ok('jellyfinVersion' in report);
             assert.ok('webVersion' in report);
             assert.ok('route' in report);
@@ -239,7 +239,7 @@ describe('Playback Info Card v0.2.7.7 Test Suite', () => {
 
         it('passes clean redacted diagnostic reports without false positive', () => {
             const cleanReport = JSON.stringify({
-                pluginVersion: '0.2.7.7',
+                pluginVersion: '0.2.7.8',
                 jellyfinVersion: '10.9.11',
                 webVersion: 'Available',
                 route: '/playbackcard',
@@ -898,10 +898,10 @@ describe('Playback Info Card v0.2.7.7 Test Suite', () => {
             return mockModule.exports;
         }
 
-        it('initializes with version 0.2.7.7', () => {
+        it('initializes with version 0.2.7.8', () => {
             const dash = createMockDashboard();
-            assert.equal(dash.version, '0.2.7.7');
-            assert.equal(dash.state.version, '0.2.7.7');
+            assert.equal(dash.version, '0.2.7.8');
+            assert.equal(dash.state.version, '0.2.7.8');
             assert.equal(dash.state.displayMode, 'compact');
         });
 
@@ -2574,6 +2574,138 @@ describe('Playback Info Card v0.2.7.7 Test Suite', () => {
             assert.ok(!report.includes('Chrome'), 'Device name never appears in the sanitized report');
         });
     });
-});
 
+    describe('27. EasyUI Card UI Enhancements (SpotlightCard cursor tracking & design tokens)', () => {
+        it('delegated mousemove updates --mouse-x and --mouse-y on hovered .playback-card elements', () => {
+            const dash = createMockDashboard();
+            const listeners = {};
+            const container = {
+                innerHTML: '',
+                attributes: {},
+                getAttribute(k) { return this.attributes[k]; },
+                setAttribute(k, v) { this.attributes[k] = v; },
+                addEventListener(type, fn) { listeners[type] = fn; }
+            };
+            dash.attachContainerEvents(container);
+            assert.equal(typeof listeners.mousemove, 'function', 'attachContainerEvents registers a mousemove listener for SpotlightCard cursor tracking');
+
+            const props = {};
+            const mockCard = {
+                getBoundingClientRect: () => ({ left: 100, top: 50 }),
+                style: {
+                    setProperty(k, v) { props[k] = v; }
+                }
+            };
+            listeners.mousemove({
+                clientX: 245,
+                clientY: 130,
+                target: {
+                    closest(sel) {
+                        return sel.includes('.playback-card') ? mockCard : null;
+                    }
+                }
+            });
+            assert.equal(props['--mouse-x'], '145px');
+            assert.equal(props['--mouse-y'], '80px');
+        });
+
+        it('includes EasyUI design tokens and SpotlightCard CSS rules in dashboard.css and playbackcard.html', () => {
+            const cssPath = path.join(__dirname, '..', 'Web', 'dashboard.css');
+            const cssContent = fs.readFileSync(cssPath, 'utf8');
+            assert.ok(cssContent.includes('--easyui-ease-soft: cubic-bezier(0.16, 1, 0.3, 1)'), 'dashboard.css defines EasyUI spring easing curve');
+            assert.ok(cssContent.includes('--mouse-x') && cssContent.includes('--mouse-y'), 'dashboard.css defines SpotlightCard cursor coordinates');
+            assert.ok(cssContent.includes('mask-composite: exclude'), 'dashboard.css defines SpotlightCard perimeter border mask');
+            assert.ok(htmlContent.includes('--easyui-ease-soft: cubic-bezier(0.16, 1, 0.3, 1)'), 'playbackcard.html defines EasyUI spring easing curve');
+            assert.ok(htmlContent.includes('mask-composite: exclude'), 'playbackcard.html defines SpotlightCard perimeter border mask');
+        });
+    });
+
+    describe('28. Telemetry, UX Continuity & Push Notification Hardening', () => {
+        it('renders 3-bar animated equalizer on Playing badge and omits it when Paused', () => {
+            const dash = createMockDashboard();
+            const playingSession = { Id: 's-eq-1', PlayState: { IsPaused: false }, NowPlayingItem: { Name: 'Equalizer Test' } };
+            const pausedSession = { Id: 's-eq-2', IsPaused: true, NowPlayingItem: { Name: 'Paused Equalizer Test' } };
+
+            const playingHtml = dash.renderSessionCard(playingSession, 0, 'compact', false);
+            assert.ok(playingHtml.includes('class="pi-eq-bars"'), 'Playing badge includes 3-bar equalizer');
+
+            const pausedHtml = dash.renderSessionCard(pausedSession, 1, 'compact', false);
+            assert.ok(!pausedHtml.includes('class="pi-eq-bars"'), 'Paused badge omits 3-bar equalizer');
+        });
+
+        it('renders dual-track transcode buffer fill and live transcode speed/throttle indicator', () => {
+            const dash = createMockDashboard();
+            const transcodeSession = {
+                Id: 's-tc-speed',
+                PlayMethod: 'Transcode',
+                PositionTicks: 1800 * 10000000,
+                RunTimeTicks: 7200 * 10000000,
+                TranscodingInfo: {
+                    IsVideoDirect: false,
+                    IsAudioDirect: false,
+                    CompletionPercentage: 64.5,
+                    Framerate: 62.4,
+                    IsThrottled: true
+                },
+                NowPlayingItem: {
+                    Name: 'Transcode Telemetry Movie',
+                    MediaStreams: [{ Type: 'Video', RealFrameRate: 24, Codec: 'hevc' }]
+                }
+            };
+
+            const html = dash.renderSessionCard(transcodeSession, 0, 'compact', false);
+            assert.ok(html.includes('playback-progress-buffer-fill'), 'Renders dual-track transcode buffer bar');
+            assert.ok(html.includes('width: 64.5%'), 'Buffer bar reflects CompletionPercentage');
+            assert.ok(html.includes('playback-transcode-speed throttled'), 'Renders live transcode speed with throttled class');
+            assert.ok(html.includes('2.6x (62 fps) · Throttled'), 'Displays calculated speed multiplier, fps, and Throttled state');
+        });
+
+        it('renders rolling bandwidth sparkline and upload limit gauge in summary strip', () => {
+            const dash = createMockDashboard();
+            dash.state.uploadBandwidthLimitMbps = 100;
+            const session = { Id: 's-bw-spark', NowPlayingItem: { Name: 'Sparkline Movie' }, PlayMethod: 'DirectPlay', TranscodingInfo: { Bitrate: 25000000 } };
+
+            // First poll sample
+            dash.buildSummaryStripHtml([session]);
+            // Second poll sample triggers sparkline rendering
+            const html = dash.buildSummaryStripHtml([session]);
+            assert.ok(html.includes('playback-bandwidth-sparkline'), 'Renders SVG bandwidth sparkline once >=2 samples exist');
+            assert.ok(html.includes('playback-bandwidth-gauge'), 'Renders upload bandwidth limit gauge');
+            assert.ok(html.includes('width: 25%;'), 'Gauge fill reflects 25 Mbps of 100 Mbps limit');
+        });
+
+        it('filters active session cards when state.methodFilter is set via header filter chips', () => {
+            const dash = createMockDashboard();
+            const container = { innerHTML: '' };
+            const sDirect = { Id: 's-f-dp', PlayMethod: 'DirectPlay', NowPlayingItem: { Name: 'Direct Play Film' } };
+            const sTrans = { Id: 's-f-tc', PlayMethod: 'Transcode', TranscodingInfo: { IsVideoDirect: false }, NowPlayingItem: { Name: 'Transcoded Film' } };
+
+            dash.state.methodFilter = 'transcode';
+            dash.renderDashboardContainer(container, [sDirect, sTrans], [sDirect, sTrans]);
+            assert.ok(container.innerHTML.includes('Transcoded Film'), 'Matching Transcode card is shown');
+            assert.ok(!container.innerHTML.includes('data-session-id="s-f-dp"'), 'Non-matching DirectPlay card is filtered out from Now Playing grid');
+            assert.ok(container.innerHTML.includes('playback-count-chip count-tc active-filter'), 'Active filter chip is highlighted');
+
+            dash.state.methodFilter = null;
+        });
+
+        it('preserves SpotlightCard --mouse-x and --mouse-y coordinates across poll re-renders', () => {
+            const dash = createMockDashboard();
+            dash.state.cardPointerCoords['dash-card-1'] = { x: '188px', y: '74px' };
+            const session = { Id: 's-spot', NowPlayingItem: { Name: 'Spotlight Movie' } };
+            const html = dash.renderSessionCard(session, 0, 'compact', false);
+            assert.ok(html.includes('--mouse-x: 188px; --mouse-y: 74px;'), 'Card re-renders with preserved SpotlightCard cursor coordinates');
+        });
+
+        it('hardens DiscordWebhookSender URL validation for PTB/Canary domains and JSON error parsing, and auto-saves unsaved credentials before Test', () => {
+            const discordSenderPath = path.join(__dirname, '..', 'Notifications', 'DiscordWebhookSender.cs');
+            const discordSenderCode = fs.readFileSync(discordSenderPath, 'utf8');
+            assert.ok(discordSenderCode.includes('ptb.discord.com') && discordSenderCode.includes('canary.discord.com'), 'DiscordWebhookSender accepts official PTB and Canary Discord domains');
+            assert.ok(discordSenderCode.includes('ReadClientErrorBody = true'), 'DiscordWebhookSender reads 4xx error bodies for detailed diagnostics');
+            assert.ok(discordSenderCode.includes('ParseDiscordErrorDescription'), 'DiscordWebhookSender extracts and redacts Discord JSON error descriptions');
+
+            assert.ok(htmlContent.includes('preSavePayload'), 'playbackcard.html auto-saves unsaved Discord/Telegram inputs before dispatching Test notification');
+        });
+    });
+});
 

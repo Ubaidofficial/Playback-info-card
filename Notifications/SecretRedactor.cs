@@ -24,7 +24,7 @@ public static class SecretRedactor
         RegexOptions.Compiled);
 
     private static readonly Regex DiscordWebhookRegex = new(
-        @"(https://(?:discord\.com|discordapp\.com)/api/webhooks/\d+/)[a-zA-Z0-9_\-]+",
+        @"(https://(?:(?:ptb\.|canary\.)?discord(?:app)?\.com)/api/webhooks/\d+/)[a-zA-Z0-9_\-]+",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex QuerySecretRegex = new(
@@ -139,7 +139,11 @@ public static class SecretRedactor
 
         if (Uri.TryCreate(webhookUrl, UriKind.Absolute, out var uri) &&
             (uri.Host.Equals("discord.com", StringComparison.OrdinalIgnoreCase) ||
-             uri.Host.Equals("discordapp.com", StringComparison.OrdinalIgnoreCase)))
+             uri.Host.Equals("discordapp.com", StringComparison.OrdinalIgnoreCase) ||
+             uri.Host.Equals("ptb.discord.com", StringComparison.OrdinalIgnoreCase) ||
+             uri.Host.Equals("canary.discord.com", StringComparison.OrdinalIgnoreCase) ||
+             uri.Host.Equals("ptb.discordapp.com", StringComparison.OrdinalIgnoreCase) ||
+             uri.Host.Equals("canary.discordapp.com", StringComparison.OrdinalIgnoreCase)))
         {
             return $"https://{uri.Host}/api/webhooks/••••••••";
         }

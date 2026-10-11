@@ -175,15 +175,9 @@ public class PlaybackSelfSessionsController : ControllerBase
 }
 
 /// <summary>
-/// Sanitized playback session DTO returned to normal authenticated users.
-/// Strictly excludes RemoteEndPoint, client IP, server IP, file paths, tokens, session IDs, and other users' data.
-/// Deliberately PascalCase, NOT camelCase (unlike NotificationConfigurationDto/etc.) -- both
-/// dashboard.js and playbackcard.html's session-rendering code is shared between this endpoint
-/// and Jellyfin's own native /Sessions API, and reads fields like session.MediaTitle,
-/// session.PlayMethod, session.IsVideoDirect in PascalCase throughout to match Jellyfin's own
-/// convention. Adding JsonPropertyName camelCase overrides here would break that shared renderer,
-/// not fix anything -- this is the one response DTO where this controller's actual (PascalCase)
-/// default output is what every consumer was actually written against.
+/// Sanitized playback session DTO returned to authenticated users for the self-session view.
+/// Excludes RemoteEndPoint, client IP, server IP, file paths, tokens, session IDs, and other users' data.
+/// Uses PascalCase property names to match Jellyfin's native /Sessions API contract consumed by the shared UI renderer.
 /// </summary>
 public sealed class UserPlaybackSessionDto
 {
