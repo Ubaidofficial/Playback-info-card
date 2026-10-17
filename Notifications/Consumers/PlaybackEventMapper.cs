@@ -185,7 +185,7 @@ public static class PlaybackEventMapper
                 audioChannels = FormatAudioChannels(tInfo.AudioChannels.Value);
             }
 
-            var hwType = tInfo.HardwareAccelerationType.ToString();
+            var hwType = GetHardwareAccelerationType(tInfo);
             if (!string.IsNullOrWhiteSpace(hwType) && !hwType.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
                 transcodeEngine = hwType;
@@ -384,5 +384,29 @@ public static class PlaybackEventMapper
         }
 
         return string.Join(", ", mapped);
+    }
+
+    /// <summary>
+    /// Safely resolves the hardware acceleration engine type name without compile-time binding
+    /// to <c>MediaBrowser.Model.Session.HardwareEncodingType</c>, preventing <see cref="TypeLoadException"/>
+    /// on Jellyfin versions where that enum was refactored, renamed, or removed.
+    /// </summary>
+    internal static string? GetHardwareAccelerationType(TranscodingInfo? tInfo)
+    {
+        if (tInfo == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var prop = tInfo.GetType().GetProperty("HardwareAccelerationType");
+            var val = prop?.GetValue(tInfo);
+            return val?.ToString();
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

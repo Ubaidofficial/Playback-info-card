@@ -121,7 +121,7 @@ public class PlaybackSelfSessionsController : ControllerBase
                 resolution = $"{tInfo.Width.Value}x{tInfo.Height.Value}";
             }
 
-            var hw = tInfo.HardwareAccelerationType.ToString();
+            var hw = PlaybackEventMapper.GetHardwareAccelerationType(tInfo);
             if (!string.IsNullOrWhiteSpace(hw) && !hw.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
                 transcodeEngine = hw;

@@ -124,12 +124,26 @@ public sealed class NotificationSecretStore : INotificationSecretStore
 
         _keyPath = Path.ChangeExtension(_filePath, ".key");
 
-        Load();
-
-        // Perform one-time migration for legacy installations if configuration directory exists
-        if (!string.IsNullOrEmpty(configDir))
+        try
         {
-            MigrateLegacyConfiguration(configDir, this);
+            Load();
+        }
+        catch (Exception ex)
+        {
+            RaiseWarning("Failed to load secret store during initialization: " + ex.Message);
+        }
+
+        try
+        {
+            // Perform one-time migration for legacy installations if configuration directory exists
+            if (!string.IsNullOrEmpty(configDir))
+            {
+                MigrateLegacyConfiguration(configDir, this);
+            }
+        }
+        catch (Exception ex)
+        {
+            RaiseWarning("Failed to migrate legacy configuration during initialization: " + ex.Message);
         }
     }
 

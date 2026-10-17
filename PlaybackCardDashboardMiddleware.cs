@@ -4,7 +4,9 @@ using System.IO.Compression;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.PlaybackCard;
 
@@ -20,18 +22,18 @@ public class PlaybackCardDashboardMiddleware
     private readonly ILogger<PlaybackCardDashboardMiddleware> _logger;
 
     private const string DashboardScriptTag =
-        "<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css?v=0.2.7.8\" data-asset-revision=\"0.2.7.8\">\n" +
-        "<script plugin=\"PlaybackCard\" version=\"0.2.7.8\" data-asset-revision=\"0.2.7.8\" src=\"/PlaybackCard/dashboard.js?v=0.2.7.8\" defer></script>\n";
+        "<link plugin=\"PlaybackCard\" rel=\"stylesheet\" href=\"/PlaybackCard/dashboard.css?v=0.2.7.9\" data-asset-revision=\"0.2.7.9\">\n" +
+        "<script plugin=\"PlaybackCard\" version=\"0.2.7.9\" data-asset-revision=\"0.2.7.9\" src=\"/PlaybackCard/dashboard.js?v=0.2.7.9\" defer></script>\n";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PlaybackCardDashboardMiddleware"/> class.
     /// </summary>
     /// <param name="next">The next middleware in the pipeline.</param>
-    /// <param name="logger">Logger instance.</param>
-    public PlaybackCardDashboardMiddleware(RequestDelegate next, ILogger<PlaybackCardDashboardMiddleware> logger)
+    /// <param name="logger">Optional logger instance.</param>
+    public PlaybackCardDashboardMiddleware(RequestDelegate next, ILogger<PlaybackCardDashboardMiddleware>? logger = null)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _logger = logger ?? NullLogger<PlaybackCardDashboardMiddleware>.Instance;
     }
 
     /// <summary>
@@ -81,9 +83,11 @@ public class PlaybackCardDashboardMiddleware
         context.Request.Headers.Remove("If-Modified-Since");
         context.Request.Headers.Remove("If-Range");
 
+        var originalBodyFeature = context.Features.Get<IHttpResponseBodyFeature>();
         var originalBodyStream = context.Response.Body;
         using var memoryStream = new MemoryStream();
-        context.Response.Body = memoryStream;
+        var responseBodyFeature = new StreamResponseBodyFeature(memoryStream);
+        context.Features.Set<IHttpResponseBodyFeature>(responseBodyFeature);
 
         try
         {
@@ -96,9 +100,20 @@ public class PlaybackCardDashboardMiddleware
         }
         finally
         {
-            // Always restore the real response stream, including when _next(context) throws,
+            // Always restore the real response feature and stream, including when _next(context) throws,
             // so any outer exception handler writes to the actual client stream, not our buffer.
+            if (originalBodyFeature != null)
+            {
+                context.Features.Set<IHttpResponseBodyFeature>(originalBodyFeature);
+            }
             context.Response.Body = originalBodyStream;
+        }
+
+        // If downstream already started or committed the response (e.g. redirected or flushed),
+        // we cannot inspect or rewrite headers/body.
+        if (context.Response.HasStarted)
+        {
+            return;
         }
 
         // From here on, _next(context) has completed successfully and the response is fully
@@ -107,6 +122,11 @@ public class PlaybackCardDashboardMiddleware
         // gracefully falls back to serving the original, unmodified response.
         try
         {
+            if (context.Response.HasStarted)
+            {
+                return;
+            }
+
             memoryStream.Seek(0, SeekOrigin.Begin);
 
             var contentType = context.Response.ContentType ?? string.Empty;
@@ -114,7 +134,7 @@ public class PlaybackCardDashboardMiddleware
                                 (contentType.Contains("text/html", StringComparison.OrdinalIgnoreCase) ||
                                  string.IsNullOrEmpty(contentType));
 
-            if (isSuccessHtml && memoryStream.Length > 0)
+            if (isSuccessHtml && memoryStream.Length > 0 && !context.Response.HasStarted)
             {
                 var contentEncoding = context.Response.Headers.ContentEncoding.ToString();
                 var isGzipped = contentEncoding.Contains("gzip", StringComparison.OrdinalIgnoreCase);
@@ -139,7 +159,8 @@ public class PlaybackCardDashboardMiddleware
                     html = await reader.ReadToEndAsync().ConfigureAwait(false);
                 }
 
-                if (html.Contains("</body>", StringComparison.OrdinalIgnoreCase) &&
+                if (!context.Response.HasStarted &&
+                    html.Contains("</body>", StringComparison.OrdinalIgnoreCase) &&
                     !html.Contains("dashboard.js", StringComparison.OrdinalIgnoreCase))
                 {
                     var modifiedHtml = html.Replace("</body>", DashboardScriptTag + "</body>", StringComparison.OrdinalIgnoreCase);
@@ -189,16 +210,26 @@ public class PlaybackCardDashboardMiddleware
             }
 
             // If not transformed, copy original stream verbatim
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            await memoryStream.CopyToAsync(originalBodyStream).ConfigureAwait(false);
+            if (!context.Response.HasStarted && memoryStream.CanSeek && originalBodyStream != null)
+            {
+                memoryStream.Seek(0, SeekOrigin.Begin);
+                await memoryStream.CopyToAsync(originalBodyStream).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PlaybackCardDashboardMiddleware encountered an error during response inspection. Falling back to unmodified response.");
-            if (memoryStream.CanSeek)
+            if (!context.Response.HasStarted && memoryStream.CanSeek && originalBodyStream != null)
             {
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                await memoryStream.CopyToAsync(originalBodyStream).ConfigureAwait(false);
+                try
+                {
+                    memoryStream.Seek(0, SeekOrigin.Begin);
+                    await memoryStream.CopyToAsync(originalBodyStream).ConfigureAwait(false);
+                }
+                catch (Exception copyEx)
+                {
+                    _logger.LogWarning(copyEx, "PlaybackCardDashboardMiddleware failed to write fallback response.");
+                }
             }
         }
     }

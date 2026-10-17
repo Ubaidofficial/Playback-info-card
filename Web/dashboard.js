@@ -1,5 +1,5 @@
 /**
- * Playback Info Card - Primary Dashboard Integration (v0.2.7.8)
+ * Playback Info Card - Primary Dashboard Integration (v0.2.7.9)
  * Completely replaces Jellyfin's standard stock Devices section on the default
  * Dashboard with the NOW PLAYING telemetry grid and active connected device telemetry.
  */
@@ -7,8 +7,8 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '0.2.7.8';
-    var ASSET_REVISION = '0.2.7.8';
+    var VERSION = '0.2.7.9';
+    var ASSET_REVISION = '0.2.7.9';
     var CONTAINER_ID = 'playback-card-nowplaying-container';
     var POLL_INTERVAL_MS = 3000;
 
@@ -1180,10 +1180,8 @@
                     var p = h.parentElement;
                     if (p && p !== document.body && p !== root && (!p.id || p.id.indexOf('Page') === -1)) {
                         p.style.display = 'none';
-                        if (p.parentNode) p.parentNode.removeChild(p);
                     } else {
                         h.style.display = 'none';
-                        if (h.parentNode) h.parentNode.removeChild(h);
                     }
                 }
             }
@@ -3107,10 +3105,10 @@
         if (typeof window.addEventListener === 'function') {
             window.addEventListener('popstate', handleRouteOrDomChange);
             window.addEventListener('hashchange', handleRouteOrDomChange);
+            window.addEventListener('pageshow', handleRouteOrDomChange);
         }
         if (typeof document.addEventListener === 'function') {
             document.addEventListener('viewshow', handleRouteOrDomChange);
-            document.addEventListener('pageshow', handleRouteOrDomChange);
             document.addEventListener('viewhide', handleRouteOrDomChange);
         }
 

@@ -7,6 +7,7 @@ using Jellyfin.Plugin.PlaybackCard.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -50,17 +51,16 @@ public class NotificationsConfigurationController : ControllerBase
     // Serializes concurrent read-modify-write updates against the shared PluginConfiguration instance.
     private static readonly object ConfigLock = new();
 
-    public NotificationsConfigurationController(
-        INotificationDeliveryService deliveryService,
-        INotificationSecretStore secretStore)
-        : this(deliveryService, secretStore, null, null)
-    {
-    }
-
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NotificationsConfigurationController"/> class.
+    /// Uses <see cref="ActivatorUtilitiesConstructorAttribute"/> to ensure deterministic, single-constructor resolution
+    /// across all DI containers and .NET runtime versions.
+    /// </summary>
+    [ActivatorUtilitiesConstructor]
     public NotificationsConfigurationController(
         INotificationDeliveryService deliveryService,
         INotificationSecretStore secretStore,
-        ILogger<NotificationsConfigurationController> logger)
+        ILogger<NotificationsConfigurationController>? logger = null)
         : this(deliveryService, secretStore, null, logger)
     {
     }

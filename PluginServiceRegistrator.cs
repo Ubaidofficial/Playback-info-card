@@ -18,32 +18,39 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        // Register dedicated server-local secret store
-        serviceCollection.AddSingleton<INotificationSecretStore, NotificationSecretStore>();
+        try
+        {
+            // Register dedicated server-local secret store
+            serviceCollection.AddSingleton<INotificationSecretStore, NotificationSecretStore>();
 
-        // Register HTTP notification senders
-        serviceCollection.AddSingleton<IDiscordWebhookSender, DiscordWebhookSender>();
-        serviceCollection.AddSingleton<ITelegramBotApiSender, TelegramBotApiSender>();
+            // Register HTTP notification senders
+            serviceCollection.AddSingleton<IDiscordWebhookSender, DiscordWebhookSender>();
+            serviceCollection.AddSingleton<ITelegramBotApiSender, TelegramBotApiSender>();
 
-        // Strictly opt-in (off by default): resolves a session's remote IP into a safe
-        // Local Network/Remote(+city/country) label without ever exposing the raw address.
-        serviceCollection.AddSingleton<INetworkLocationService, NetworkLocationService>();
+            // Strictly opt-in (off by default): resolves a session's remote IP into a safe
+            // Local Network/Remote(+city/country) label without ever exposing the raw address.
+            serviceCollection.AddSingleton<INetworkLocationService, NetworkLocationService>();
 
-        // Bounded in-memory "recently finished" history, independent of the notification
-        // pipeline/settings -- purely a UI convenience, cleared on restart.
-        serviceCollection.AddSingleton<IRecentSessionsHistoryService, RecentSessionsHistoryService>();
+            // Bounded in-memory "recently finished" history, independent of the notification
+            // pipeline/settings -- purely a UI convenience, cleared on restart.
+            serviceCollection.AddSingleton<IRecentSessionsHistoryService, RecentSessionsHistoryService>();
 
-        // Register background delivery worker (shared singleton for delivery interface and hosted service)
-        serviceCollection.AddSingleton<NotificationDeliveryService>();
-        serviceCollection.AddSingleton<INotificationDeliveryService>(sp => sp.GetRequiredService<NotificationDeliveryService>());
-        serviceCollection.AddSingleton<IHostedService>(sp => sp.GetRequiredService<NotificationDeliveryService>());
+            // Register background delivery worker (shared singleton for delivery interface and hosted service)
+            serviceCollection.AddSingleton<NotificationDeliveryService>();
+            serviceCollection.AddSingleton<INotificationDeliveryService>(sp => sp.GetRequiredService<NotificationDeliveryService>());
+            serviceCollection.AddSingleton<IHostedService>(sp => sp.GetRequiredService<NotificationDeliveryService>());
 
-        // Register Jellyfin server-side event consumers as Scoped (required by Jellyfin EventManager)
-        serviceCollection.AddScoped<IEventConsumer<PlaybackStartEventArgs>, PlaybackStartConsumer>();
-        serviceCollection.AddScoped<IEventConsumer<PlaybackStopEventArgs>, PlaybackStopConsumer>();
-        serviceCollection.AddScoped<IEventConsumer<PlaybackProgressEventArgs>, PlaybackProgressConsumer>();
+            // Register Jellyfin server-side event consumers as Scoped (required by Jellyfin EventManager)
+            serviceCollection.AddScoped<IEventConsumer<PlaybackStartEventArgs>, PlaybackStartConsumer>();
+            serviceCollection.AddScoped<IEventConsumer<PlaybackStopEventArgs>, PlaybackStopConsumer>();
+            serviceCollection.AddScoped<IEventConsumer<PlaybackProgressEventArgs>, PlaybackProgressConsumer>();
 
-        // Register dashboard script injection startup filter
-        serviceCollection.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter, PlaybackCardStartupFilter>();
+            // Register dashboard script injection startup filter
+            serviceCollection.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter, PlaybackCardStartupFilter>();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.TraceError("[PlayInfo] Failed to register plugin services during startup: " + ex.Message);
+        }
     }
 }
