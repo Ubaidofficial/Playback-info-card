@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/Ubaidofficial/Playback-info-card/main/banner.png",
     "versions": [
       {
+        "version": "0.2.7.9",
+        "changelog": "Release v0.2.7.9 - Resolved Jellyfin server startup and dashboard crashes across 10.9, 10.10, and 12.0: safely extracted hardware acceleration engine via reflection to prevent TypeLoadException on Jellyfin 10.10+ where HardwareEncodingType was refactored; consolidated NotificationsConfigurationController constructor with [ActivatorUtilitiesConstructor] to guarantee deterministic DI resolution; protected dashboard injection middleware using StreamResponseBodyFeature and defensive Response.HasStarted guards against unhandled response mutation exceptions; guarded NotificationSecretStore and PluginServiceRegistrator startup with defensive try/catch logging; fixed client-side React DOM reconciliation crash (DOMException: Node.insertBefore) on dashboard updates by setting display:none instead of removeChild on heading elements; and moved pageshow listener from document to window to resolve Firefox PageTransitionEvent TypeError.",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/Ubaidofficial/Playback-info-card/releases/download/v0.2.7.9/jellyfin-plugin-playbackcard.zip",
+        "checksum": "05cff00150db208dac1fb0514e77fa81",
+        "timestamp": "2026-10-17T15:07:59Z"
+      },
+      {
         "version": "0.2.7.8",
         "changelog": "Release v0.2.7.8 - Redesigned playback cards with EasyUI Dark Precision styling, interactive cursor-tracking SpotlightCard glow, animated Playing equalizer bars, dual-track transcode buffer bar, and live transcode speed/throttle badges. Added a rolling 20-sample bandwidth sparkline and clickable stream-method filter chips to the summary strip. Simplified the density toggle to Compact (expandable on click) and Extended (always expanded inline). Hardened Discord webhook validation (supporting PTB/Canary domains and structured API error messages), auto-saved unsaved Discord/Telegram inputs when clicking Test, added Tailscale/WireGuard CGNAT (100.64.0.0/10) local IP classification and bounded geo-cache pruning, and consolidated backend admin authorization and DTOs.",
         "targetAbi": "10.9.0.0",
